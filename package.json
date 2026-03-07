@@ -41,11 +41,23 @@
     "docker:build": "docker compose build",
     "health:gateway": "curl -s http://localhost:3000/health | jq",
     "health:auth": "curl -s http://localhost:3000/api/auth/health | jq",
-    "health:property": "curl -s http://localhost:3000/api/property/health | jq"
+    "health:property": "curl -s http://localhost:3000/api/property/health | jq",
+    "prepare": "husky",
+    "lint-staged": "lint-staged",
+    "commitlint": "commitlint"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc,md,css,scss,yml,yaml}": [
+      "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
+    ]
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@commitlint/cli": "^20.4.3",
+    "@commitlint/config-conventional": "^20.4.3",
     "@types/node": "^20.19.37",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2",
     "tsup": "^8.5.1",
     "turbo": "^2.3.3",
     "typescript": "^5.7.3",
