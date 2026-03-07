@@ -43,9 +43,16 @@ async function handler(req: IncomingMessage, res: ServerResponse) {
   }
 
   // ── 2. Everything else → Hono ─────────────────────────────────────────────
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value !== undefined) {
+      headers[key] = Array.isArray(value) ? value.join(", ") : value;
+    }
+  }
+
   const request = new Request(new URL(url, `http://localhost:${env.PORT}`), {
     method: req.method ?? "GET",
-    headers: req.headers as Record<string, string | string[]>,
+    headers,
     // Don't set body for GET/HEAD — ReadableStream from IncomingMessage
     body:
       req.method === "GET" || req.method === "HEAD"

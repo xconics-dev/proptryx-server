@@ -199,6 +199,7 @@ cat > "$SERVICE_DIR/Dockerfile" <<EOF
 FROM node:20-alpine AS base
 WORKDIR /app
 ENV PNPM_HOME="/pnpm"
+ENV PNPM_STORE_DIR="/pnpm/store"
 ENV PATH="\$PNPM_HOME:\$PATH"
 RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
@@ -207,7 +208,8 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/logger/package.json ./packages/logger/package.json
 COPY packages/typescript-config/package.json ./packages/typescript-config/package.json
 COPY services/${SERVICE_NAME}/package.json ./services/${SERVICE_NAME}/package.json
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \\
+  pnpm install --frozen-lockfile --prefer-offline
 
 FROM base AS builder
 COPY --from=build-deps /app/node_modules /app/node_modules
@@ -217,23 +219,21 @@ COPY packages/logger /app/packages/logger
 COPY packages/typescript-config /app/packages/typescript-config
 COPY services/${SERVICE_NAME} /app/services/${SERVICE_NAME}
 WORKDIR /app
-RUN cd /app/packages/logger \\
- && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \\
- && cd /app \\
- && SKIP_ENV_VALIDATION=true pnpm --filter @proptryx/${SERVICE_NAME} run build \\
- && pnpm --filter @proptryx/${SERVICE_NAME} deploy --prod --legacy /prod/${SERVICE_NAME}
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \\
+  cd /app/packages/logger \\
+  && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \\
+  && cd /app \\
+  && SKIP_ENV_VALIDATION=true pnpm --filter @proptryx/${SERVICE_NAME} run build \\
+  && pnpm --filter @proptryx/${SERVICE_NAME} deploy --prod --legacy /prod/${SERVICE_NAME}
 
-FROM node:20-alpine AS runner
+FROM gcr.io/distroless/nodejs20-debian12:nonroot AS runner
 WORKDIR /app/services/${SERVICE_NAME}
 ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs \\
- && adduser --system --uid 1001 appuser
-COPY --from=builder --chown=appuser:nodejs /prod/${SERVICE_NAME}/dist ./dist
-COPY --from=builder --chown=appuser:nodejs /prod/${SERVICE_NAME}/node_modules ./node_modules
-COPY --from=builder --chown=appuser:nodejs /prod/${SERVICE_NAME}/package.json ./package.json
-USER appuser
+COPY --from=builder --chown=65532:65532 /prod/${SERVICE_NAME}/dist ./dist
+COPY --from=builder --chown=65532:65532 /prod/${SERVICE_NAME}/node_modules ./node_modules
+COPY --from=builder --chown=65532:65532 /prod/${SERVICE_NAME}/package.json ./package.json
 EXPOSE ${PORT}
-CMD ["node", "dist/index.js"]
+CMD ["dist/index.js"]
 EOF
 
 node -e "
@@ -263,7 +263,8 @@ if ! grep -qE "^  ${SERVICE_NAME}:" docker-compose.yml; then
               "      <<: *service-env\n" \
               "      PORT: \"" p "\"\n" \
               "    healthcheck:\n" \
-              "      test: [\"CMD\", \"wget\", \"-qO-\", \"http://localhost:" p "/health\"]\n" \
+              "      test:\n" \
+              "        [\"CMD\", \"node\", \"-e\", \"fetch('\''http://127.0.0.1:" p "/health'\'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"]\n" \
               "      interval: 10s\n" \
               "      timeout: 5s\n" \
               "      retries: 5\n" \
