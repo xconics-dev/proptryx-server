@@ -31,10 +31,16 @@ jobs:
             const marker = '<!-- cloudflare-ai-pr-review -->';
             const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
             const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-            const model = (process.env.CLOUDFLARE_AI_MODEL || '@cf/meta/llama-3.1-8b-instruct-fast').trim();
+            const modelRaw = process.env.CLOUDFLARE_AI_MODEL || '@cf/meta/llama-3.1-8b-instruct';
+            const model = modelRaw.trim().replace(/^['"]|['"]$/g, '');
 
             if (!accountId || !apiToken) {
               core.warning('CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN is not configured. Skipping Cloudflare AI PR review.');
+              return;
+            }
+
+            if (!model.startsWith('@cf/')) {
+              core.setFailed(`Invalid CLOUDFLARE_AI_MODEL: "${model}". Expected a Cloudflare model id like @cf/meta/llama-3.1-8b-instruct`);
               return;
             }
 
