@@ -4,9 +4,9 @@ x-service-defaults: &service-defaults
     - app-network
 
 x-service-env: &service-env
-  NODE_ENV: production
-  LOG_LEVEL: info
-  LOG_FORMAT: json
+  NODE_ENV: ${NODE_ENV:-production}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_FORMAT: ${LOG_FORMAT:-json}
 
 services:
   gateway:
@@ -16,12 +16,12 @@ services:
       dockerfile: services/gateway/Dockerfile
     container_name: gateway
     ports:
-      - "8080:8080"
+      - "${GATEWAY_HOST_PORT:-8080}:${GATEWAY_PORT:-8080}"
     environment:
       <<: *service-env
-      PORT: "8080"
-      AUTH_SERVICE_URL: http://auth:6001
-      PROPERTY_SERVICE_URL: http://property:6002
+      PORT: "${GATEWAY_PORT:-8080}"
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth:${AUTH_PORT:-6001}}
+      PROPERTY_SERVICE_URL: ${PROPERTY_SERVICE_URL:-http://property:${PROPERTY_PORT:-6002}}
     depends_on:
       auth:
         condition: service_healthy
@@ -47,10 +47,10 @@ services:
       dockerfile: services/auth/Dockerfile
     container_name: auth
     ports:
-      - "6001:6001"
+      - "${AUTH_HOST_PORT:-6001}:${AUTH_PORT:-6001}"
     environment:
       <<: *service-env
-      PORT: "6001"
+      PORT: "${AUTH_PORT:-6001}"
     healthcheck:
       test:
         [
@@ -71,10 +71,10 @@ services:
       dockerfile: services/property/Dockerfile
     container_name: property
     ports:
-      - "6002:6002"
+      - "${PROPERTY_HOST_PORT:-6002}:${PROPERTY_PORT:-6002}"
     environment:
       <<: *service-env
-      PORT: "6002"
+      PORT: "${PROPERTY_PORT:-6002}"
     healthcheck:
       test:
         [
