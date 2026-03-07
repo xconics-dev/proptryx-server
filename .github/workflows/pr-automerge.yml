@@ -1,0 +1,96 @@
+name: pr-automerge
+
+on:
+  pull_request_target:
+    types: [labeled, unlabeled, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable-automerge:
+    name: enable-automerge
+    if: |
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.base.ref == 'main' &&
+      contains(github.event.pull_request.labels.*.name, 'automerge') &&
+      github.event.action != 'unlabeled'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pullNumber = context.payload.pull_request.number;
+
+            const pr = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: pullNumber,
+            });
+
+            const pullRequestId = pr.data.node_id;
+
+            try {
+              await github.graphql(
+                `
+                  mutation EnableAutoMerge($pullRequestId: ID!) {
+                    enablePullRequestAutoMerge(
+                      input: { pullRequestId: $pullRequestId, mergeMethod: SQUASH }
+                    ) {
+                      clientMutationId
+                    }
+                  }
+                `,
+                { pullRequestId },
+              );
+
+              core.info(`Auto-merge enabled for PR #${pullNumber}.`);
+            } catch (error) {
+              const message = error?.message || String(error);
+              if (message.includes('Pull request is in clean status')) {
+                core.info(`Auto-merge is already enabled for PR #${pullNumber}.`);
+                return;
+              }
+              core.setFailed(
+                `Failed to enable auto-merge for PR #${pullNumber}: ${message}. ` +
+                  'Ensure repository auto-merge is enabled in GitHub settings.',
+              );
+            }
+
+  disable-automerge:
+    name: disable-automerge
+    if: github.event.action == 'unlabeled' && github.event.label.name == 'automerge'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disable auto-merge
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pullNumber = context.payload.pull_request.number;
+
+            try {
+              await github.graphql(
+                `
+                  mutation DisableAutoMerge($pullRequestId: ID!) {
+                    disablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) {
+                      clientMutationId
+                    }
+                  }
+                `,
+                { pullRequestId: context.payload.pull_request.node_id },
+              );
+              core.info(`Auto-merge disabled for PR #${pullNumber}.`);
+            } catch (error) {
+              const message = error?.message || String(error);
+              if (message.includes('Pull request is not in auto-merge')) {
+                core.info(`Auto-merge was not enabled for PR #${pullNumber}.`);
+                return;
+              }
+              core.setFailed(`Failed to disable auto-merge for PR #${pullNumber}: ${message}`);
+            }
