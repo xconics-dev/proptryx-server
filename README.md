@@ -97,6 +97,7 @@ docker compose up --build
 - [docs/NEW_SERVICE_CONFIG.md](docs/NEW_SERVICE_CONFIG.md)
 - [docs/SCRIPTS.md](docs/SCRIPTS.md)
 - [docs/GITHUB_AUTOMATION.md](docs/GITHUB_AUTOMATION.md)
+- [docs/JENKINS_DEPLOYMENT.md](docs/JENKINS_DEPLOYMENT.md)
 
 ## Docker Optimization & Compatibility
 
@@ -187,9 +188,5 @@ Gateway additionally defines upstream service URLs.
 
 - service health endpoint: `GET /health`
 - gateway health endpoint: `GET /health`
-<<<<<<< Updated upstream
-- compose healthchecks use local service health routes
-=======
 - compose healthchecks use local service health routes
 - default container user is non-root (`appuser`)
->>>>>>> Stashed changes
