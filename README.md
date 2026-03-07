@@ -188,6 +188,3 @@ Gateway additionally defines upstream service URLs.
 - service health endpoint: `GET /health`
 - gateway health endpoint: `GET /health`
 - compose healthchecks use local service health routes
-- default container user is non-root (`appuser`)
-
-test
