@@ -37,5 +37,5 @@ ENV NODE_ENV=production
 COPY --from=builder --chown=65532:65532 /prod/property/dist ./dist
 COPY --from=builder --chown=65532:65532 /prod/property/node_modules ./node_modules
 COPY --from=builder --chown=65532:65532 /prod/property/package.json ./package.json
-EXPOSE 3002
+EXPOSE 6002
 CMD ["dist/index.js"]
