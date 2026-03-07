@@ -1,11 +1,11 @@
-import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { createServer } from "node:http";
+import { createHonoRequestLogger } from "@proptryx/logger";
+import { Hono } from "hono";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { proxyRequest, proxyRoutes } from "@/proxy";
 import healthRoute from "@/routes/health";
-import { createHonoRequestLogger } from "@proptryx/logger";
-import { Hono } from "hono";
 
 // ── Hono app (non-proxy routes only) ─────────────────────────────────────────
 const app = new Hono();
@@ -43,9 +43,16 @@ async function handler(req: IncomingMessage, res: ServerResponse) {
   }
 
   // ── 2. Everything else → Hono ─────────────────────────────────────────────
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value !== undefined) {
+      headers[key] = Array.isArray(value) ? value.join(", ") : value;
+    }
+  }
+
   const request = new Request(new URL(url, `http://localhost:${env.PORT}`), {
     method: req.method ?? "GET",
-    headers: req.headers as Record<string, string | string[]>,
+    headers,
     // Don't set body for GET/HEAD — ReadableStream from IncomingMessage
     body:
       req.method === "GET" || req.method === "HEAD"
@@ -70,9 +77,7 @@ const server = createServer((req, res) => {
     logger.error("gateway request handler failed", { error: err });
     if (!res.headersSent) {
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({ success: false, error: "Internal Server Error" })
-      );
+      res.end(JSON.stringify({ success: false, error: "Internal Server Error" }));
     }
   });
 });

@@ -1,6 +1,6 @@
-import { logger } from "@/lib/logger";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 /**
  * Typesafe env for the gateway service.
@@ -11,30 +11,17 @@ import { z } from "zod";
  */
 export const env = createEnv({
   server: {
-    NODE_ENV: z
-      .enum(["development", "test", "production"])
-      .default("development"),
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
-    PORT: z.coerce
-      .number({ invalid_type_error: "PORT must be a number" })
-      .int()
-      .min(1)
-      .max(65535)
-      .default(3000),
-    LOG_LEVEL: z
-      .enum(["debug", "info", "warn", "error", "fatal"])
-      .default("info"),
+    PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+    LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "fatal"]).default("info"),
     LOG_FORMAT: z.enum(["pretty", "json"]).default("pretty"),
 
-    AUTH_SERVICE_URL: z
-      .string()
-      .url("AUTH_SERVICE_URL must be a valid URL — e.g. http://auth:3001"),
+    AUTH_SERVICE_URL: z.url("AUTH_SERVICE_URL must be a valid URL — e.g. http://auth:3001"),
 
-    PROPERTY_SERVICE_URL: z
-      .string()
-      .url(
-        "PROPERTY_SERVICE_URL must be a valid URL — e.g. http://property:3002"
-      ),
+    PROPERTY_SERVICE_URL: z.url(
+      "PROPERTY_SERVICE_URL must be a valid URL — e.g. http://property:3002"
+    ),
   },
 
   runtimeEnv: {
@@ -49,7 +36,7 @@ export const env = createEnv({
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
 
   onValidationError(issues) {
-    const normalizedIssues = Array.isArray(issues) ? issues : issues.errors;
+    const normalizedIssues = Array.isArray(issues) ? issues : issues;
     logger.fatal("invalid or missing environment variables");
     for (const issue of normalizedIssues) {
       logger.fatal("env validation issue", {

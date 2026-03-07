@@ -43,12 +43,16 @@ Run from repo root with `pnpm <script>`.
 | `docker:logs:property` | `docker compose logs -f property` | Follow property logs. |
 | `docker:ps` | `docker compose ps` | Show running compose services. |
 | `docker:build` | `docker compose build` | Build compose images only. |
+| `docker:size` | `bash scripts/docker-image-size.sh` | Show Docker image sizes (all or selected services). |
+| `docker:size:build` | `bash scripts/docker-image-size.sh --build` | Build selected services first, then print image sizes. |
 | `health:gateway` | `curl -s http://localhost:3000/health | jq` | Check gateway health endpoint. |
 | `health:auth` | `curl -s http://localhost:3000/api/auth/health | jq` | Check auth health endpoint through gateway routing. |
 | `health:property` | `curl -s http://localhost:3000/api/property/health | jq` | Check property health endpoint through gateway routing. |
 | `prepare` | `husky` | Install/refresh Git hooks path on install. |
 | `lint-staged` | `lint-staged` | Run staged-file quality checks (used by pre-commit hook). |
 | `commitlint` | `commitlint` | Validate commit messages (used by commit-msg hook). |
+| `deps:check` | `NO_UPDATE_NOTIFIER=1 ncu --workspaces --root` | Check available dependency updates across root and all workspaces. |
+| `deps:bump` | `NO_UPDATE_NOTIFIER=1 ncu -u --workspaces --root && pnpm install --no-frozen-lockfile` | Bump dependency versions across root and workspaces, then refresh lockfile. |
 
 ## Service Scripts
 
@@ -96,3 +100,14 @@ No scripts are currently defined.
 This means every commit is checked for:
 - Staged-file formatting/linting (Biome via lint-staged)
 - Commit message format (Conventional Commits via Commitlint)
+
+## Docker Size Selector Examples
+
+Use service selectors: `gateway`, `auth`, `property`, or `all`.
+
+```bash
+pnpm docker:size
+pnpm docker:size -- all
+pnpm docker:size -- gateway auth
+pnpm docker:size:build -- property
+```
