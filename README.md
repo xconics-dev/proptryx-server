@@ -97,6 +97,7 @@ docker compose up --build
 - [docs/NEW_SERVICE_CONFIG.md](docs/NEW_SERVICE_CONFIG.md)
 - [docs/SCRIPTS.md](docs/SCRIPTS.md)
 - [docs/GITHUB_AUTOMATION.md](docs/GITHUB_AUTOMATION.md)
+- [docs/JENKINS_DEPLOYMENT.md](docs/JENKINS_DEPLOYMENT.md)
 
 ## Docker Optimization & Compatibility
 
