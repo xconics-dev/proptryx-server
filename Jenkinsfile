@@ -44,4 +44,13 @@ EOF
       }
     }
   }
+
+  post {
+    always {
+      sh '''
+        docker compose -f docker-compose.prod.yml --env-file .env ps || true
+        docker compose -f docker-compose.prod.yml --env-file .env logs --no-color --tail=200 auth property gateway || true
+      '''
+    }
+  }
 }
