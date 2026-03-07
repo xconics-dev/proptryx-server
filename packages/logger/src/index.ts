@@ -13,10 +13,7 @@ type HonoContextLike = {
     status: number;
   };
 };
-type MiddlewareHandler = (
-  context: HonoContextLike,
-  next: NextHandler
-) => Promise<void>;
+type MiddlewareHandler = (context: HonoContextLike, next: NextHandler) => Promise<void>;
 
 const LOG_LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 10,
@@ -45,13 +42,7 @@ const LEVEL_COLOR: Record<LogLevel, string> = {
   fatal: ANSI.magenta,
 };
 
-const VALID_LOG_LEVELS = new Set<LogLevel>([
-  "debug",
-  "info",
-  "warn",
-  "error",
-  "fatal",
-]);
+const VALID_LOG_LEVELS = new Set<LogLevel>(["debug", "info", "warn", "error", "fatal"]);
 const VALID_LOG_FORMATS = new Set<LogFormat>(["pretty", "json"]);
 
 export interface Logger {
@@ -211,9 +202,7 @@ function createLoggerInstance(
     };
 
     const stream =
-      LOG_LEVEL_ORDER[level] >= LOG_LEVEL_ORDER.error
-        ? process.stderr
-        : process.stdout;
+      LOG_LEVEL_ORDER[level] >= LOG_LEVEL_ORDER.error ? process.stderr : process.stdout;
     const line =
       format === "json"
         ? JSON.stringify(record)

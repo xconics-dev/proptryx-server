@@ -91,6 +91,13 @@ pnpm dev
 docker compose up --build
 ```
 
+## Documentation
+
+- [docs/SETUP.md](docs/SETUP.md)
+- [docs/NEW_SERVICE_CONFIG.md](docs/NEW_SERVICE_CONFIG.md)
+- [docs/SCRIPTS.md](docs/SCRIPTS.md)
+- [docs/GITHUB_AUTOMATION.md](docs/GITHUB_AUTOMATION.md)
+
 ## Docker Optimization & Compatibility
 
 Current Docker strategy per service:

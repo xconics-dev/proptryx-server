@@ -11,7 +11,9 @@
     }
   },
   "types": "./src/index.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup --config ../../tsup.config.ts",
     "lint": "biome lint ./src",
@@ -20,10 +22,10 @@
     "clean": "rm -rf dist .turbo"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@types/node": "^20.0.0",
-    "tsup": "^8.3.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "@biomejs/biome": "^2.4.6",
+    "@types/node": "^25.3.5",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

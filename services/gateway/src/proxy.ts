@@ -1,8 +1,4 @@
-import {
-  type IncomingMessage,
-  type ServerResponse,
-  request as httpRequest,
-} from "node:http";
+import { request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
@@ -22,9 +18,7 @@ export const proxyRoutes: ProxyRoute[] = [
 ];
 
 // Parse targets once at startup — avoids repeated URL parsing per request
-const parsedTargets = new Map(
-  proxyRoutes.map((r) => [r.prefix, new URL(r.target)])
-);
+const parsedTargets = new Map(proxyRoutes.map((r) => [r.prefix, new URL(r.target)]));
 
 /**
  * Ultra-lean streaming proxy using Node's built-in http/https modules.
@@ -44,7 +38,7 @@ export function proxyRequest(
   route: ProxyRoute
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    // biome-ignore lint/style/noNonNullAssertion: <explanation>
+    // biome-ignore lint/style/noNonNullAssertion: route is guaranteed by prior match
     const target = parsedTargets.get(route.prefix)!;
     const isHttps = target.protocol === "https:";
     const reqFn = isHttps ? httpsRequest : httpRequest;

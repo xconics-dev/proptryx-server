@@ -1,9 +1,9 @@
+import { serve } from "@hono/node-server";
+import { createHonoRequestLogger } from "@proptryx/logger";
+import { Hono } from "hono";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import healthRoute from "@/routes/health";
-import { createHonoRequestLogger } from "@proptryx/logger";
-import { serve } from "@hono/node-server";
-import { Hono } from "hono";
 
 const app = new Hono();
 app.use("*", createHonoRequestLogger(logger));

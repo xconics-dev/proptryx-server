@@ -1,0 +1,71 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "Asia/Kolkata"
+    target-branch: "main"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "bot:dependabot"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+      production-dependencies:
+        dependency-type: "production"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:30"
+      timezone: "Asia/Kolkata"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "bot:dependabot"
+    commit-message:
+      prefix: "chore(actions)"
+
+  - package-ecosystem: "docker"
+    directory: "/services/gateway"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Asia/Kolkata"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "bot:dependabot"
+
+  - package-ecosystem: "docker"
+    directory: "/services/auth"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:15"
+      timezone: "Asia/Kolkata"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "bot:dependabot"
+
+  - package-ecosystem: "docker"
+    directory: "/services/property"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:30"
+      timezone: "Asia/Kolkata"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "bot:dependabot"

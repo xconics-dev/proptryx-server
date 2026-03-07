@@ -1,6 +1,6 @@
-import { logger } from "@/lib/logger";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 /**
  * Typesafe env for the gateway service.
@@ -11,9 +11,7 @@ import { z } from "zod";
  */
 export const env = createEnv({
   server: {
-    NODE_ENV: z
-      .enum(["development", "test", "production"])
-      .default("development"),
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
     PORT: z.coerce
       .number({ invalid_type_error: "PORT must be a number" })
@@ -21,9 +19,7 @@ export const env = createEnv({
       .min(1)
       .max(65535)
       .default(3000),
-    LOG_LEVEL: z
-      .enum(["debug", "info", "warn", "error", "fatal"])
-      .default("info"),
+    LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "fatal"]).default("info"),
     LOG_FORMAT: z.enum(["pretty", "json"]).default("pretty"),
 
     AUTH_SERVICE_URL: z
@@ -32,9 +28,7 @@ export const env = createEnv({
 
     PROPERTY_SERVICE_URL: z
       .string()
-      .url(
-        "PROPERTY_SERVICE_URL must be a valid URL — e.g. http://property:3002"
-      ),
+      .url("PROPERTY_SERVICE_URL must be a valid URL — e.g. http://property:3002"),
   },
 
   runtimeEnv: {

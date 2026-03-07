@@ -49,6 +49,8 @@ Run from repo root with `pnpm <script>`.
 | `prepare` | `husky` | Install/refresh Git hooks path on install. |
 | `lint-staged` | `lint-staged` | Run staged-file quality checks (used by pre-commit hook). |
 | `commitlint` | `commitlint` | Validate commit messages (used by commit-msg hook). |
+| `deps:check` | `NO_UPDATE_NOTIFIER=1 ncu --workspaces --root` | Check available dependency updates across root and all workspaces. |
+| `deps:bump` | `NO_UPDATE_NOTIFIER=1 ncu -u --workspaces --root && pnpm install --no-frozen-lockfile` | Bump dependency versions across root and workspaces, then refresh lockfile. |
 
 ## Service Scripts
 

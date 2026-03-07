@@ -4,9 +4,7 @@ import { logger } from "@/lib/logger";
 
 export const env = createEnv({
   server: {
-    NODE_ENV: z
-      .enum(["development", "test", "production"])
-      .default("development"),
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
     PORT: z.coerce
       .number({ invalid_type_error: "PORT must be a number" })
@@ -14,9 +12,7 @@ export const env = createEnv({
       .min(1)
       .max(65535)
       .default(3002),
-    LOG_LEVEL: z
-      .enum(["debug", "info", "warn", "error", "fatal"])
-      .default("info"),
+    LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "fatal"]).default("info"),
     LOG_FORMAT: z.enum(["pretty", "json"]).default("pretty"),
   },
 
