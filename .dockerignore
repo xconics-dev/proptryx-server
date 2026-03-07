@@ -1,0 +1,13 @@
+# Never send these to Docker build context
+node_modules
+**/node_modules
+**/dist
+**/.turbo
+**/.env
+**/.env.local
+**/coverage
+.git
+.gitignore
+*.md
+.vscode
+apps

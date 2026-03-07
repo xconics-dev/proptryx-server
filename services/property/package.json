@@ -1,0 +1,30 @@
+{
+  "name": "@proptryx/property",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build":      "tsup --config ../../tsup.config.ts",
+    "dev":        "tsx watch --env-file=.env src/index.ts",
+    "start":      "node dist/index.js",
+    "lint":       "biome lint ./src",
+    "lint:fix":   "biome lint --write ./src",
+    "type-check": "tsc --noEmit",
+    "clean":      "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@proptryx/logger": "workspace:*",
+    "@hono/node-server": "^1.12.0",
+    "@t3-oss/env-core":  "^0.11.1",
+    "hono":              "^4.4.0",
+    "zod":               "^3.23.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome":              "^1.9.4",
+    "@proptryx/typescript-config": "workspace:*",
+    "@types/node":                 "^20.0.0",
+    "tsup":                        "^8.3.0",
+    "tsx":                         "^4.19.2",
+    "typescript":                  "^5.7.3"
+  }
+}

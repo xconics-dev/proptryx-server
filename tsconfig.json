@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // Root tsconfig — not used to compile directly.
+  // Purpose:
+  //   1. Editor / IDE: provides a single project root for intellisense across all workspaces
+  //   2. Turbo: type-check task can reference this from root
+  //   3. Biome + tools: resolve imports correctly across packages/ and services/
+  //
+  // Each service has its own tsconfig.json that extends
+  // @proptryx/typescript-config/service.json for actual compilation via tsup.
+  "extends": "./packages/typescript-config/base.json",
+  "compilerOptions": {
+    // No emit from root — compilation is handled per-service by tsup
+    "noEmit": true
+  },
+  // Teach the editor about every workspace package
+  "references": [
+    { "path": "./packages/typescript-config" },
+    { "path": "./packages/logger" },
+    { "path": "./services/gateway" },
+    { "path": "./services/auth" },
+    { "path": "./services/property" }
+  ],
+  // Include nothing directly at root — just the references above matter
+  "include": [],
+  "exclude": ["node_modules", "**/dist", "**/.turbo"]
+}
