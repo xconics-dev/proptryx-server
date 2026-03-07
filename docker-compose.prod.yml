@@ -16,12 +16,12 @@ services:
       dockerfile: services/gateway/Dockerfile
     container_name: gateway
     ports:
-      - "${GATEWAY_HOST_PORT:-8080}:${GATEWAY_PORT:-8080}"
+      - "${GATEWAY_HOST_PORT:-7000}:${GATEWAY_PORT:-7000}"
     environment:
       <<: *service-env
-      PORT: "${GATEWAY_PORT:-8080}"
-      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth:${AUTH_PORT:-6001}}
-      PROPERTY_SERVICE_URL: ${PROPERTY_SERVICE_URL:-http://property:${PROPERTY_PORT:-6002}}
+      PORT: "${GATEWAY_PORT:-7000}"
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth:${AUTH_PORT:-7001}}
+      PROPERTY_SERVICE_URL: ${PROPERTY_SERVICE_URL:-http://property:${PROPERTY_PORT:-7002}}
     depends_on:
       auth:
         condition: service_healthy
@@ -33,7 +33,7 @@ services:
           "CMD",
           "/nodejs/bin/node",
           "-e",
-          "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:${GATEWAY_PORT:-7000}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -47,17 +47,17 @@ services:
       dockerfile: services/auth/Dockerfile
     container_name: auth
     ports:
-      - "${AUTH_HOST_PORT:-6001}:${AUTH_PORT:-6001}"
+      - "${AUTH_HOST_PORT:-7001}:${AUTH_PORT:-7001}"
     environment:
       <<: *service-env
-      PORT: "${AUTH_PORT:-6001}"
+      PORT: "${AUTH_PORT:-7001}"
     healthcheck:
       test:
         [
           "CMD",
           "/nodejs/bin/node",
           "-e",
-          "fetch('http://127.0.0.1:6001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:${AUTH_PORT:-7001}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -71,17 +71,17 @@ services:
       dockerfile: services/property/Dockerfile
     container_name: property
     ports:
-      - "${PROPERTY_HOST_PORT:-6002}:${PROPERTY_PORT:-6002}"
+      - "${PROPERTY_HOST_PORT:-7002}:${PROPERTY_PORT:-7002}"
     environment:
       <<: *service-env
-      PORT: "${PROPERTY_PORT:-6002}"
+      PORT: "${PROPERTY_PORT:-7002}"
     healthcheck:
       test:
         [
           "CMD",
           "/nodejs/bin/node",
           "-e",
-          "fetch('http://127.0.0.1:6002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:${PROPERTY_PORT:-7002}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
