@@ -29,13 +29,18 @@ jobs:
         with:
           script: |
             const marker = '<!-- cloudflare-ai-pr-review -->';
-            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-            const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+            const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+            const apiToken = (process.env.CLOUDFLARE_API_TOKEN || '').trim();
             const modelRaw = process.env.CLOUDFLARE_AI_MODEL || '@cf/meta/llama-3.1-8b-instruct';
             const model = modelRaw.trim().replace(/^['"]|['"]$/g, '');
 
             if (!accountId || !apiToken) {
               core.warning('CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN is not configured. Skipping Cloudflare AI PR review.');
+              return;
+            }
+
+            if (!/^[a-f0-9]{32}$/i.test(accountId)) {
+              core.setFailed(`Invalid CLOUDFLARE_ACCOUNT_ID format. Expected 32-char hex account id, got length ${accountId.length}.`);
               return;
             }
 
@@ -105,6 +110,7 @@ jobs:
             ].join('\n');
 
             core.info(`Using Cloudflare model: ${model}`);
+            core.info(`Cloudflare account id length: ${accountId.length}`);
 
             const response = await fetch(
               `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
