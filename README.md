@@ -107,7 +107,7 @@ Current Docker strategy per service:
 2. Build stage installs workspace deps and builds:
    - shared logger package first
    - target service second
-3. `pnpm --config.inject-workspace-packages=true deploy --prod` creates minimal runtime dependency set
+3. `pnpm deploy --prod --legacy` creates minimal runtime dependency set
 4. Runner stage is non-root and only copies deployed runtime output
 
 Compose-level compatibility defaults:
@@ -134,7 +134,7 @@ Compose-level compatibility defaults:
 - gateway introduces an extra network hop and proxy complexity
 - more infra overhead than a single-process monolith
 - Docker builds still install full workspace in build stage (faster dev consistency, heavier build step)
-- Docker builds use `pnpm --config.inject-workspace-packages=true deploy --prod` to avoid legacy deploy warnings
+- Docker builds use `pnpm deploy --prod --legacy` for stable workspace deploy behavior in CI/Docker
 - adding a proxied domain service still needs gateway route/env updates
 
 ## Add A New Service (Low Config)
