@@ -224,7 +224,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \\
   && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \\
   && cd /app \\
   && SKIP_ENV_VALIDATION=true pnpm --filter @proptryx/${SERVICE_NAME} run build \\
-  && pnpm --filter @proptryx/${SERVICE_NAME} deploy --prod --legacy /prod/${SERVICE_NAME}
+  && pnpm --config.inject-workspace-packages=true --filter @proptryx/${SERVICE_NAME} deploy --prod /prod/${SERVICE_NAME}
 
 FROM gcr.io/distroless/nodejs20-debian12:nonroot AS runner
 WORKDIR /app/services/${SERVICE_NAME}
