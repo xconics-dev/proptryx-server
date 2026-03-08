@@ -45,9 +45,9 @@ Run from repo root with `pnpm <script>`.
 | `docker:build` | `docker compose build` | Build compose images only. |
 | `docker:size` | `bash scripts/docker-image-size.sh` | Show Docker image sizes (all or selected services). |
 | `docker:size:build` | `bash scripts/docker-image-size.sh --build` | Build selected services first, then print image sizes. |
-| `health:gateway` | `curl -s http://localhost:3000/health | jq` | Check gateway health endpoint. |
-| `health:auth` | `curl -s http://localhost:3000/api/auth/health | jq` | Check auth health endpoint through gateway routing. |
-| `health:property` | `curl -s http://localhost:3000/api/property/health | jq` | Check property health endpoint through gateway routing. |
+| `health:gateway` | `curl -s http://localhost:8000/health | jq` | Check gateway health endpoint. |
+| `health:auth` | `curl -s http://localhost:8000/api/auth/health | jq` | Check auth health endpoint through gateway routing. |
+| `health:property` | `curl -s http://localhost:8000/api/property/health | jq` | Check property health endpoint through gateway routing. |
 | `prepare` | `husky` | Install/refresh Git hooks path on install. |
 | `lint-staged` | `lint-staged` | Run staged-file quality checks (used by pre-commit hook). |
 | `commitlint` | `commitlint` | Validate commit messages (used by commit-msg hook). |
