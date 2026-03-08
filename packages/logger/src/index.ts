@@ -92,6 +92,18 @@ function parseColorEnabled(): boolean {
   return Boolean(process.stdout.isTTY);
 }
 
+function shouldLogHealthchecks(): boolean {
+  const rawValue = process.env.LOG_HEALTHCHECKS?.toLowerCase();
+  if (rawValue === "true" || rawValue === "1" || rawValue === "yes") {
+    return true;
+  }
+  if (rawValue === "false" || rawValue === "0" || rawValue === "no") {
+    return false;
+  }
+
+  return process.env.NODE_ENV !== "production";
+}
+
 function serializeError(error: unknown): LogPayload {
   if (!(error instanceof Error)) {
     return { value: error };
@@ -253,6 +265,8 @@ export function createServiceLogger(service: string): Logger {
 export function createHonoRequestLogger(logger: Logger): MiddlewareHandler {
   return async (c, next) => {
     const startedAt = Date.now();
+    const isHealthcheckRoute = c.req.path === "/health";
+    const logHealthchecks = shouldLogHealthchecks();
 
     try {
       await next();
@@ -284,6 +298,12 @@ export function createHonoRequestLogger(logger: Logger): MiddlewareHandler {
 
     if (status >= 400) {
       logger.warn(message, payload);
+      return;
+    }
+
+    // Docker/compose health probes can be very noisy in production logs.
+    // Keep them only when explicitly enabled.
+    if (isHealthcheckRoute && !logHealthchecks) {
       return;
     }
 
