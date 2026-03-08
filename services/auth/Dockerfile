@@ -29,7 +29,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
   && cd /app \
   && SKIP_ENV_VALIDATION=true pnpm --filter @proptryx/auth run build \
-  && pnpm --config.inject-workspace-packages=true --filter @proptryx/auth deploy --prod /prod/auth
+  && pnpm --filter @proptryx/auth deploy --prod --legacy /prod/auth
 
 FROM gcr.io/distroless/nodejs20-debian12:nonroot AS runner
 WORKDIR /app/services/auth
@@ -37,5 +37,5 @@ ENV NODE_ENV=production
 COPY --from=builder --chown=65532:65532 /prod/auth/dist ./dist
 COPY --from=builder --chown=65532:65532 /prod/auth/node_modules ./node_modules
 COPY --from=builder --chown=65532:65532 /prod/auth/package.json ./package.json
-EXPOSE 7001
+EXPOSE 6001
 CMD ["dist/index.js"]

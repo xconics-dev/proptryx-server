@@ -64,4 +64,4 @@ Then add env validation fields in:
 
 - Service Dockerfiles are compatible with `pnpm@10.30.3`.
 - Build flow compiles `@proptryx/logger` before each service build.
-- Runtime image uses `pnpm --config.inject-workspace-packages=true deploy --prod` output for minimal runtime contents.
+- Runtime image uses `pnpm deploy --prod --legacy` output for minimal runtime contents.
