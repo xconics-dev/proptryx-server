@@ -16,6 +16,13 @@ services:
       context: .
       dockerfile: services/gateway/Dockerfile
     container_name: gateway
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gateway.rule=Host(`proptryx.devmon.in`)"
+      - "traefik.http.routers.gateway.entrypoints=${TRAEFIK_ENTRYPOINTS:-websecure}"
+      - "traefik.http.routers.gateway.tls=true"
+      - "traefik.http.routers.gateway.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}"
+      - "traefik.http.services.gateway.loadbalancer.server.port=${GATEWAY_PORT:-8000}"
     ports:
       - "${GATEWAY_HOST_PORT:-8000}:${GATEWAY_PORT:-8000}"
     environment:
