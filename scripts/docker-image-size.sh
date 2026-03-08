@@ -27,6 +27,40 @@ contains_service() {
   return 1
 }
 
+find_image_ref_for_service() {
+  local svc="$1"
+  local expected_repo="${project_name}-${svc}"
+  local ref=""
+
+  # 1) Preferred exact default compose tag
+  if docker image inspect "${expected_repo}:latest" >/dev/null 2>&1; then
+    echo "${expected_repo}:latest"
+    return 0
+  fi
+
+  # 2) Any tag for expected compose repo
+  ref="$(
+    docker image ls --format '{{.Repository}}:{{.Tag}}' \
+      | awk -v repo="${expected_repo}" -F: '$1 == repo && $2 != "<none>" { print $0; exit }'
+  )"
+  if [[ -n "$ref" ]]; then
+    echo "$ref"
+    return 0
+  fi
+
+  # 3) Fallback: any repo that ends with "-<service>" (helps with custom project names)
+  ref="$(
+    docker image ls --format '{{.Repository}}:{{.Tag}}' \
+      | awk -v suffix="-${svc}" -F: 'index($1, suffix) > 0 && $2 != "<none>" { print $0; exit }'
+  )"
+  if [[ -n "$ref" ]]; then
+    echo "$ref"
+    return 0
+  fi
+
+  return 1
+}
+
 to_human() {
   local bytes="$1"
   awk -v b="$bytes" 'BEGIN {
@@ -68,6 +102,11 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! docker info >/dev/null 2>&1; then
+  echo "docker daemon is not running or not reachable" >&2
+  exit 1
+fi
+
 if $BUILD_FIRST; then
   echo "Building selected services: ${selected[*]}"
   docker compose build "${selected[@]}"
@@ -79,20 +118,27 @@ printf "\n%-10s %-40s %12s\n" "SERVICE" "IMAGE" "SIZE"
 printf "%-10s %-40s %12s\n" "----------" "----------------------------------------" "------------"
 
 total_bytes=0
+found_count=0
 for svc in "${selected[@]}"; do
-  image_ref="${project_name}-${svc}:latest"
-
-  if ! docker image inspect "$image_ref" >/dev/null 2>&1; then
-    printf "%-10s %-40s %12s\n" "$svc" "$image_ref" "NOT FOUND"
+  if ! image_ref="$(find_image_ref_for_service "$svc")"; then
+    printf "%-10s %-40s %12s\n" "$svc" "${project_name}-${svc}:latest" "NOT FOUND"
     continue
   fi
 
   size_bytes="$(docker image inspect "$image_ref" --format '{{.Size}}')"
   size_human="$(to_human "$size_bytes")"
   total_bytes=$((total_bytes + size_bytes))
+  found_count=$((found_count + 1))
 
   printf "%-10s %-40s %12s\n" "$svc" "$image_ref" "$size_human"
 done
 
 printf "%-10s %-40s %12s\n" "----------" "----------------------------------------" "------------"
 printf "%-10s %-40s %12s\n\n" "TOTAL" "selected-images" "$(to_human "$total_bytes")"
+
+if [[ "$found_count" -eq 0 ]]; then
+  echo "No matching local images found. Build first with:"
+  echo "  pnpm docker:build"
+  echo "or:"
+  echo "  pnpm docker:size:build"
+fi
