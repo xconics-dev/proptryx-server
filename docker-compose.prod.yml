@@ -5,8 +5,9 @@ x-service-defaults: &service-defaults
 
 x-service-env: &service-env
   NODE_ENV: ${NODE_ENV:-production}
-  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_LEVEL: ${PROD_LOG_LEVEL:-info}
   LOG_FORMAT: ${LOG_FORMAT:-json}
+  LOG_HEALTHCHECKS: ${LOG_HEALTHCHECKS:-false}
 
 services:
   gateway:
@@ -19,6 +20,7 @@ services:
       - "${GATEWAY_HOST_PORT:-7000}:${GATEWAY_PORT:-7000}"
     environment:
       <<: *service-env
+      LOG_LEVEL: ${GATEWAY_LOG_LEVEL:-${PROD_LOG_LEVEL:-info}}
       PORT: "${GATEWAY_PORT:-7000}"
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth:${AUTH_PORT:-7001}}
       PROPERTY_SERVICE_URL: ${PROPERTY_SERVICE_URL:-http://property:${PROPERTY_PORT:-7002}}
@@ -50,6 +52,7 @@ services:
       - "${AUTH_HOST_PORT:-7001}:${AUTH_PORT:-7001}"
     environment:
       <<: *service-env
+      LOG_LEVEL: ${AUTH_LOG_LEVEL:-${PROD_LOG_LEVEL:-info}}
       PORT: "${AUTH_PORT:-7001}"
     healthcheck:
       test:
@@ -74,6 +77,7 @@ services:
       - "${PROPERTY_HOST_PORT:-7002}:${PROPERTY_PORT:-7002}"
     environment:
       <<: *service-env
+      LOG_LEVEL: ${PROPERTY_LOG_LEVEL:-${PROD_LOG_LEVEL:-info}}
       PORT: "${PROPERTY_PORT:-7002}"
     healthcheck:
       test:
