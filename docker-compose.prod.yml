@@ -18,6 +18,12 @@ services:
     container_name: gateway
     ports:
       - "${GATEWAY_HOST_PORT:-8000}:${GATEWAY_PORT:-8000}"
+    labels:
+    - traefik.enable=true
+    - traefik.http.routers.proptryx.rule=Host(`proptryx.devmon.in`)
+    - traefik.http.routers.proptryx.entrypoints=websecure
+    - traefik.http.routers.proptryx.tls.certresolver=letsencrypt
+    - traefik.http.services.proptryx.loadbalancer.server.port=8000
     environment:
       <<: *service-env
       LOG_LEVEL: ${GATEWAY_LOG_LEVEL:-${PROD_LOG_LEVEL:-info}}
