@@ -100,4 +100,4 @@ services:
 
 networks:
   app-network:
-    driver: overlay
+    driver: bridge
