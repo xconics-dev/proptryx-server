@@ -10,9 +10,10 @@ coverage/
 *.tsbuildinfo
 
 # Environment files
-.env
-.env.*
-!.env.example
+env/.env
+env/.env.*
+!env/.env.example
+!env/.env.dockploy.example
 
 # Logs and runtime files
 *.log

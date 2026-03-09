@@ -16,14 +16,13 @@ This creates and wires:
 
 - `services/<service-name>/package.json`
 - `services/<service-name>/tsconfig.json`
-- `services/<service-name>/.env`
 - `services/<service-name>/Dockerfile`
 - `services/<service-name>/src/index.ts`
 - `services/<service-name>/src/config/env.ts`
 - `services/<service-name>/src/lib/logger.ts`
 - `services/<service-name>/src/routes/health.ts`
 - root `tsconfig.json` reference entry
-- `docker-compose.yml` service entry (same structure as auth/property)
+- `docker/docker-compose.yml` service entry (same structure as auth/property)
 
 After generation:
 
@@ -57,8 +56,8 @@ Example:
 Then add env validation fields in:
 
 - `services/gateway/src/config/env.ts`
-- `services/gateway/.env`
-- `docker-compose.yml` (`gateway.environment`)
+- root `.env`
+- `docker/docker-compose.yml` (`gateway.environment`)
 
 ## Docker Notes
 

@@ -1,0 +1,142 @@
+x-service-defaults: &service-defaults
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+  logging:
+    driver: local
+    options:
+      max-size: ${DOCKER_LOG_MAX_SIZE:-10m}
+      max-file: ${DOCKER_LOG_MAX_FILE:-5}
+  networks:
+    - app-network
+
+x-deploy-defaults: &deploy-defaults
+  restart_policy:
+    condition: on-failure
+    delay: 5s
+    max_attempts: 5
+    window: 120s
+  update_config:
+    order: start-first
+    parallelism: 1
+    delay: 10s
+    failure_action: rollback
+  rollback_config:
+    order: stop-first
+    parallelism: 1
+
+services:
+  gateway:
+    <<: *service-defaults
+    image: ${GATEWAY_IMAGE}
+    environment:
+      NODE_ENV: ${GATEWAY_NODE_ENV}
+      PORT: ${GATEWAY_PORT}
+      LOG_LEVEL: ${GATEWAY_LOG_LEVEL}
+      LOG_FORMAT: ${GATEWAY_LOG_FORMAT}
+      LOG_HEALTHCHECKS: ${GATEWAY_LOG_HEALTHCHECKS}
+      NODE_OPTIONS: ${GATEWAY_NODE_OPTIONS}
+      AUTH_SERVICE_URL: http://auth:${AUTH_PORT}
+      PROPERTY_SERVICE_URL: http://property:${PROPERTY_PORT}
+    ports:
+      - target: ${GATEWAY_PORT}
+        published: ${GATEWAY_HOST_PORT}
+        protocol: tcp
+        mode: ingress
+    healthcheck:
+      test:
+        ["CMD", "node", "-e", "fetch('http://127.0.0.1:${GATEWAY_PORT}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      <<: *deploy-defaults
+      mode: replicated
+      replicas: ${GATEWAY_REPLICAS}
+      resources:
+        limits:
+          cpus: "${GATEWAY_CPU_LIMIT:-1.00}"
+          memory: ${GATEWAY_MEM_LIMIT:-768M}
+        reservations:
+          cpus: "${GATEWAY_CPU_RESERVATION:-0.25}"
+          memory: ${GATEWAY_MEM_RESERVATION:-256M}
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=app-network
+        - traefik.http.routers.proptryx.rule=Host(`${TRAEFIK_GATEWAY_HOST}`)
+        - traefik.http.routers.proptryx.entrypoints=websecure
+        - traefik.http.routers.proptryx.tls=true
+        - traefik.http.routers.proptryx.tls.certresolver=letsencrypt
+        - traefik.http.services.proptryx.loadbalancer.server.port=${GATEWAY_PORT}
+
+  auth:
+    <<: *service-defaults
+    image: ${AUTH_IMAGE}
+    environment:
+      NODE_ENV: ${AUTH_NODE_ENV}
+      PORT: ${AUTH_PORT}
+      LOG_LEVEL: ${AUTH_LOG_LEVEL}
+      LOG_FORMAT: ${AUTH_LOG_FORMAT}
+      LOG_HEALTHCHECKS: ${AUTH_LOG_HEALTHCHECKS}
+      NODE_OPTIONS: ${AUTH_NODE_OPTIONS}
+    healthcheck:
+      test:
+        ["CMD", "node", "-e", "fetch('http://127.0.0.1:${AUTH_PORT}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      <<: *deploy-defaults
+      mode: replicated
+      replicas: ${AUTH_REPLICAS}
+      resources:
+        limits:
+          cpus: "${AUTH_CPU_LIMIT:-1.50}"
+          memory: ${AUTH_MEM_LIMIT:-1024M}
+        reservations:
+          cpus: "${AUTH_CPU_RESERVATION:-0.30}"
+          memory: ${AUTH_MEM_RESERVATION:-256M}
+
+  property:
+    <<: *service-defaults
+    image: ${PROPERTY_IMAGE}
+    environment:
+      NODE_ENV: ${PROPERTY_NODE_ENV}
+      PORT: ${PROPERTY_PORT}
+      LOG_LEVEL: ${PROPERTY_LOG_LEVEL}
+      LOG_FORMAT: ${PROPERTY_LOG_FORMAT}
+      LOG_HEALTHCHECKS: ${PROPERTY_LOG_HEALTHCHECKS}
+      NODE_OPTIONS: ${PROPERTY_NODE_OPTIONS}
+    healthcheck:
+      test:
+        ["CMD", "node", "-e", "fetch('http://127.0.0.1:${PROPERTY_PORT}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      <<: *deploy-defaults
+      mode: replicated
+      replicas: ${PROPERTY_REPLICAS}
+      resources:
+        limits:
+          cpus: "${PROPERTY_CPU_LIMIT:-1.50}"
+          memory: ${PROPERTY_MEM_LIMIT:-1024M}
+        reservations:
+          cpus: "${PROPERTY_CPU_RESERVATION:-0.30}"
+          memory: ${PROPERTY_MEM_RESERVATION:-256M}
+
+networks:
+  app-network:
+    driver: overlay
+    attachable: true
