@@ -4,18 +4,18 @@ import { logger } from "@/lib/logger";
 
 export const env = createEnv({
   server: {
-    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    NODE_ENV: z.enum(["development", "test", "production"]),
 
-    PORT: z.coerce.number().int().min(1).max(65535).default(6002),
-    LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "fatal"]).default("info"),
-    LOG_FORMAT: z.enum(["pretty", "json"]).default("pretty"),
+    PORT: z.coerce.number().int().min(1).max(65535),
+    LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "fatal"]),
+    LOG_FORMAT: z.enum(["pretty", "json"]),
   },
 
   runtimeEnv: {
-    NODE_ENV: process.env.NODE_ENV,
-    PORT: process.env.PORT,
-    LOG_LEVEL: process.env.LOG_LEVEL,
-    LOG_FORMAT: process.env.LOG_FORMAT,
+    NODE_ENV: process.env.NODE_ENV ?? process.env.PROPERTY_NODE_ENV,
+    PORT: process.env.PORT ?? process.env.PROPERTY_PORT,
+    LOG_LEVEL: process.env.LOG_LEVEL ?? process.env.PROPERTY_LOG_LEVEL,
+    LOG_FORMAT: process.env.LOG_FORMAT ?? process.env.PROPERTY_LOG_FORMAT,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
@@ -29,7 +29,7 @@ export const env = createEnv({
       });
     }
     logger.fatal("see environment example", {
-      exampleFile: "services/property/.env.example",
+      exampleFile: "env/.env.example",
     });
     process.exit(1);
   },

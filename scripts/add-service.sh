@@ -36,7 +36,7 @@ cat > "$SERVICE_DIR/package.json" <<EOF
   "type": "module",
   "scripts": {
     "build": "tsup --config ../../tsup.config.ts",
-    "dev": "tsx watch --env-file=.env src/index.ts",
+    "dev": "tsx watch --env-file=../../env/.env src/index.ts",
     "start": "node dist/index.js",
     "lint": "biome lint ./src",
     "lint:fix": "biome lint --write ./src",
@@ -73,15 +73,6 @@ cat > "$SERVICE_DIR/tsconfig.json" <<'EOF'
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
 }
-EOF
-
-cat > "$SERVICE_DIR/.env" <<EOF
-# services/${SERVICE_NAME}/.env — copy: cp .env.example .env
-
-NODE_ENV=development
-PORT=${PORT}
-LOG_LEVEL=info
-LOG_FORMAT=pretty
 EOF
 
 cat > "$SERVICE_DIR/src/lib/logger.ts" <<EOF
@@ -132,7 +123,7 @@ export const env = createEnv({
       });
     }
     logger.fatal("see environment example", {
-      exampleFile: "services/${SERVICE_NAME}/.env.example",
+      exampleFile: "env/.env.example",
     });
     process.exit(1);
   },
@@ -192,9 +183,9 @@ serve({ fetch: app.fetch, port: env.PORT }, (info) => {
 export default app;
 EOF
 
-cat > "$SERVICE_DIR/Dockerfile" <<EOF
+cat > "docker/${SERVICE_NAME}.Dockerfile" <<EOF
 # syntax=docker/dockerfile:1.7
-# Build context: repo root (docker-compose.yml sets context: .)
+# Build context: repo root (docker/docker-compose.yml sets context: ..)
 
 FROM node:20-alpine AS base
 WORKDIR /app
@@ -248,19 +239,19 @@ if (!config.references.some((r) => r.path === refPath)) {
 fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
 "
 
-if ! grep -qE "^  ${SERVICE_NAME}:" docker-compose.yml; then
+if ! grep -qE "^  ${SERVICE_NAME}:" docker/docker-compose.yml; then
   awk -v s="${SERVICE_NAME}" -v p="${PORT}" '
     BEGIN {
       block = "  " s ":\n" \
               "    <<: *service-defaults\n" \
               "    build:\n" \
-              "      context: .\n" \
-              "      dockerfile: services/" s "/Dockerfile\n" \
+              "      context: ..\n" \
+              "      dockerfile: docker/" s ".Dockerfile\n" \
               "    container_name: " s "\n" \
               "    ports:\n" \
               "      - \"" p ":" p "\"\n" \
               "    environment:\n" \
-              "      <<: *service-env\n" \
+              "      <<: *shared-env\n" \
               "      PORT: \"" p "\"\n" \
               "    healthcheck:\n" \
               "      test:\n" \
@@ -272,12 +263,12 @@ if ! grep -qE "^  ${SERVICE_NAME}:" docker-compose.yml; then
     }
     /^networks:/ && !done { printf "%s\n", block; done = 1 }
     { print }
-  ' docker-compose.yml > docker-compose.yml.tmp
-  mv docker-compose.yml.tmp docker-compose.yml
+  ' docker/docker-compose.yml > docker/docker-compose.yml.tmp
+  mv docker/docker-compose.yml.tmp docker/docker-compose.yml
 fi
 
 echo "Created service: ${SERVICE_NAME}"
 echo "Next:"
 echo "  1) pnpm install --no-frozen-lockfile"
 echo "  2) pnpm -r type-check && pnpm -r build"
-echo "  3) docker compose build ${SERVICE_NAME}"
+echo "  3) docker compose --env-file env/.env -f docker/docker-compose.yml build ${SERVICE_NAME}"

@@ -10,7 +10,18 @@ proptryx/
 ├── tsup.config.ts                   ← single global build config (used by all services)
 ├── biome.json                       ← linter / formatter (extends ultracite)
 ├── .npmrc                           ← pnpm hoist / workspace settings
-├── docker-compose.yml
+├── docker/
+│   ├── docker-compose.yml
+│   ├── docker-compose.prod.yml
+│   ├── docker-compose.dockploy.yml
+│   ├── gateway.Dockerfile
+│   ├── auth.Dockerfile
+│   └── property.Dockerfile
+├── env/
+│   ├── .env
+│   ├── .env.example
+│   ├── .env.prod
+│   └── .env.dockploy.example
 │
 ├── apps/                            ← future Next.js / Expo apps (empty for now)
 │
@@ -22,10 +33,8 @@ proptryx/
 │
 └── services/
     ├── gateway/                     ← @proptryx/gateway  :3000
-    │   ├── Dockerfile
     │   ├── package.json
     │   ├── tsconfig.json
-    │   ├── .env.example
     │   └── src/
     │       ├── index.ts
     │       ├── proxy.ts
@@ -33,20 +42,16 @@ proptryx/
     │       └── routes/health.ts
     │
     ├── auth/                        ← @proptryx/auth     :3001
-    │   ├── Dockerfile
     │   ├── package.json
     │   ├── tsconfig.json
-    │   ├── .env.example
     │   └── src/
     │       ├── index.ts
     │       ├── config/env.ts
     │       └── routes/health.ts
     │
     └── property/                    ← @proptryx/property :3002
-        ├── Dockerfile
         ├── package.json
         ├── tsconfig.json
-        ├── .env.example
         └── src/
             ├── index.ts
             ├── config/env.ts
@@ -94,15 +99,14 @@ Workspace packages resolved:
 
 ---
 
-## 3 — Create .env files
+## 3 — Create env files
 
 ```bash
-cp services/gateway/.env.example  services/gateway/.env
-cp services/auth/.env.example     services/auth/.env
-cp services/property/.env.example services/property/.env
+cp env/.env.example env/.env
 ```
 
-Edit each file before running locally.
+Edit `env/.env` for local dev.
+Use `env/.env.prod` as the production baseline when running `docker/docker-compose.prod.yml`.
 
 ---
 
@@ -204,7 +208,16 @@ pnpm docker:logs:auth
 pnpm docker:logs:property
 pnpm docker:down        # stop
 pnpm docker:down:v      # stop + remove volumes
-docker compose build --no-cache   # force full rebuild
+docker compose --env-file env/.env -f docker/docker-compose.yml build --no-cache   # force full rebuild
+```
+
+Production compose:
+
+```bash
+pnpm docker:prod:up:build:d
+pnpm docker:prod:ps
+pnpm docker:prod:logs
+pnpm docker:prod:down
 ```
 
 ---

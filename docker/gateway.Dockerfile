@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Build context: repo root (docker-compose.yml sets context: .)
+# Build context: repo root (docker/docker-compose.yml sets context: .)
 
 FROM node:20-alpine AS base
 WORKDIR /app
@@ -12,30 +12,29 @@ FROM base AS build-deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/logger/package.json ./packages/logger/package.json
 COPY packages/typescript-config/package.json ./packages/typescript-config/package.json
-COPY services/auth/package.json ./services/auth/package.json
+COPY services/gateway/package.json ./services/gateway/package.json
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   pnpm install --frozen-lockfile --prefer-offline
 
 FROM base AS builder
 COPY --from=build-deps /app/node_modules /app/node_modules
-COPY --from=build-deps /app/services/auth/node_modules /app/services/auth/node_modules
+COPY --from=build-deps /app/services/gateway/node_modules /app/services/gateway/node_modules
 COPY tsup.config.ts /app/tsup.config.ts
 COPY packages/logger /app/packages/logger
 COPY packages/typescript-config /app/packages/typescript-config
-COPY services/auth /app/services/auth
+COPY services/gateway /app/services/gateway
 WORKDIR /app
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   cd /app/packages/logger \
   && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
   && cd /app \
-  && SKIP_ENV_VALIDATION=true pnpm --filter @proptryx/auth run build \
-  && pnpm --filter @proptryx/auth deploy --prod --legacy /prod/auth
+  && SKIP_ENV_VALIDATION=true pnpm --filter @proptryx/gateway run build \
+  && pnpm --filter @proptryx/gateway deploy --prod --legacy /prod/gateway
 
 FROM gcr.io/distroless/nodejs20-debian12:nonroot AS runner
-WORKDIR /app/services/auth
-ENV NODE_ENV=production
-COPY --from=builder --chown=65532:65532 /prod/auth/dist ./dist
-COPY --from=builder --chown=65532:65532 /prod/auth/node_modules ./node_modules
-COPY --from=builder --chown=65532:65532 /prod/auth/package.json ./package.json
-EXPOSE 6001
+WORKDIR /app/services/gateway
+COPY --from=builder --chown=65532:65532 /prod/gateway/dist ./dist
+COPY --from=builder --chown=65532:65532 /prod/gateway/node_modules ./node_modules
+COPY --from=builder --chown=65532:65532 /prod/gateway/package.json ./package.json
+EXPOSE 8000
 CMD ["dist/index.js"]

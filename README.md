@@ -42,7 +42,18 @@ The stack is optimized for:
 
 ```text
 .
-├── docker-compose.yml
+├── docker/
+│   ├── docker-compose.yml
+│   ├── docker-compose.prod.yml
+│   ├── docker-compose.dockploy.yml
+│   ├── gateway.Dockerfile
+│   ├── auth.Dockerfile
+│   └── property.Dockerfile
+├── env/
+│   ├── .env
+│   ├── .env.example
+│   ├── .env.prod
+│   └── .env.dockploy.example
 ├── package.json
 ├── pnpm-workspace.yaml
 ├── turbo.json
@@ -59,16 +70,10 @@ The stack is optimized for:
 │   └── add-service.sh
 └── services
     ├── gateway
-    │   ├── Dockerfile
-    │   ├── .env
     │   └── src
     ├── auth
-    │   ├── Dockerfile
-    │   ├── .env
     │   └── src
     └── property
-        ├── Dockerfile
-        ├── .env
         └── src
 ```
 
@@ -88,12 +93,15 @@ pnpm install --no-frozen-lockfile
 pnpm -r type-check
 pnpm -r build
 pnpm dev
-docker compose up --build
+pnpm docker:up:build
+pnpm docker:prod:up:build:d
 ```
 
 ## Documentation
 
 - [docs/SETUP.md](docs/SETUP.md)
+- [docs/DOCKER_PROD_SETUP.md](docs/DOCKER_PROD_SETUP.md)
+- [docs/DOCKPLOY_SWARM_DEPLOY.md](docs/DOCKPLOY_SWARM_DEPLOY.md)
 - [docs/NEW_SERVICE_CONFIG.md](docs/NEW_SERVICE_CONFIG.md)
 - [docs/SCRIPTS.md](docs/SCRIPTS.md)
 - [docs/GITHUB_AUTOMATION.md](docs/GITHUB_AUTOMATION.md)
@@ -154,9 +162,9 @@ Example:
 This script creates:
 
 - service source files (`src/index.ts`, `src/config/env.ts`, `src/routes/health.ts`, `src/lib/logger.ts`)
-- service config (`package.json`, `tsconfig.json`, `.env`, `Dockerfile`)
+- service config (`package.json`, `tsconfig.json`, `docker/<service>.Dockerfile`)
 - root `tsconfig.json` reference
-- new service block in `docker-compose.yml`
+- new service block in `docker/docker-compose.yml`
 
 After generation:
 
@@ -171,18 +179,16 @@ If the service must be routed via gateway:
 
 1. Add route in `services/gateway/src/proxy.ts`
 2. Add service URL env fields in `services/gateway/src/config/env.ts`
-3. Add values in `services/gateway/.env` and `docker-compose.yml`
+3. Add required `env/.env` variables and map them in `docker/docker-compose.yml`
 
 ## Environment Conventions
 
-Every service should define:
+Environment setup uses a single global env folder:
 
-- `NODE_ENV`
-- `PORT`
-- `LOG_LEVEL`
-- `LOG_FORMAT`
-
-Gateway additionally defines upstream service URLs.
+- all services read local config from `env/.env` (copy from `env/.env.example`)
+- env validation has no default fallbacks in `config/env.ts`
+- shared env is minimal (`NODE_ENV`, `LOG_LEVEL`, `LOG_FORMAT`, ports)
+- compose maps root `.env` values into container runtime env
 
 ## Health & Operations
 
