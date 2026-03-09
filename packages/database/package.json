@@ -1,0 +1,43 @@
+{
+  "name": "@proptryx/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "dist",
+    "drizzle"
+  ],
+  "scripts": {
+    "build": "tsup --config ../../tsup.config.ts",
+    "lint": "biome lint ./src drizzle.config.ts",
+    "lint:fix": "biome lint --write ./src drizzle.config.ts",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo drizzle",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "db:push": "drizzle-kit push --config=drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config=drizzle.config.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.6",
+    "@proptryx/typescript-config": "workspace:*",
+    "@types/node": "^25.3.5",
+    "@types/pg": "^8.15.6",
+    "drizzle-kit": "^0.31.9",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

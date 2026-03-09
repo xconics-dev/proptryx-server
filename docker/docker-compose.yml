@@ -18,6 +18,7 @@ services:
       LOG_LEVEL: ${GATEWAY_LOG_LEVEL}
       LOG_FORMAT: ${GATEWAY_LOG_FORMAT}
       LOG_HEALTHCHECKS: ${GATEWAY_LOG_HEALTHCHECKS}
+      DATABASE_URL: ${DATABASE_URL}
       AUTH_SERVICE_URL: http://auth:${AUTH_PORT}
       PROPERTY_SERVICE_URL: http://property:${PROPERTY_PORT}
     depends_on:
@@ -47,6 +48,7 @@ services:
       LOG_LEVEL: ${AUTH_LOG_LEVEL}
       LOG_FORMAT: ${AUTH_LOG_FORMAT}
       LOG_HEALTHCHECKS: ${AUTH_LOG_HEALTHCHECKS}
+      DATABASE_URL: ${DATABASE_URL}
     healthcheck:
       test:
         ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${AUTH_PORT}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -69,6 +71,7 @@ services:
       LOG_LEVEL: ${PROPERTY_LOG_LEVEL}
       LOG_FORMAT: ${PROPERTY_LOG_FORMAT}
       LOG_HEALTHCHECKS: ${PROPERTY_LOG_HEALTHCHECKS}
+      DATABASE_URL: ${DATABASE_URL}
     healthcheck:
       test:
         ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${PROPERTY_PORT}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]

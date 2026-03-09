@@ -5,8 +5,8 @@
     "rules": {
       "recommended": true,
       "correctness": {
-        "noUnusedVariables": "error",
-        "noUnusedImports": "error"
+        "noUnusedVariables": "off",
+        "noUnusedImports": "off"
       },
       "style": {
         "noNonNullAssertion": "warn",

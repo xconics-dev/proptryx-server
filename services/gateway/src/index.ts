@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
+import { initDB, initDBMiddleware } from "@proptryx/database";
 import { createHonoRequestLogger } from "@proptryx/logger";
 import { Hono } from "hono";
 import { env } from "@/config/env";
@@ -10,6 +11,7 @@ import healthRoute from "@/routes/health";
 // ── Hono app (non-proxy routes only) ─────────────────────────────────────────
 const app = new Hono();
 app.use("*", createHonoRequestLogger(logger));
+app.use("*", initDBMiddleware({ logger, serviceName: "gateway" }));
 
 app.route("/health", healthRoute);
 
@@ -72,6 +74,8 @@ async function handler(req: IncomingMessage, res: ServerResponse) {
 }
 
 // ── Server ────────────────────────────────────────────────────────────────────
+await initDB({ logger, serviceName: "gateway" });
+
 const server = createServer((req, res) => {
   handler(req, res).catch((err) => {
     logger.error("gateway request handler failed", { error: err });

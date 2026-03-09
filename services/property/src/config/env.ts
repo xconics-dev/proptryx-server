@@ -9,6 +9,7 @@ export const env = createEnv({
     PORT: z.coerce.number().int().min(1).max(65535),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "fatal"]),
     LOG_FORMAT: z.enum(["pretty", "json"]),
+    DATABASE_URL: z.url("DATABASE_URL must be a valid PostgreSQL connection string"),
   },
 
   runtimeEnv: {
@@ -16,6 +17,7 @@ export const env = createEnv({
     PORT: process.env.PORT ?? process.env.PROPERTY_PORT,
     LOG_LEVEL: process.env.LOG_LEVEL ?? process.env.PROPERTY_LOG_LEVEL,
     LOG_FORMAT: process.env.LOG_FORMAT ?? process.env.PROPERTY_LOG_FORMAT,
+    DATABASE_URL: process.env.DATABASE_URL,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
