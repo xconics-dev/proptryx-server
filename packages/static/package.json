@@ -1,5 +1,5 @@
 {
-  "name": "@proptryx/utils",
+  "name": "@proptryx/static",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,8 @@
   },
   "types": "./src/index.ts",
   "files": [
-    "dist"
+    "dist",
+    "logo"
   ],
   "scripts": {
     "build": "tsup --config ../../tsup.config.ts",
@@ -20,10 +21,6 @@
     "lint:fix": "biome lint --write ./src",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist .turbo"
-  },
-  "dependencies": {
-    "@proptryx/static": "workspace:*",
-    "hono": "^4.12.5"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",

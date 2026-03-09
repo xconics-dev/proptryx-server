@@ -38,7 +38,6 @@ export function proxyRequest(
   route: ProxyRoute
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    // biome-ignore lint/style/noNonNullAssertion: route is guaranteed by prior match
     const target = parsedTargets.get(route.prefix)!;
     const isHttps = target.protocol === "https:";
     const reqFn = isHttps ? httpsRequest : httpRequest;

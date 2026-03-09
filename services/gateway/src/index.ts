@@ -4,6 +4,7 @@ import { initDB, initDBMiddleware } from "@proptryx/database";
 import { createHonoRequestLogger } from "@proptryx/logger";
 import {
   createErrorHandler,
+  createFaviconHandler,
   createHealthCheckHandler,
   createNotFoundHandler,
 } from "@proptryx/utils";
@@ -17,7 +18,10 @@ const app = new Hono();
 app.use("*", createHonoRequestLogger(logger));
 app.use("*", initDBMiddleware({ logger, serviceName: "gateway" }));
 
+const faviconHandler = createFaviconHandler();
 app.get("/health", createHealthCheckHandler({ serviceName: "gateway" }));
+app.get("/favicon.png", faviconHandler);
+app.get("/favicon.ico", faviconHandler);
 
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler({ serviceName: "gateway", logger }));

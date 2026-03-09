@@ -7,3 +7,4 @@ export {
 } from "./handlers/healthcheck";
 export { createNotFoundHandler } from "./handlers/not-found";
 export { createErrorHandler, type ErrorHandlerOptions } from "./handlers/error";
+export { createFaviconHandler, type FaviconHandlerOptions } from "./handlers/favicon";
