@@ -16,6 +16,7 @@ export const env = createEnv({
     PORT: z.coerce.number().int().min(1).max(65535),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "fatal"]),
     LOG_FORMAT: z.enum(["pretty", "json"]),
+    DATABASE_URL: z.url("DATABASE_URL must be a valid PostgreSQL connection string"),
 
     AUTH_SERVICE_URL: z.url("AUTH_SERVICE_URL must be a valid URL — e.g. http://auth:6001"),
 
@@ -29,6 +30,7 @@ export const env = createEnv({
     PORT: process.env.PORT ?? process.env.GATEWAY_PORT,
     LOG_LEVEL: process.env.LOG_LEVEL ?? process.env.GATEWAY_LOG_LEVEL,
     LOG_FORMAT: process.env.LOG_FORMAT ?? process.env.GATEWAY_LOG_FORMAT,
+    DATABASE_URL: process.env.DATABASE_URL,
     AUTH_SERVICE_URL:
       process.env.AUTH_SERVICE_URL ??
       process.env.GATEWAY_AUTH_SERVICE_URL ??

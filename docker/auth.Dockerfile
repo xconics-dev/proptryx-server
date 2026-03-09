@@ -10,6 +10,7 @@ RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
 FROM base AS build-deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/database/package.json ./packages/database/package.json
 COPY packages/logger/package.json ./packages/logger/package.json
 COPY packages/typescript-config/package.json ./packages/typescript-config/package.json
 COPY services/auth/package.json ./services/auth/package.json
@@ -20,12 +21,15 @@ FROM base AS builder
 COPY --from=build-deps /app/node_modules /app/node_modules
 COPY --from=build-deps /app/services/auth/node_modules /app/services/auth/node_modules
 COPY tsup.config.ts /app/tsup.config.ts
+COPY packages/database /app/packages/database
 COPY packages/logger /app/packages/logger
 COPY packages/typescript-config /app/packages/typescript-config
 COPY services/auth /app/services/auth
 WORKDIR /app
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   cd /app/packages/logger \
+  && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
+  && cd /app/packages/database \
   && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
   && cd /app \
   && SKIP_ENV_VALIDATION=true pnpm --filter @proptryx/auth run build \

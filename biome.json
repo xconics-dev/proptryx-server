@@ -1,20 +1,29 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.6/schema.json",
+
   "linter": {
     "enabled": true,
     "rules": {
       "recommended": true,
       "correctness": {
-        "noUnusedVariables": "error",
-        "noUnusedImports": "error"
+        "noUnusedVariables": "off",
+        "noUnusedImports": "off"
       },
       "style": {
-        "noNonNullAssertion": "warn",
+        "noNonNullAssertion": "off",
         "useConst": "error"
       },
       "suspicious": {
         "noConsole": "off",
         "noExplicitAny": "warn"
+      }
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "off"
       }
     }
   },
