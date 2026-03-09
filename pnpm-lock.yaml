@@ -102,6 +102,31 @@ importers:
 
   packages/typescript-config: {}
 
+  packages/utils:
+    dependencies:
+      hono:
+        specifier: ^4.12.5
+        version: 4.12.5
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.4.6
+        version: 2.4.6
+      '@proptryx/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^25.3.5
+        version: 25.3.5
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   services/auth:
     dependencies:
       '@hono/node-server':
@@ -113,6 +138,9 @@ importers:
       '@proptryx/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@proptryx/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@t3-oss/env-core':
         specifier: ^0.13.10
         version: 0.13.10(typescript@5.9.3)(zod@4.3.6)
@@ -150,6 +178,9 @@ importers:
       '@proptryx/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@proptryx/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@t3-oss/env-core':
         specifier: ^0.13.10
         version: 0.13.10(typescript@5.9.3)(zod@4.3.6)
@@ -190,6 +221,9 @@ importers:
       '@proptryx/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@proptryx/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@t3-oss/env-core':
         specifier: ^0.13.10
         version: 0.13.10(typescript@5.9.3)(zod@4.3.6)

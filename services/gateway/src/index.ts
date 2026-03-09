@@ -2,29 +2,25 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import { initDB, initDBMiddleware } from "@proptryx/database";
 import { createHonoRequestLogger } from "@proptryx/logger";
+import {
+  createErrorHandler,
+  createHealthCheckHandler,
+  createNotFoundHandler,
+} from "@proptryx/utils";
 import { Hono } from "hono";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { proxyRequest, proxyRoutes } from "@/proxy";
-import healthRoute from "@/routes/health";
 
 // ── Hono app (non-proxy routes only) ─────────────────────────────────────────
 const app = new Hono();
 app.use("*", createHonoRequestLogger(logger));
 app.use("*", initDBMiddleware({ logger, serviceName: "gateway" }));
 
-app.route("/health", healthRoute);
+app.get("/health", createHealthCheckHandler({ serviceName: "gateway" }));
 
-app.notFound((c) =>
-  c.json(
-    {
-      success: false,
-      error: "Not Found",
-      message: `${c.req.method} ${c.req.path} not found`,
-    },
-    404
-  )
-);
+app.notFound(createNotFoundHandler());
+app.onError(createErrorHandler({ serviceName: "gateway", logger }));
 
 // ── Request handler ───────────────────────────────────────────────────────────
 //

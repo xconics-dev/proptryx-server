@@ -7,3 +7,5 @@ export const test_table = pgTable("test_table", {
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export type TestTable = typeof test_table.$inferSelect;

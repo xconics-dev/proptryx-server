@@ -8,7 +8,7 @@
     "build:gateway": "turbo run build --filter=@proptryx/gateway",
     "build:auth": "turbo run build --filter=@proptryx/auth",
     "build:property": "turbo run build --filter=@proptryx/property",
-    "dev": "pnpm --filter @proptryx/logger run build && pnpm --filter @proptryx/database run build && turbo run dev --filter=@proptryx/gateway --filter=@proptryx/auth --filter=@proptryx/property",
+    "dev": "pnpm --filter @proptryx/logger run build && pnpm --filter @proptryx/database run build && pnpm --filter @proptryx/utils run build && turbo run dev --filter=@proptryx/gateway --filter=@proptryx/auth --filter=@proptryx/property",
     "dev:gateway": "turbo run dev --filter=@proptryx/gateway",
     "dev:auth": "turbo run dev --filter=@proptryx/auth",
     "dev:property": "turbo run dev --filter=@proptryx/property",
