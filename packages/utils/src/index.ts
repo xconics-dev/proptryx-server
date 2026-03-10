@@ -7,4 +7,5 @@ export {
 } from "./handlers/healthcheck";
 export { createNotFoundHandler } from "./handlers/not-found";
 export { createErrorHandler, type ErrorHandlerOptions } from "./handlers/error";
+export { applyAppSecurity, type AppSecurityOptions } from "./middleware/security";
 export { createFaviconHandler, type FaviconHandlerOptions } from "./handlers/favicon";

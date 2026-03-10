@@ -3,6 +3,10 @@ packages:
   - packages/*
   - services/*
 
+ignoredBuiltDependencies:
+  - '@prisma/engines'
+  - prisma
+
 onlyBuiltDependencies:
   - '@biomejs/biome'
   - esbuild

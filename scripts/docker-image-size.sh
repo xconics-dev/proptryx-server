@@ -3,6 +3,11 @@ set -euo pipefail
 
 SERVICES=(gateway auth property)
 BUILD_FIRST=false
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+COMPOSE_FILE="${REPO_ROOT}/docker/docker-compose.yml"
+ENV_FILE="${REPO_ROOT}/env/.env"
+PROJECT_NAME="proptryx"
 
 print_usage() {
   cat <<'USAGE'
@@ -27,32 +32,44 @@ contains_service() {
   return 1
 }
 
+compose() {
+  docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "$@"
+}
+
+compose_image_ref_for_service() {
+  local svc="$1"
+  local image_ref=""
+  image_ref="$(compose config --images 2>/dev/null | awk -v service="$svc" 'NR == 1 { next } { print }' | grep -E "(^|/)${PROJECT_NAME}-${svc}(:|$)" | head -n 1 || true)"
+  if [[ -z "$image_ref" ]]; then
+    image_ref="${PROJECT_NAME}-${svc}"
+  fi
+  echo "$image_ref"
+}
+
 find_image_ref_for_service() {
   local svc="$1"
-  local expected_repo="${project_name}-${svc}"
+  local expected_repo="$(compose_image_ref_for_service "$svc")"
+  expected_repo="${expected_repo%:latest}"
   local ref=""
 
-  # 1) Preferred exact default compose tag
   if docker image inspect "${expected_repo}:latest" >/dev/null 2>&1; then
     echo "${expected_repo}:latest"
     return 0
   fi
 
-  # 2) Any tag for expected compose repo
-  ref="$(
+  ref="$({
     docker image ls --format '{{.Repository}}:{{.Tag}}' \
       | awk -v repo="${expected_repo}" -F: '$1 == repo && $2 != "<none>" { print $0; exit }'
-  )"
+  } || true)"
   if [[ -n "$ref" ]]; then
     echo "$ref"
     return 0
   fi
 
-  # 3) Fallback: any repo that ends with "-<service>" (helps with custom project names)
-  ref="$(
+  ref="$({
     docker image ls --format '{{.Repository}}:{{.Tag}}' \
       | awk -v suffix="-${svc}" -F: 'index($1, suffix) > 0 && $2 != "<none>" { print $0; exit }'
-  )"
+  } || true)"
   if [[ -n "$ref" ]]; then
     echo "$ref"
     return 0
@@ -107,12 +124,20 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
-if $BUILD_FIRST; then
-  echo "Building selected services: ${selected[*]}"
-  docker compose build "${selected[@]}"
+if [[ ! -f "${COMPOSE_FILE}" ]]; then
+  echo "compose file not found: ${COMPOSE_FILE}" >&2
+  exit 1
 fi
 
-project_name="$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-')"
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+if $BUILD_FIRST; then
+  echo "Building selected services: ${selected[*]}"
+  compose build "${selected[@]}"
+fi
 
 printf "\n%-10s %-40s %12s\n" "SERVICE" "IMAGE" "SIZE"
 printf "%-10s %-40s %12s\n" "----------" "----------------------------------------" "------------"
@@ -121,7 +146,7 @@ total_bytes=0
 found_count=0
 for svc in "${selected[@]}"; do
   if ! image_ref="$(find_image_ref_for_service "$svc")"; then
-    printf "%-10s %-40s %12s\n" "$svc" "${project_name}-${svc}:latest" "NOT FOUND"
+    printf "%-10s %-40s %12s\n" "$svc" "${PROJECT_NAME}-${svc}:latest" "NOT FOUND"
     continue
   fi
 

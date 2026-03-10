@@ -1,3 +1,5 @@
+name: proptryx
+
 x-service-defaults: &service-defaults
   restart: unless-stopped
   networks:
@@ -18,6 +20,7 @@ services:
       LOG_LEVEL: ${GATEWAY_LOG_LEVEL}
       LOG_FORMAT: ${GATEWAY_LOG_FORMAT}
       LOG_HEALTHCHECKS: ${GATEWAY_LOG_HEALTHCHECKS}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       DATABASE_URL: ${DATABASE_URL}
       AUTH_SERVICE_URL: http://auth:${AUTH_PORT}
       PROPERTY_SERVICE_URL: http://property:${PROPERTY_PORT}
@@ -48,7 +51,11 @@ services:
       LOG_LEVEL: ${AUTH_LOG_LEVEL}
       LOG_FORMAT: ${AUTH_LOG_FORMAT}
       LOG_HEALTHCHECKS: ${AUTH_LOG_HEALTHCHECKS}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      BETTER_AUTH_API_KEY: ${BETTER_AUTH_API_KEY}
     healthcheck:
       test:
         ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${AUTH_PORT}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -71,6 +78,7 @@ services:
       LOG_LEVEL: ${PROPERTY_LOG_LEVEL}
       LOG_FORMAT: ${PROPERTY_LOG_FORMAT}
       LOG_HEALTHCHECKS: ${PROPERTY_LOG_HEALTHCHECKS}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       DATABASE_URL: ${DATABASE_URL}
     healthcheck:
       test:

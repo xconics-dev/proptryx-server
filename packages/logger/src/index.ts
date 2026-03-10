@@ -287,8 +287,8 @@ export function createHonoRequestLogger(logger: Logger): MiddlewareHandler {
       path: c.req.path,
       status,
       durationMs: Date.now() - startedAt,
-      userAgent: c.req.header("user-agent") ?? null,
-      requestId: c.req.header("x-request-id") ?? null,
+      // userAgent: c.req.header("user-agent") ?? null,
+      // requestId: c.req.header("x-request-id") ?? null,
     };
 
     if (status >= 500) {
