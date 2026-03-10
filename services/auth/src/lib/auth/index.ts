@@ -6,10 +6,10 @@ import * as schema from "@proptryx/database";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import {
-  betterAuthSecondaryStorage,
   getBetterAuthConfigState,
   normalizeBasePath,
   resolveAuthDatabase,
+  resolveAuthSecondaryStorage,
 } from "./utils";
 
 const { betterAuthSecret, betterAuthUrl, isProduction, trustedOrigins } =
@@ -25,7 +25,7 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
-  secondaryStorage: betterAuthSecondaryStorage,
+  secondaryStorage: resolveAuthSecondaryStorage(),
   onAPIError: {
     throw: true,
     onError: (error, _ctx) => {
@@ -41,12 +41,12 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
     updateAge: 60 * 60 * 24, // 24 hours
-    storeSessionInDatabase: false,
     deferSessionRefresh: true,
+    storeSessionInDatabase: false,
     cookieCache: {
       enabled: true,
       maxAge: 60 * 5, // 5 minutes
-      strategy: "compact",
+      strategy: "jwe",
     },
   },
   plugins: [

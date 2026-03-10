@@ -10,6 +10,7 @@ import {
 } from "@proptryx/utils";
 import { Hono } from "hono";
 import { env } from "@/config/env";
+import { initializeAuthSecondaryStorage } from "@/lib/auth/utils";
 import { logger } from "@/lib/logger";
 
 const app = new Hono();
@@ -23,6 +24,7 @@ app.get("/favicon.ico", faviconHandler);
 app.get("/", (c) => c.redirect("/docs", 302));
 
 await initDB({ logger, serviceName: "auth" });
+await initializeAuthSecondaryStorage();
 const { auth } = await import("@/lib/auth");
 
 app.all("*", (c) => auth.handler(c.req.raw));

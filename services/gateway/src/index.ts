@@ -22,6 +22,8 @@ const faviconHandler = createFaviconHandler();
 app.get("/health", createHealthCheckHandler({ serviceName: "gateway" }));
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
+app.get("/api/auth", (c) => c.redirect("/api/auth/docs", 302));
+app.get("/api/auth/", (c) => c.redirect("/api/auth/docs", 302));
 
 function registerProxyRoute(route: ProxyRoute) {
   const handler = async (c: Context) => {
@@ -29,6 +31,9 @@ function registerProxyRoute(route: ProxyRoute) {
       const upstreamUrl = createUpstreamUrl(c.req.url, route);
       const headers = new Headers(c.req.raw.headers);
       headers.set("host", new URL(route.target).host);
+      headers.set("x-forwarded-host", new URL(c.req.url).host);
+      headers.set("x-forwarded-proto", new URL(c.req.url).protocol.replace(":", ""));
+      headers.set("x-forwarded-prefix", route.prefix);
 
       const response = await proxy(upstreamUrl, {
         raw: c.req.raw,

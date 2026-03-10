@@ -1,16 +1,7 @@
-import { redisStorage } from "@better-auth/redis-storage";
 import { getDB } from "@proptryx/database";
 import { AUTH_SESSION_REDIS_PREFIX, getRedisClient, initializeRedisClient } from "@proptryx/utils";
+import { redisStorage } from "@better-auth/redis-storage";
 import { env } from "@/config/env";
-import { logger } from "@/lib/logger";
-
-const redis = getRedisClient();
-
-void initializeRedisClient().catch((error) => {
-  logger.warn("Proptryx Auth Service Redis warmup failed", {
-    error: error instanceof Error ? error.stack : error,
-  });
-});
 
 export function getBetterAuthConfigState() {
   const betterAuthUrl = new URL(env.BETTER_AUTH_URL);
@@ -38,7 +29,13 @@ export function resolveAuthDatabase() {
   }
 }
 
-export const betterAuthSecondaryStorage = redisStorage({
-  client: redis,
-  keyPrefix: AUTH_SESSION_REDIS_PREFIX,
-});
+export function resolveAuthSecondaryStorage() {
+  return redisStorage({
+    client: getRedisClient(),
+    keyPrefix: AUTH_SESSION_REDIS_PREFIX,
+  });
+}
+
+export async function initializeAuthSecondaryStorage() {
+  await initializeRedisClient();
+}
