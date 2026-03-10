@@ -2,7 +2,7 @@ import { getDB } from "@proptryx/database";
 import { dash } from "@better-auth/infra";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { openAPI } from "better-auth/plugins";
+import { openAPI, organization } from "better-auth/plugins";
 import { env } from "@/config/env";
 import * as schema from "@proptryx/database";
 
@@ -42,6 +42,7 @@ export const auth = betterAuth({
     dash({
       apiKey: env.BETTER_AUTH_API_KEY,
     }),
+    organization(),
   ],
   experimental: {
     joins: true,

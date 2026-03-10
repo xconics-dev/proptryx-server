@@ -3,6 +3,7 @@ import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import type { Context, Hono } from "hono";
+import { requestId } from "hono/request-id";
 
 type AppLike = Pick<Hono, "use" | "get">;
 
@@ -48,6 +49,7 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
     })
   );
 
+  app.use("*", requestId());
   app.use("*", secureHeaders());
   app.use("*", compress({ threshold: 1024 }));
 

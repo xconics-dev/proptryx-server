@@ -21,6 +21,7 @@ const faviconHandler = createFaviconHandler();
 app.get("/health", createHealthCheckHandler({ serviceName: "auth" }));
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
+app.get("/", (c) => c.redirect("/docs", 302));
 
 await initDB({ logger, serviceName: "auth" });
 const { auth } = await import("@/lib/auth");
