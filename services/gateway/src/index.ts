@@ -1,20 +1,21 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { createServer } from "node:http";
+import { serve } from "@hono/node-server";
 import { initDB, initDBMiddleware } from "@proptryx/database";
 import { createHonoRequestLogger } from "@proptryx/logger";
 import {
+  applyAppSecurity,
   createErrorHandler,
   createFaviconHandler,
   createHealthCheckHandler,
   createNotFoundHandler,
 } from "@proptryx/utils";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { proxy } from "hono/proxy";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
-import { proxyRequest, proxyRoutes } from "@/proxy";
+import { createUpstreamUrl, proxyRoutes, type ProxyRoute } from "@/proxy";
 
-// ── Hono app (non-proxy routes only) ─────────────────────────────────────────
 const app = new Hono();
+applyAppSecurity(app, { corsOrigins: env.CORS_ALLOWED_ORIGINS });
 app.use("*", createHonoRequestLogger(logger));
 app.use("*", initDBMiddleware({ logger, serviceName: "gateway" }));
 
@@ -23,70 +24,59 @@ app.get("/health", createHealthCheckHandler({ serviceName: "gateway" }));
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
 
-app.notFound(createNotFoundHandler());
-app.onError(createErrorHandler({ serviceName: "gateway", logger }));
+function registerProxyRoute(route: ProxyRoute) {
+  const handler = async (c: Context) => {
+    try {
+      const upstreamUrl = createUpstreamUrl(c.req.url, route);
+      const headers = new Headers(c.req.raw.headers);
+      headers.set("host", new URL(route.target).host);
 
-// ── Request handler ───────────────────────────────────────────────────────────
-//
-// Proxy requests are handled at the raw Node level — Hono never sees them.
-// This is the only correct way to avoid ERR_HTTP_HEADERS_SENT:
-// @hono/node-server unconditionally calls responseViaResponseObject() after
-// your handler returns, which double-writes headers if the proxy already
-// wrote to the ServerResponse.
-//
-async function handler(req: IncomingMessage, res: ServerResponse) {
-  const url = req.url ?? "/";
+      const response = await proxy(upstreamUrl, {
+        raw: c.req.raw,
+        headers,
+      });
 
-  // ── 1. Proxy routes ────────────────────────────────────────────────────────
-  const route = proxyRoutes.find((r) => url.startsWith(r.prefix));
-  if (route) {
-    await proxyRequest(req, res, route);
-    return; // res already ended by the proxy stream
-  }
+      logger.info("proxied request", {
+        method: c.req.method,
+        prefix: route.prefix,
+        upstreamPath: new URL(upstreamUrl).pathname,
+        status: response.status,
+        target: route.target,
+      });
 
-  // ── 2. Everything else → Hono ─────────────────────────────────────────────
-  const headers: Record<string, string> = {};
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (value !== undefined) {
-      headers[key] = Array.isArray(value) ? value.join(", ") : value;
+      return response;
+    } catch (error) {
+      logger.error("upstream request failed", {
+        method: c.req.method,
+        prefix: route.prefix,
+        target: route.target,
+        error,
+      });
+
+      return c.json(
+        {
+          success: false,
+          error: "Bad Gateway",
+          message: `Upstream unavailable: ${route.target}`,
+        },
+        502
+      );
     }
-  }
+  };
 
-  const request = new Request(new URL(url, `http://localhost:${env.PORT}`), {
-    method: req.method ?? "GET",
-    headers,
-    // Don't set body for GET/HEAD — ReadableStream from IncomingMessage
-    body:
-      req.method === "GET" || req.method === "HEAD"
-        ? undefined
-        : (req as unknown as ReadableStream),
-    duplex: "half",
-  });
-
-  const response = await app.fetch(request);
-  const body = response.body ? Buffer.from(await response.arrayBuffer()) : null;
-
-  res.writeHead(response.status, Object.fromEntries(response.headers));
-  if (body) {
-    res.write(body);
-  }
-  res.end();
+  app.all(route.prefix, handler);
+  app.all(`${route.prefix}/*`, handler);
 }
 
-// ── Server ────────────────────────────────────────────────────────────────────
+for (const route of proxyRoutes) {
+  registerProxyRoute(route);
+}
+
+app.notFound(createNotFoundHandler());
+app.onError(createErrorHandler({ serviceName: "gateway", logger }));
 await initDB({ logger, serviceName: "gateway" });
 
-const server = createServer((req, res) => {
-  handler(req, res).catch((err) => {
-    logger.error("gateway request handler failed", { error: err });
-    if (!res.headersSent) {
-      res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: false, error: "Internal Server Error" }));
-    }
-  });
-});
-
-server.listen(env.PORT, () => {
+serve({ fetch: app.fetch, port: env.PORT }, () => {
   logger.info("service started", {
     port: env.PORT,
     baseUrl: `http://localhost:${env.PORT}`,

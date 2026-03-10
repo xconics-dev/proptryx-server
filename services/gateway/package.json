@@ -13,6 +13,7 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.11",
     "@proptryx/database": "workspace:*",
     "@proptryx/logger": "workspace:*",
     "@proptryx/utils": "workspace:*",

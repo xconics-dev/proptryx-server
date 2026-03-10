@@ -22,6 +22,7 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.11",
     "@proptryx/static": "workspace:*",
     "hono": "^4.12.5"
   },

@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { initDB, initDBMiddleware } from "@proptryx/database";
 import { createHonoRequestLogger } from "@proptryx/logger";
 import {
+  applyAppSecurity,
   createErrorHandler,
   createFaviconHandler,
   createHealthCheckHandler,
@@ -12,6 +13,7 @@ import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 
 const app = new Hono();
+applyAppSecurity(app, { corsOrigins: env.CORS_ALLOWED_ORIGINS });
 app.use("*", createHonoRequestLogger(logger));
 app.use("*", initDBMiddleware({ logger, serviceName: "auth" }));
 
