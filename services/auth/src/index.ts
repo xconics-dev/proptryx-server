@@ -22,10 +22,12 @@ app.get("/health", createHealthCheckHandler({ serviceName: "auth" }));
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
 
+await initDB({ logger, serviceName: "auth" });
+const { auth } = await import("@/lib/auth");
+
+app.on(["GET", "POST"], "*", (c) => auth.handler(c.req.raw));
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler({ serviceName: "auth", logger }));
-
-await initDB({ logger, serviceName: "auth" });
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info("service started", {

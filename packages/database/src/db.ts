@@ -1,6 +1,7 @@
 import type { ConnectionOptions } from "node:tls";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import * as schema from "./schemas";
 
 export type DB = ReturnType<typeof drizzle>;
 export let db: DB;
@@ -78,7 +79,7 @@ export async function initDB(options: InitDBOptions = {}): Promise<DB> {
       ssl: buildSslOptions(url),
     });
 
-    db = drizzle(pool);
+    db = drizzle(pool, { schema });
     await pool.query("select 1");
 
     options.logger?.info("database connected", {

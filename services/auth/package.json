@@ -10,9 +10,13 @@
     "lint": "biome lint ./src",
     "lint:fix": "biome lint --write ./src",
     "type-check": "tsc --noEmit",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .turbo",
+    "db:auth:generate": "set -a && . ../../env/.env && set +a && pnpm dlx auth@latest generate --config src/lib/auth.ts --output ../../packages/database/src/schemas/auth/schema.ts --yes",
+    "db:auth:secret": "pnpm dlx auth@latest secret",
+    "db:auth:info": "set -a && . ../../env/.env && set +a && pnpm dlx auth@latest info --config src/lib/auth.ts --json"
   },
   "dependencies": {
+    "@better-auth/infra": "^0.1.8",
     "@hono/node-server": "^1.19.11",
     "@proptryx/database": "workspace:*",
     "@proptryx/logger": "workspace:*",

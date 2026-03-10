@@ -64,7 +64,7 @@ const ssl: ConnectionOptions | undefined =
 
 export default defineConfig({
   out: "./drizzle",
-  schema: "./src/schemas/*.ts",
+  schema: "./src/schemas/**/*.ts",
   dialect: "postgresql",
   dbCredentials: {
     host: url.hostname,
