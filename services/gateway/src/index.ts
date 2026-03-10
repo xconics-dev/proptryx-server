@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server";
-import { initDB, initDBMiddleware } from "@proptryx/database";
+import { initDB } from "@proptryx/database";
 import { createHonoRequestLogger } from "@proptryx/logger";
 import {
   applyAppSecurity,
@@ -17,7 +17,6 @@ import { createUpstreamUrl, proxyRoutes, type ProxyRoute } from "@/proxy";
 const app = new Hono();
 applyAppSecurity(app, { corsOrigins: env.CORS_ALLOWED_ORIGINS });
 app.use("*", createHonoRequestLogger(logger));
-app.use("*", initDBMiddleware({ logger, serviceName: "gateway" }));
 
 const faviconHandler = createFaviconHandler();
 app.get("/health", createHealthCheckHandler({ serviceName: "gateway" }));

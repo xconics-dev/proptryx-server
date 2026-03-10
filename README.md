@@ -34,9 +34,11 @@ The stack is optimized for:
 - centralized logger package: `@proptryx/logger`
 - service-level logger wrapper per service (`src/lib/logger.ts`)
 - Hono request middleware for consistent request logs
-- env-driven logging:
+- shared logging env for all services:
   - `LOG_LEVEL=debug|info|warn|error|fatal`
   - `LOG_FORMAT=pretty|json`
+  - `LOG_HEALTHCHECKS=true|false`
+- compose passes the same logging config into every service container
 
 ## Monorepo Structure
 
@@ -186,8 +188,7 @@ If the service must be routed via gateway:
 Environment setup uses a single global env folder:
 
 - all services read local config from `env/.env` (copy from `env/.env.example`)
-- env validation has no default fallbacks in `config/env.ts`
-- shared env is minimal (`NODE_ENV`, `LOG_LEVEL`, `LOG_FORMAT`, ports)
+- shared env is minimal (`NODE_ENV`, `LOG_LEVEL`, `LOG_FORMAT`, `LOG_HEALTHCHECKS`, shared network/database config, service ports)
 - compose maps root `.env` values into container runtime env
 
 ## Health & Operations

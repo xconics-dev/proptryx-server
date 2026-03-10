@@ -3,6 +3,8 @@ import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import type { Context, Hono } from "hono";
+import { requestId } from "hono/request-id";
+import { createGlobalRateLimit } from "./rate-limit";
 
 type AppLike = Pick<Hono, "use" | "get">;
 
@@ -10,6 +12,9 @@ export interface AppSecurityOptions {
   corsOrigins: string[];
   maxBodySizeBytes?: number;
   exposeCorsRoute?: boolean;
+  compressionThresholdBytes?: number;
+  validateJsonBody?: boolean;
+  enableGlobalRateLimit?: boolean;
 }
 
 function hasJsonContentType(contentType: string | undefined) {
@@ -27,6 +32,8 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
   const allowAll = normalizedOrigins.includes("*");
   const allowedOrigins = new Set(normalizedOrigins);
   const exposeCorsRoute = options.exposeCorsRoute ?? true;
+  const validateJsonBody = options.validateJsonBody ?? false;
+  const enableGlobalRateLimit = options.enableGlobalRateLimit ?? true;
 
   app.use(
     "*",
@@ -41,15 +48,24 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
         return allowedOrigins.has(origin) ? origin : "";
       },
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
-      exposeHeaders: ["X-Request-Id"],
+      allowHeaders: ["Content-Type", "Authorization", "X-Request-Id", "Set-Auth-Token"],
+      exposeHeaders: ["X-Request-Id", "Set-Auth-Token"],
       maxAge: 600,
       credentials: !allowAll,
     })
   );
 
+  app.use("*", requestId());
+  if (enableGlobalRateLimit) {
+    app.use(
+      "*",
+      createGlobalRateLimit({
+        skipPaths: exposeCorsRoute ? ["/health", "/cors"] : ["/health"],
+      })
+    );
+  }
   app.use("*", secureHeaders());
-  app.use("*", compress({ threshold: 1024 }));
+  app.use("*", compress({ threshold: options.compressionThresholdBytes ?? 2048 }));
 
   if (exposeCorsRoute) {
     app.get("/cors", (c: Context) =>
@@ -78,6 +94,10 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
         ),
     })
   );
+
+  if (!validateJsonBody) {
+    return;
+  }
 
   app.use("*", async (c, next) => {
     const method = c.req.method;

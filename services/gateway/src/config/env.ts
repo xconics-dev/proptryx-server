@@ -31,6 +31,7 @@ export const env = createEnv({
     LOG_FORMAT: z.enum(["pretty", "json"]),
     CORS_ALLOWED_ORIGINS: corsOriginsSchema,
     DATABASE_URL: z.url("DATABASE_URL must be a valid PostgreSQL connection string"),
+    REDIS_URL: z.url("REDIS_URL must be a valid Redis connection string"),
 
     AUTH_SERVICE_URL: z.url("AUTH_SERVICE_URL must be a valid URL — e.g. http://auth:6001"),
 
@@ -40,21 +41,15 @@ export const env = createEnv({
   },
 
   runtimeEnv: {
-    NODE_ENV: process.env.NODE_ENV ?? process.env.GATEWAY_NODE_ENV,
-    PORT: process.env.PORT ?? process.env.GATEWAY_PORT,
-    LOG_LEVEL: process.env.LOG_LEVEL ?? process.env.GATEWAY_LOG_LEVEL,
-    LOG_FORMAT: process.env.LOG_FORMAT ?? process.env.GATEWAY_LOG_FORMAT,
-    CORS_ALLOWED_ORIGINS:
-      process.env.CORS_ALLOWED_ORIGINS ?? process.env.GATEWAY_CORS_ALLOWED_ORIGINS,
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.GATEWAY_PORT,
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    LOG_FORMAT: process.env.LOG_FORMAT,
+    CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
     DATABASE_URL: process.env.DATABASE_URL,
-    AUTH_SERVICE_URL:
-      process.env.AUTH_SERVICE_URL ??
-      process.env.GATEWAY_AUTH_SERVICE_URL ??
-      (process.env.AUTH_PORT ? `http://localhost:${process.env.AUTH_PORT}` : undefined),
-    PROPERTY_SERVICE_URL:
-      process.env.PROPERTY_SERVICE_URL ??
-      process.env.GATEWAY_PROPERTY_SERVICE_URL ??
-      (process.env.PROPERTY_PORT ? `http://localhost:${process.env.PROPERTY_PORT}` : undefined),
+    REDIS_URL: process.env.REDIS_URL,
+    AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL,
+    PROPERTY_SERVICE_URL: process.env.PROPERTY_SERVICE_URL,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",

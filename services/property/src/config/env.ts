@@ -24,16 +24,17 @@ export const env = createEnv({
     LOG_FORMAT: z.enum(["pretty", "json"]),
     CORS_ALLOWED_ORIGINS: corsOriginsSchema,
     DATABASE_URL: z.url("DATABASE_URL must be a valid PostgreSQL connection string"),
+    REDIS_URL: z.url("REDIS_URL must be a valid Redis connection string"),
   },
 
   runtimeEnv: {
-    NODE_ENV: process.env.NODE_ENV ?? process.env.PROPERTY_NODE_ENV,
-    PORT: process.env.PORT ?? process.env.PROPERTY_PORT,
-    LOG_LEVEL: process.env.LOG_LEVEL ?? process.env.PROPERTY_LOG_LEVEL,
-    LOG_FORMAT: process.env.LOG_FORMAT ?? process.env.PROPERTY_LOG_FORMAT,
-    CORS_ALLOWED_ORIGINS:
-      process.env.CORS_ALLOWED_ORIGINS ?? process.env.PROPERTY_CORS_ALLOWED_ORIGINS,
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PROPERTY_PORT,
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    LOG_FORMAT: process.env.LOG_FORMAT,
+    CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
     DATABASE_URL: process.env.DATABASE_URL,
+    REDIS_URL: process.env.REDIS_URL,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",

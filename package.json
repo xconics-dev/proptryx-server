@@ -60,6 +60,8 @@
     "health:gateway": "curl -s http://localhost:8000/health | jq",
     "health:auth": "curl -s http://localhost:8000/api/auth/health | jq",
     "health:property": "curl -s http://localhost:8000/api/property/health | jq",
+    "redis:cleanup:legacy": "pnpm --filter @proptryx/auth exec sh -c 'set -a; . \"$INIT_CWD/env/.env\"; set +a; node --import tsx \"$INIT_CWD/scripts/redis-cleanup.ts\"'",
+    "redis:cleanup:legacy:apply": "pnpm --filter @proptryx/auth exec sh -c 'set -a; . \"$INIT_CWD/env/.env\"; set +a; node --import tsx \"$INIT_CWD/scripts/redis-cleanup.ts\" --execute'",
     "prepare": "husky",
     "lint-staged": "lint-staged",
     "commitlint": "commitlint",
