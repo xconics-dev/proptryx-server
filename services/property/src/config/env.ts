@@ -27,12 +27,11 @@ export const env = createEnv({
   },
 
   runtimeEnv: {
-    NODE_ENV: process.env.NODE_ENV ?? process.env.PROPERTY_NODE_ENV,
-    PORT: process.env.PORT ?? process.env.PROPERTY_PORT,
-    LOG_LEVEL: process.env.LOG_LEVEL ?? process.env.PROPERTY_LOG_LEVEL,
-    LOG_FORMAT: process.env.LOG_FORMAT ?? process.env.PROPERTY_LOG_FORMAT,
-    CORS_ALLOWED_ORIGINS:
-      process.env.CORS_ALLOWED_ORIGINS ?? process.env.PROPERTY_CORS_ALLOWED_ORIGINS,
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PROPERTY_PORT,
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    LOG_FORMAT: process.env.LOG_FORMAT,
+    CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
     DATABASE_URL: process.env.DATABASE_URL,
   },
 

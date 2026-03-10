@@ -19,6 +19,15 @@ type InitDBOptions = {
   serviceName?: string;
 };
 
+const DEFAULT_REMOTE_POOL_MAX = 5;
+const DEFAULT_REMOTE_POOL_MIN = 0;
+const DEFAULT_LOCAL_POOL_MAX = 20;
+const DEFAULT_LOCAL_POOL_MIN = 2;
+const DEFAULT_CONNECTION_TIMEOUT_MS = 15_000;
+const DEFAULT_STATEMENT_TIMEOUT_MS = 20_000;
+const DEFAULT_QUERY_TIMEOUT_MS = 20_000;
+const DB_CONNECT_RETRY_DELAYS_MS = [0, 1_000, 2_000];
+
 let pool: Pool | null = null;
 let initPromise: Promise<DB> | null = null;
 
@@ -82,9 +91,19 @@ function buildSslOptions(url: string): ConnectionOptions | undefined {
 
 function buildPoolConfig(url: string, serviceName?: string): PoolConfig {
   const parsedUrl = new URL(url);
-  const maxConnections = parseIntegerParam(parsedUrl.searchParams.get("pool_max"), 20);
+  const isLocal =
+    parsedUrl.hostname === "localhost" ||
+    parsedUrl.hostname === "127.0.0.1" ||
+    parsedUrl.hostname === "::1";
+  const maxConnections = parseIntegerParam(
+    parsedUrl.searchParams.get("pool_max"),
+    isLocal ? DEFAULT_LOCAL_POOL_MAX : DEFAULT_REMOTE_POOL_MAX
+  );
   const minConnections = Math.min(
-    parseIntegerParam(parsedUrl.searchParams.get("pool_min"), 2),
+    parseIntegerParam(
+      parsedUrl.searchParams.get("pool_min"),
+      isLocal ? DEFAULT_LOCAL_POOL_MIN : DEFAULT_REMOTE_POOL_MIN
+    ),
     maxConnections
   );
 
@@ -96,7 +115,7 @@ function buildPoolConfig(url: string, serviceName?: string): PoolConfig {
     idleTimeoutMillis: parseIntegerParam(parsedUrl.searchParams.get("idle_timeout_ms"), 10_000),
     connectionTimeoutMillis: parseIntegerParam(
       parsedUrl.searchParams.get("connect_timeout_ms"),
-      5_000
+      DEFAULT_CONNECTION_TIMEOUT_MS
     ),
     maxUses: parseIntegerParam(parsedUrl.searchParams.get("max_uses"), 7_500),
     maxLifetimeSeconds: parseIntegerParam(
@@ -110,11 +129,51 @@ function buildPoolConfig(url: string, serviceName?: string): PoolConfig {
     ),
     statement_timeout: parseIntegerParam(
       parsedUrl.searchParams.get("statement_timeout_ms"),
-      15_000
+      DEFAULT_STATEMENT_TIMEOUT_MS
     ),
-    query_timeout: parseIntegerParam(parsedUrl.searchParams.get("query_timeout_ms"), 15_000),
+    query_timeout: parseIntegerParam(
+      parsedUrl.searchParams.get("query_timeout_ms"),
+      DEFAULT_QUERY_TIMEOUT_MS
+    ),
     ssl: buildSslOptions(url),
   };
+}
+
+function sleep(delayMs: number) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function verifyPoolConnection(
+  pool: Pool,
+  logger?: DBLogger,
+  serviceName?: string
+): Promise<void> {
+  let lastError: unknown;
+
+  for (const [attempt, delayMs] of DB_CONNECT_RETRY_DELAYS_MS.entries()) {
+    if (delayMs > 0) {
+      await sleep(delayMs);
+    }
+
+    try {
+      await pool.query("select 1");
+      return;
+    } catch (error) {
+      lastError = error;
+      logger?.error("database connection attempt failed", {
+        service: serviceName ?? "unknown",
+        attempt: attempt + 1,
+        maxAttempts: DB_CONNECT_RETRY_DELAYS_MS.length,
+        retryDelayMs:
+          attempt + 1 < DB_CONNECT_RETRY_DELAYS_MS.length
+            ? DB_CONNECT_RETRY_DELAYS_MS[attempt + 1]
+            : 0,
+        error,
+      });
+    }
+  }
+
+  throw lastError;
 }
 
 export async function initDB(options: InitDBOptions = {}): Promise<DB> {
@@ -132,7 +191,7 @@ export async function initDB(options: InitDBOptions = {}): Promise<DB> {
     pool = new Pool(buildPoolConfig(url, options.serviceName));
 
     db = drizzle(pool, { schema });
-    await pool.query("select 1");
+    await verifyPoolConnection(pool, options.logger, options.serviceName);
 
     options.logger?.info("database connected", {
       service: options.serviceName ?? "unknown",

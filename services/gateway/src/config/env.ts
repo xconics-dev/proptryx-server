@@ -40,21 +40,14 @@ export const env = createEnv({
   },
 
   runtimeEnv: {
-    NODE_ENV: process.env.NODE_ENV ?? process.env.GATEWAY_NODE_ENV,
-    PORT: process.env.PORT ?? process.env.GATEWAY_PORT,
-    LOG_LEVEL: process.env.LOG_LEVEL ?? process.env.GATEWAY_LOG_LEVEL,
-    LOG_FORMAT: process.env.LOG_FORMAT ?? process.env.GATEWAY_LOG_FORMAT,
-    CORS_ALLOWED_ORIGINS:
-      process.env.CORS_ALLOWED_ORIGINS ?? process.env.GATEWAY_CORS_ALLOWED_ORIGINS,
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.GATEWAY_PORT,
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    LOG_FORMAT: process.env.LOG_FORMAT,
+    CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
     DATABASE_URL: process.env.DATABASE_URL,
-    AUTH_SERVICE_URL:
-      process.env.AUTH_SERVICE_URL ??
-      process.env.GATEWAY_AUTH_SERVICE_URL ??
-      (process.env.AUTH_PORT ? `http://localhost:${process.env.AUTH_PORT}` : undefined),
-    PROPERTY_SERVICE_URL:
-      process.env.PROPERTY_SERVICE_URL ??
-      process.env.GATEWAY_PROPERTY_SERVICE_URL ??
-      (process.env.PROPERTY_PORT ? `http://localhost:${process.env.PROPERTY_PORT}` : undefined),
+    AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL,
+    PROPERTY_SERVICE_URL: process.env.PROPERTY_SERVICE_URL,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",

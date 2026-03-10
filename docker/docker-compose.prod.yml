@@ -49,11 +49,11 @@ services:
       - traefik.http.routers.proptryx.tls.certresolver=letsencrypt
       - traefik.http.services.proptryx.loadbalancer.server.port=${GATEWAY_PORT}
     environment:
-      NODE_ENV: ${GATEWAY_NODE_ENV}
+      NODE_ENV: ${NODE_ENV}
       PORT: ${GATEWAY_PORT}
-      LOG_LEVEL: ${GATEWAY_LOG_LEVEL}
-      LOG_FORMAT: ${GATEWAY_LOG_FORMAT}
-      LOG_HEALTHCHECKS: ${GATEWAY_LOG_HEALTHCHECKS}
+      LOG_LEVEL: ${LOG_LEVEL}
+      LOG_FORMAT: ${LOG_FORMAT}
+      LOG_HEALTHCHECKS: ${LOG_HEALTHCHECKS}
       NODE_OPTIONS: ${GATEWAY_NODE_OPTIONS}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       DATABASE_URL: ${DATABASE_URL}
@@ -94,11 +94,11 @@ services:
         aliases:
           - auth
     environment:
-      NODE_ENV: ${AUTH_NODE_ENV}
+      NODE_ENV: ${NODE_ENV}
       PORT: ${AUTH_PORT}
-      LOG_LEVEL: ${AUTH_LOG_LEVEL}
-      LOG_FORMAT: ${AUTH_LOG_FORMAT}
-      LOG_HEALTHCHECKS: ${AUTH_LOG_HEALTHCHECKS}
+      LOG_LEVEL: ${LOG_LEVEL}
+      LOG_FORMAT: ${LOG_FORMAT}
+      LOG_HEALTHCHECKS: ${LOG_HEALTHCHECKS}
       NODE_OPTIONS: ${AUTH_NODE_OPTIONS}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       DATABASE_URL: ${DATABASE_URL}
@@ -135,11 +135,11 @@ services:
         aliases:
           - property
     environment:
-      NODE_ENV: ${PROPERTY_NODE_ENV}
+      NODE_ENV: ${NODE_ENV}
       PORT: ${PROPERTY_PORT}
-      LOG_LEVEL: ${PROPERTY_LOG_LEVEL}
-      LOG_FORMAT: ${PROPERTY_LOG_FORMAT}
-      LOG_HEALTHCHECKS: ${PROPERTY_LOG_HEALTHCHECKS}
+      LOG_LEVEL: ${LOG_LEVEL}
+      LOG_FORMAT: ${LOG_FORMAT}
+      LOG_HEALTHCHECKS: ${LOG_HEALTHCHECKS}
       NODE_OPTIONS: ${PROPERTY_NODE_OPTIONS}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       DATABASE_URL: ${DATABASE_URL}

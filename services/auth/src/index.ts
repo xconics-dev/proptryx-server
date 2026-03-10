@@ -25,7 +25,7 @@ app.get("/", (c) => c.redirect("/docs", 302));
 await initDB({ logger, serviceName: "auth" });
 const { auth } = await import("@/lib/auth");
 
-app.on(["GET", "POST"], "*", (c) => auth.handler(c.req.raw));
+app.all("*", (c) => auth.handler(c.req.raw));
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler({ serviceName: "auth", logger }));
 

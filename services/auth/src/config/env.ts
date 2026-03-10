@@ -34,15 +34,15 @@ export const env = createEnv({
   },
 
   runtimeEnv: {
-    NODE_ENV: process.env.NODE_ENV ?? process.env.AUTH_NODE_ENV,
-    PORT: process.env.PORT ?? process.env.AUTH_PORT,
-    LOG_LEVEL: process.env.LOG_LEVEL ?? process.env.AUTH_LOG_LEVEL,
-    LOG_FORMAT: process.env.LOG_FORMAT ?? process.env.AUTH_LOG_FORMAT,
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.AUTH_PORT,
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    LOG_FORMAT: process.env.LOG_FORMAT,
     CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
     DATABASE_URL: process.env.DATABASE_URL,
-    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_BETTER_AUTH_SECRET,
-    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? process.env.AUTH_BETTER_AUTH_URL,
-    BETTER_AUTH_API_KEY: process.env.BETTER_AUTH_API_KEY ?? process.env.AUTH_BETTER_AUTH_API_KEY,
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    BETTER_AUTH_API_KEY: process.env.BETTER_AUTH_API_KEY,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
