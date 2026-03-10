@@ -1,31 +1,19 @@
-import { getDB } from "@proptryx/database";
 import { dash } from "@better-auth/infra";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, multiSession, openAPI, organization } from "better-auth/plugins";
-import { env } from "@/config/env";
 import * as schema from "@proptryx/database";
-import { logger } from "./logger";
+import { env } from "@/config/env";
+import { logger } from "@/lib/logger";
+import {
+  betterAuthSecondaryStorage,
+  getBetterAuthConfigState,
+  normalizeBasePath,
+  resolveAuthDatabase,
+} from "./utils";
 
-const betterAuthUrl = new URL(env.BETTER_AUTH_URL);
-const betterAuthSecret = env.BETTER_AUTH_SECRET;
-const corsAllowedOrigins = env.CORS_ALLOWED_ORIGINS;
-const trustedOrigins = Array.from(new Set([...corsAllowedOrigins, betterAuthUrl.origin]));
-const isProduction = env.NODE_ENV === "production";
-
-function normalizeBasePath(pathname: string) {
-  const normalizedPathname = pathname.trim().replace(/\/+$/, "");
-  return normalizedPathname.length === 0 ? "/" : normalizedPathname;
-}
-
-function resolveAuthDatabase() {
-  try {
-    return getDB();
-  } catch {
-    // Better Auth CLI imports this file before service boot; it only needs config shape.
-    return {} as never;
-  }
-}
+const { betterAuthSecret, betterAuthUrl, isProduction, trustedOrigins } =
+  getBetterAuthConfigState();
 
 export const auth = betterAuth({
   appName: "Proptryx Auth Service",
@@ -37,10 +25,11 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  secondaryStorage: betterAuthSecondaryStorage,
   onAPIError: {
     throw: true,
     onError: (error, _ctx) => {
-      logger.error("Better Auth API error", {
+      logger.error("Proptryx Auth Service API", {
         error: error instanceof Error ? error.stack : error,
       });
     },
@@ -52,6 +41,7 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
     updateAge: 60 * 60 * 24, // 24 hours
+    storeSessionInDatabase: false,
     deferSessionRefresh: true,
     cookieCache: {
       enabled: true,

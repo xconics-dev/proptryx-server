@@ -12,6 +12,7 @@ type HonoContextLike = {
   res: {
     status: number;
   };
+  get?(key: string): unknown;
 };
 type MiddlewareHandler = (context: HonoContextLike, next: NextHandler) => Promise<void>;
 
@@ -151,6 +152,28 @@ function stringifyValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function shortenUserAgent(userAgent: string | undefined, maxLength = 72): string | null {
+  if (!userAgent) {
+    return null;
+  }
+
+  const normalized = userAgent.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength - 3)}...`;
+}
+
+function getRequestId(context: HonoContextLike): string | null {
+  const contextRequestId = context.get?.("requestId");
+  if (typeof contextRequestId === "string" && contextRequestId.length > 0) {
+    return contextRequestId;
+  }
+
+  return context.req.header("x-request-id") ?? context.req.header("request-id") ?? null;
+}
+
 function colorize(value: string, color: string, enabled: boolean): string {
   if (!enabled) {
     return value;
@@ -287,8 +310,8 @@ export function createHonoRequestLogger(logger: Logger): MiddlewareHandler {
       path: c.req.path,
       status,
       durationMs: Date.now() - startedAt,
-      // userAgent: c.req.header("user-agent") ?? null,
-      // requestId: c.req.header("x-request-id") ?? null,
+      userAgent: shortenUserAgent(c.req.header("user-agent")),
+      requestId: getRequestId(c),
     };
 
     if (status >= 500) {
