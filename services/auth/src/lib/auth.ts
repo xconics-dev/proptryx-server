@@ -5,6 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { openAPI, organization } from "better-auth/plugins";
 import { env } from "@/config/env";
 import * as schema from "@proptryx/database";
+import { logger } from "./logger";
 
 const betterAuthUrl = env.BETTER_AUTH_URL;
 const betterAuthSecret = env.BETTER_AUTH_SECRET;
@@ -30,6 +31,14 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  onAPIError: {
+    throw: true,
+    onError: (error, _ctx) => {
+      logger.error("Better Auth API error", {
+        error: error instanceof Error ? error.stack : error,
+      });
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
@@ -38,12 +47,36 @@ export const auth = betterAuth({
     openAPI({
       path: "/docs",
       nonce: env.BETTER_AUTH_SECRET,
+      theme: "purple",
     }),
     dash({
       apiKey: env.BETTER_AUTH_API_KEY,
     }),
     organization(),
   ],
+  emailVerification: {
+    sendOnSignUp: false,
+    autoSignInAfterVerification: true,
+  },
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 200,
+    customRules: {
+      "/sign-in/email": {
+        window: 60,
+        max: 20,
+      },
+      "/sign-up/email": {
+        window: 60,
+        max: 20,
+      },
+    },
+  },
+  logger: {
+    level: env.NODE_ENV === "development" ? "debug" : "info",
+    disabled: false,
+  },
   experimental: {
     joins: true,
   },

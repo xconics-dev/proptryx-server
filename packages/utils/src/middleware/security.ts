@@ -11,6 +11,8 @@ export interface AppSecurityOptions {
   corsOrigins: string[];
   maxBodySizeBytes?: number;
   exposeCorsRoute?: boolean;
+  compressionThresholdBytes?: number;
+  validateJsonBody?: boolean;
 }
 
 function hasJsonContentType(contentType: string | undefined) {
@@ -28,6 +30,7 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
   const allowAll = normalizedOrigins.includes("*");
   const allowedOrigins = new Set(normalizedOrigins);
   const exposeCorsRoute = options.exposeCorsRoute ?? true;
+  const validateJsonBody = options.validateJsonBody ?? false;
 
   app.use(
     "*",
@@ -42,7 +45,7 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
         return allowedOrigins.has(origin) ? origin : "";
       },
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
+      allowHeaders: ["Content-Type", "Authorization", "X-Request-Id", "set-auth-token"],
       exposeHeaders: ["X-Request-Id"],
       maxAge: 600,
       credentials: !allowAll,
@@ -51,7 +54,7 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
 
   app.use("*", requestId());
   app.use("*", secureHeaders());
-  app.use("*", compress({ threshold: 1024 }));
+  app.use("*", compress({ threshold: options.compressionThresholdBytes ?? 2048 }));
 
   if (exposeCorsRoute) {
     app.get("/cors", (c: Context) =>
@@ -80,6 +83,10 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
         ),
     })
   );
+
+  if (!validateJsonBody) {
+    return;
+  }
 
   app.use("*", async (c, next) => {
     const method = c.req.method;

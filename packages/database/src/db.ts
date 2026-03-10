@@ -1,6 +1,6 @@
 import type { ConnectionOptions } from "node:tls";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { Pool, type PoolConfig } from "pg";
 import * as schema from "./schemas";
 
 export type DB = ReturnType<typeof drizzle>;
@@ -21,6 +21,27 @@ type InitDBOptions = {
 
 let pool: Pool | null = null;
 let initPromise: Promise<DB> | null = null;
+
+function parseIntegerParam(value: string | null, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function parseBooleanParam(value: string | null, fallback: boolean): boolean {
+  if (!value) {
+    return fallback;
+  }
+
+  return value === "1" || value.toLowerCase() === "true";
+}
 
 function resolveDatabaseUrl(databaseUrl?: string): string {
   const url = databaseUrl ?? process.env.DATABASE_URL;
@@ -59,6 +80,43 @@ function buildSslOptions(url: string): ConnectionOptions | undefined {
   };
 }
 
+function buildPoolConfig(url: string, serviceName?: string): PoolConfig {
+  const parsedUrl = new URL(url);
+  const maxConnections = parseIntegerParam(parsedUrl.searchParams.get("pool_max"), 20);
+  const minConnections = Math.min(
+    parseIntegerParam(parsedUrl.searchParams.get("pool_min"), 2),
+    maxConnections
+  );
+
+  return {
+    connectionString: url,
+    application_name: serviceName ? `proptryx-${serviceName}` : "proptryx",
+    max: maxConnections,
+    min: minConnections,
+    idleTimeoutMillis: parseIntegerParam(parsedUrl.searchParams.get("idle_timeout_ms"), 10_000),
+    connectionTimeoutMillis: parseIntegerParam(
+      parsedUrl.searchParams.get("connect_timeout_ms"),
+      5_000
+    ),
+    maxUses: parseIntegerParam(parsedUrl.searchParams.get("max_uses"), 7_500),
+    maxLifetimeSeconds: parseIntegerParam(
+      parsedUrl.searchParams.get("max_lifetime_seconds"),
+      60 * 30
+    ),
+    keepAlive: parseBooleanParam(parsedUrl.searchParams.get("keep_alive"), true),
+    keepAliveInitialDelayMillis: parseIntegerParam(
+      parsedUrl.searchParams.get("keep_alive_initial_delay_ms"),
+      10_000
+    ),
+    statement_timeout: parseIntegerParam(
+      parsedUrl.searchParams.get("statement_timeout_ms"),
+      15_000
+    ),
+    query_timeout: parseIntegerParam(parsedUrl.searchParams.get("query_timeout_ms"), 15_000),
+    ssl: buildSslOptions(url),
+  };
+}
+
 export async function initDB(options: InitDBOptions = {}): Promise<DB> {
   if (db) {
     return db;
@@ -71,13 +129,7 @@ export async function initDB(options: InitDBOptions = {}): Promise<DB> {
   initPromise = (async () => {
     const url = resolveDatabaseUrl(options.databaseUrl);
 
-    pool = new Pool({
-      connectionString: url,
-      max: 10,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-      ssl: buildSslOptions(url),
-    });
+    pool = new Pool(buildPoolConfig(url, options.serviceName));
 
     db = drizzle(pool, { schema });
     await pool.query("select 1");
@@ -86,6 +138,8 @@ export async function initDB(options: InitDBOptions = {}): Promise<DB> {
       service: options.serviceName ?? "unknown",
       adapter: "drizzle-orm/node-postgres",
       tlsMinVersion: "TLSv1.2",
+      maxPoolSize: pool.options.max,
+      minPoolSize: pool.options.min,
     });
 
     return db;
