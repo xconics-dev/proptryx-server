@@ -24,7 +24,6 @@ export const env = createEnv({
     LOG_FORMAT: z.enum(["pretty", "json"]),
     CORS_ALLOWED_ORIGINS: corsOriginsSchema,
     DATABASE_URL: z.url("DATABASE_URL must be a valid PostgreSQL connection string"),
-    REDIS_URL: z.url("REDIS_URL must be a valid Redis connection string"),
     BETTER_AUTH_SECRET: z
       .string()
       .min(16, "BETTER_AUTH_SECRET must be at least 16 characters long"),
@@ -41,7 +40,6 @@ export const env = createEnv({
     LOG_FORMAT: process.env.LOG_FORMAT,
     CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
     DATABASE_URL: process.env.DATABASE_URL,
-    REDIS_URL: process.env.REDIS_URL,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     BETTER_AUTH_API_KEY: process.env.BETTER_AUTH_API_KEY,
