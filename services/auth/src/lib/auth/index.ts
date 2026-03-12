@@ -20,6 +20,7 @@ export const auth = betterAuth({
   baseURL: betterAuthUrl.origin,
   basePath: normalizeBasePath(betterAuthUrl.pathname),
   secret: betterAuthSecret,
+  trustedProxyHeaders: isProduction,
   trustedOrigins,
   database: drizzleAdapter(resolveAuthDatabase(), {
     provider: "pg",
