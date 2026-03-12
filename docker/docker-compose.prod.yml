@@ -23,17 +23,6 @@ x-service-defaults: &service-defaults
   networks:
     - app-network
 
-x-deploy-defaults: &deploy-defaults
-  restart_policy:
-    condition: on-failure
-  update_config:
-    order: start-first
-    parallelism: 1
-    failure_action: rollback
-  rollback_config:
-    order: stop-first
-    parallelism: 1
-
 services:
   gateway:
     <<: *service-defaults
@@ -66,17 +55,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    deploy:
-      <<: *deploy-defaults
-      replicas: ${GATEWAY_REPLICAS:-2}
-      resources:
-        limits:
-          cpus: "${GATEWAY_CPU_LIMIT:-1.00}"
-          memory: ${GATEWAY_MEM_LIMIT:-768M}
-        reservations:
-          cpus: "${GATEWAY_CPU_RESERVATION:-0.25}"
-          memory: ${GATEWAY_MEM_RESERVATION:-256M}
-
   auth:
     <<: *service-defaults
     build:
@@ -108,17 +86,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    deploy:
-      <<: *deploy-defaults
-      replicas: ${AUTH_REPLICAS:-3}
-      resources:
-        limits:
-          cpus: "${AUTH_CPU_LIMIT:-1.50}"
-          memory: ${AUTH_MEM_LIMIT:-1024M}
-        reservations:
-          cpus: "${AUTH_CPU_RESERVATION:-0.30}"
-          memory: ${AUTH_MEM_RESERVATION:-256M}
-
   property:
     <<: *service-defaults
     build:
@@ -147,17 +114,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    deploy:
-      <<: *deploy-defaults
-      replicas: ${PROPERTY_REPLICAS:-3}
-      resources:
-        limits:
-          cpus: "${PROPERTY_CPU_LIMIT:-1.50}"
-          memory: ${PROPERTY_MEM_LIMIT:-1024M}
-        reservations:
-          cpus: "${PROPERTY_CPU_RESERVATION:-0.30}"
-          memory: ${PROPERTY_MEM_RESERVATION:-256M}
-
 networks:
   app-network:
     driver: bridge
