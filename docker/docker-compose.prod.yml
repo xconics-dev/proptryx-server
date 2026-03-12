@@ -42,12 +42,6 @@ services:
       dockerfile: docker/gateway.Dockerfile
     ports:
       - "${GATEWAY_HOST_PORT:-8000}:${GATEWAY_PORT:-8000}"
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.proptryx.rule=Host(`${TRAEFIK_GATEWAY_HOST:-api.example.com}`)
-      - traefik.http.routers.proptryx.entrypoints=websecure
-      - traefik.http.routers.proptryx.tls.certresolver=letsencrypt
-      - traefik.http.services.proptryx.loadbalancer.server.port=${GATEWAY_PORT:-8000}
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       GATEWAY_PORT: ${GATEWAY_PORT:-8000}

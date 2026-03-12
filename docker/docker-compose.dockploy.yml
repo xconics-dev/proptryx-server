@@ -58,7 +58,12 @@ services:
         mode: ingress
     healthcheck:
       test:
-        ["CMD", "node", "-e", "fetch('http://127.0.0.1:${GATEWAY_PORT:-8000}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:${GATEWAY_PORT:-8000}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -74,15 +79,6 @@ services:
         reservations:
           cpus: "${GATEWAY_CPU_RESERVATION:-0.25}"
           memory: ${GATEWAY_MEM_RESERVATION:-256M}
-      labels:
-        - traefik.enable=true
-        - traefik.docker.network=app-network
-        - traefik.http.routers.proptryx.rule=Host(`${TRAEFIK_GATEWAY_HOST:-api.example.com}`)
-        - traefik.http.routers.proptryx.entrypoints=websecure
-        - traefik.http.routers.proptryx.tls=true
-        - traefik.http.routers.proptryx.tls.certresolver=letsencrypt
-        - traefik.http.services.proptryx.loadbalancer.server.port=${GATEWAY_PORT:-8000}
-
   auth:
     <<: *service-defaults
     image: ${AUTH_IMAGE}
@@ -101,7 +97,12 @@ services:
       BETTER_AUTH_API_KEY: ${BETTER_AUTH_API_KEY}
     healthcheck:
       test:
-        ["CMD", "node", "-e", "fetch('http://127.0.0.1:${AUTH_PORT:-6001}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:${AUTH_PORT:-6001}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -133,7 +134,12 @@ services:
       REDIS_URL: ${REDIS_URL}
     healthcheck:
       test:
-        ["CMD", "node", "-e", "fetch('http://127.0.0.1:${PROPERTY_PORT:-6002}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:${PROPERTY_PORT:-6002}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
