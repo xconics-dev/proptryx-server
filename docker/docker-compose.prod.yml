@@ -68,6 +68,7 @@ services:
       app-network:
         aliases:
           - auth
+          - proptryx-auth
     environment:
       NODE_ENV: ${NODE_ENV}
       AUTH_PORT: ${AUTH_PORT}
@@ -100,6 +101,7 @@ services:
       app-network:
         aliases:
           - property
+          - proptryx-property
     environment:
       NODE_ENV: ${NODE_ENV}
       PROPERTY_PORT: ${PROPERTY_PORT}
