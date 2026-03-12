@@ -25,27 +25,47 @@ app.get("/favicon.ico", faviconHandler);
 app.get("/api/auth", (c) => c.redirect("/api/auth/docs", 302));
 app.get("/api/auth/", (c) => c.redirect("/api/auth/docs", 302));
 
+function normalizeForwardedIp(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  const first = value
+    .split(",")[0]
+    ?.trim()
+    .replace(/^\[|\]$/g, "");
+  if (!first) {
+    return undefined;
+  }
+
+  // Handle IPv4 with port, e.g. 203.0.113.10:52341
+  if (first.includes(".") && first.includes(":")) {
+    const [host] = first.split(":");
+    return host?.trim() || undefined;
+  }
+
+  return first;
+}
+
 function registerProxyRoute(route: ProxyRoute) {
   const handler = async (c: Context) => {
     try {
       const upstreamUrl = createUpstreamUrl(c.req.url, route);
       const headers = new Headers(c.req.raw.headers);
-      const forwardedFor =
+      const rawForwardedFor =
         c.req.header("x-forwarded-for") ??
         c.req.header("x-real-ip") ??
-        c.req.header("cf-connecting-ip");
-      const clientIp = forwardedFor?.split(",")[0]?.trim();
+        c.req.header("cf-connecting-ip") ??
+        c.req.header("true-client-ip") ??
+        c.req.header("x-client-ip");
+      const clientIp = normalizeForwardedIp(rawForwardedFor) ?? "127.0.0.1";
 
       headers.set("host", new URL(route.target).host);
       headers.set("x-forwarded-host", new URL(c.req.url).host);
       headers.set("x-forwarded-proto", new URL(c.req.url).protocol.replace(":", ""));
       headers.set("x-forwarded-prefix", route.prefix);
-      if (forwardedFor) {
-        headers.set("x-forwarded-for", forwardedFor);
-      }
-      if (clientIp) {
-        headers.set("x-real-ip", clientIp);
-      }
+      headers.set("x-forwarded-for", clientIp);
+      headers.set("x-real-ip", clientIp);
 
       const response = await proxy(upstreamUrl, {
         raw: c.req.raw,
