@@ -20,8 +20,6 @@ x-service-defaults: &service-defaults
     options:
       max-size: ${DOCKER_LOG_MAX_SIZE}
       max-file: ${DOCKER_LOG_MAX_FILE}
-  networks:
-    - app-network
 
 services:
   gateway:
@@ -29,6 +27,10 @@ services:
     build:
       context: ..
       dockerfile: docker/gateway.Dockerfile
+    networks:
+      app-network:
+        aliases:
+          - gateway
     ports:
       - "${GATEWAY_HOST_PORT}:${GATEWAY_PORT}"
     environment:
