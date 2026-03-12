@@ -29,8 +29,7 @@ services:
     build:
       context: ..
       dockerfile: docker/gateway.Dockerfile
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    container_name: proptryx-gateway
     ports:
       - "${GATEWAY_HOST_PORT}:${GATEWAY_PORT}"
     environment:
@@ -62,6 +61,7 @@ services:
     build:
       context: ..
       dockerfile: docker/auth.Dockerfile
+    container_name: proptryx-auth
     ports:
       - "${AUTH_HOST_PORT}:${AUTH_PORT}"
     networks:
@@ -93,6 +93,7 @@ services:
     build:
       context: ..
       dockerfile: docker/property.Dockerfile
+    container_name: proptryx-property
     ports:
       - "${PROPERTY_HOST_PORT}:${PROPERTY_PORT}"
     networks:
