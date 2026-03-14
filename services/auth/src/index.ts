@@ -30,9 +30,10 @@ app.get("/", (c) => c.redirect("/docs", 302));
 
 await initDB({ logger, serviceName: "auth" });
 await initializeAuthSecondaryStorage();
-const { auth } = await import("@/lib/auth");
+const { getAuth } = await import("@/lib/auth");
+await getAuth();
 
-app.all("*", (c) => auth.handler(c.req.raw));
+app.all("*", async (c) => (await getAuth()).handler(c.req.raw));
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler({ serviceName: "auth", logger }));
 

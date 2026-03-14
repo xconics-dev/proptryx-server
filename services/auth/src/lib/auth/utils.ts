@@ -1,7 +1,8 @@
-import { getDB } from "@proptryx/database";
+import { getDB, region, zone } from "@proptryx/database";
 import { AUTH_SESSION_REDIS_PREFIX, getRedisClient, initializeRedisClient } from "@proptryx/utils";
 import { redisStorage } from "@better-auth/redis-storage";
 import { env } from "@/config/env";
+import { eq } from "drizzle-orm";
 
 function getTrustedOriginHosts(origins: string[]) {
   return Array.from(
@@ -67,4 +68,45 @@ export function resolveAuthSecondaryStorage() {
 
 export async function initializeAuthSecondaryStorage() {
   await initializeRedisClient();
+}
+
+export async function resolveUserLocation(zoneId?: string | null) {
+  if (!zoneId) {
+    return {
+      region: null,
+      zone: null,
+    };
+  }
+
+  const [location] = await getDB()
+    .select({
+      regionId: region.id,
+      regionName: region.name,
+      zoneId: zone.id,
+      zoneName: zone.name,
+    })
+    .from(zone)
+    .leftJoin(region, eq(zone.regionId, region.id))
+    .where(eq(zone.id, zoneId))
+    .limit(1);
+
+  if (!location) {
+    return {
+      region: null,
+      zone: null,
+    };
+  }
+
+  return {
+    zone: {
+      id: location.zoneId,
+      name: location.zoneName,
+    },
+    region: location.regionId
+      ? {
+          id: location.regionId,
+          name: location.regionName,
+        }
+      : null,
+  };
 }
