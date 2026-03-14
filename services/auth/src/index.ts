@@ -14,7 +14,10 @@ import { initializeAuthSecondaryStorage } from "@/lib/auth/utils";
 import { logger } from "@/lib/logger";
 
 const app = new Hono();
-applyAppSecurity(app, { corsOrigins: env.CORS_ALLOWED_ORIGINS });
+applyAppSecurity(app, {
+  corsOrigins: env.CORS_ALLOWED_ORIGINS,
+  enableGlobalRateLimit: false,
+});
 app.use("*", createHonoRequestLogger(logger));
 
 const faviconHandler = createFaviconHandler();

@@ -13,11 +13,20 @@ import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 
 const app = new Hono();
-applyAppSecurity(app, { corsOrigins: env.CORS_ALLOWED_ORIGINS });
+applyAppSecurity(app, {
+  corsOrigins: env.CORS_ALLOWED_ORIGINS,
+  enableGlobalRateLimit: false,
+});
 app.use("*", createHonoRequestLogger(logger));
 
 const faviconHandler = createFaviconHandler();
-app.get("/health", createHealthCheckHandler({ serviceName: "property" }));
+app.get(
+  "/health",
+  createHealthCheckHandler({
+    serviceName: "property",
+    includeConnectionInfo: true,
+  })
+);
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
 

@@ -11,13 +11,26 @@ import {
   resolveAuthDatabase,
   resolveAuthSecondaryStorage,
 } from "./utils";
+import { generateRandomId, generateUID, PasswordUtils } from "@proptryx/utils";
 
-const { betterAuthSecret, betterAuthUrl, isProduction, trustedOrigins } =
-  getBetterAuthConfigState();
+const {
+  betterAuthSecret,
+  betterAuthUrl,
+  betterAuthAllowedHosts,
+  crossSubDomainCookies,
+  isProduction,
+  trustedOrigins,
+} = getBetterAuthConfigState();
 
 export const auth = betterAuth({
   appName: "Proptryx Auth Service",
-  baseURL: betterAuthUrl.origin,
+  baseURL: isProduction
+    ? {
+        allowedHosts: betterAuthAllowedHosts,
+        fallback: betterAuthUrl.origin,
+        protocol: "https",
+      }
+    : betterAuthUrl.origin,
   basePath: normalizeBasePath(betterAuthUrl.pathname),
   secret: betterAuthSecret,
   trustedProxyHeaders: isProduction,
@@ -38,6 +51,14 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    password: {
+      hash: async (password) => await PasswordUtils.hash(password),
+      verify: async ({ password, hash }) => await PasswordUtils.verify(password, hash),
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: false,
+    autoSignInAfterVerification: true,
   },
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
@@ -65,10 +86,6 @@ export const auth = betterAuth({
     }),
     organization(),
   ],
-  emailVerification: {
-    sendOnSignUp: false,
-    autoSignInAfterVerification: true,
-  },
   rateLimit: {
     enabled: true,
     window: 60,
@@ -91,12 +108,28 @@ export const auth = betterAuth({
   experimental: {
     joins: true,
   },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => ({
+          data: {
+            ...user,
+            id: generateUID(),
+          },
+        }),
+      },
+    },
+  },
   advanced: {
+    crossSubDomainCookies,
     defaultCookieAttributes: {
       sameSite: "lax",
       secure: isProduction,
       httpOnly: true,
       path: "/",
+    },
+    database: {
+      generateId: () => generateRandomId(),
     },
     ipAddress: {
       ipAddressHeaders: ["x-forwarded-for", "x-real-ip"],
