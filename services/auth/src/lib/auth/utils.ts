@@ -3,6 +3,7 @@ import { AUTH_SESSION_REDIS_PREFIX, getRedisClient, initializeRedisClient } from
 import { redisStorage } from "@better-auth/redis-storage";
 import { env } from "@/config/env";
 import { eq } from "drizzle-orm";
+import { type OrgFields, orgFields } from "./fields/org";
 
 function getTrustedOriginHosts(origins: string[]) {
   return Array.from(
@@ -110,3 +111,17 @@ export async function resolveUserLocation(zoneId?: string | null) {
       : null,
   };
 }
+
+export const organizationAdditionalFields = Array.isArray(orgFields)
+  ? Object.fromEntries(
+      orgFields.map((field: OrgFields) => [
+        field.name,
+        {
+          type: field.type,
+          input: field.input,
+          required: field.required,
+          defaultValue: field.defaultValue,
+        },
+      ])
+    )
+  : orgFields;

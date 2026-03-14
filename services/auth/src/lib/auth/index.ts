@@ -13,6 +13,7 @@ import { loadRbacCatalog } from "./rbac";
 import {
   getBetterAuthConfigState,
   normalizeBasePath,
+  organizationAdditionalFields,
   resolveAuthDatabase,
   resolveAuthSecondaryStorage,
   resolveUserLocation,
@@ -79,15 +80,15 @@ async function createAuthInstance() {
       expiresIn: 60 * 60 * 24 * 30, // 30 days
       updateAge: 60 * 60 * 24, // 24 hours
       deferSessionRefresh: true,
-      storeSessionInDatabase: true,
+      storeSessionInDatabase: false,
       cookieCache: {
-        enabled: true,
+        enabled: false,
         maxAge: 60 * 5, // 5 minutes
         strategy: "jwe",
       },
     },
     verification: {
-      storeInDatabase: true,
+      storeInDatabase: false,
     },
     plugins: [
       bearer(),
@@ -105,6 +106,11 @@ async function createAuthInstance() {
       organization({
         organizationLimit: 10,
         creatorRole: rbac.defaultOrganizationRoleName,
+        schema: {
+          organization: {
+            additionalFields: organizationAdditionalFields,
+          },
+        },
         ac: rbac.organizationAccessControl,
         roles: rbac.organizationRoles,
         dynamicAccessControl: {
@@ -131,8 +137,6 @@ async function createAuthInstance() {
       customSession(async ({ session, user }) => {
         const userWithTags = user as typeof user & {
           zoneId?: string | null;
-          zone?: string | null;
-          region?: string | null;
         };
         const location = await resolveUserLocation(userWithTags.zoneId);
 

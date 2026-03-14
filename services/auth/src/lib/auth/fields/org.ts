@@ -3,7 +3,7 @@ export type OrgFields = {
   type: "string" | "number" | "boolean" | "date" | "string[]" | "json";
   input: boolean;
   required?: boolean;
-  defaultValue?: number;
+  defaultValue?: string | number | boolean | string[] | Record<string, unknown>;
 };
 export const orgFields: OrgFields[] = [
   {
