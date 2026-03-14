@@ -1,5 +1,5 @@
 {
-  "id": "c5ece76a-93d6-437e-b440-9e06e130baf9",
+  "id": "bf0e0690-8b90-46b7-a367-792398d462af",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -377,6 +377,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "type": {
+          "name": "type",
+          "type": "organization_types",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -386,6 +393,37 @@
         "metadata": {
           "name": "metadata",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gst_number": {
+          "name": "gst_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone_number": {
+          "name": "phone_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "industry": {
+          "name": "industry",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_type": {
+          "name": "company_type",
+          "type": "company_types",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": false
         }
@@ -552,73 +590,6 @@
           "columns": ["email"]
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.verification": {
-      "name": "verification",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "identifier": {
-          "name": "identifier",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "verification_identifier_idx": {
-          "name": "verification_identifier_idx",
-          "columns": [
-            {
-              "expression": "identifier",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1041,7 +1012,27 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.company_types": {
+      "name": "company_types",
+      "schema": "public",
+      "values": [
+        "PVT_LTD",
+        "LLP",
+        "PROPRIETORSHIP",
+        "PARTNERSHIP",
+        "CORPORATION",
+        "LLC",
+        "NON_PROFIT",
+        "OTHER"
+      ]
+    },
+    "public.organization_types": {
+      "name": "organization_types",
+      "schema": "public",
+      "values": ["SELLER", "BUYER"]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},

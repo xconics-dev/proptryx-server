@@ -1,3 +1,5 @@
+CREATE TYPE "public"."company_types" AS ENUM('PVT_LTD', 'LLP', 'PROPRIETORSHIP', 'PARTNERSHIP', 'CORPORATION', 'LLC', 'NON_PROFIT', 'OTHER');--> statement-breakpoint
+CREATE TYPE "public"."organization_types" AS ENUM('SELLER', 'BUYER');--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -38,8 +40,14 @@ CREATE TABLE "organization" (
 	"name" text NOT NULL,
 	"slug" text NOT NULL,
 	"logo" text,
+	"type" "organization_types" NOT NULL,
 	"created_at" timestamp NOT NULL,
 	"metadata" text,
+	"email" text,
+	"gst_number" text,
+	"phone_number" text,
+	"industry" text,
+	"company_type" "company_types",
 	CONSTRAINT "organization_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
@@ -57,15 +65,6 @@ CREATE TABLE "user" (
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "user_email_unique" UNIQUE("email")
-);
---> statement-breakpoint
-CREATE TABLE "verification" (
-	"id" text PRIMARY KEY NOT NULL,
-	"identifier" text NOT NULL,
-	"value" text NOT NULL,
-	"expires_at" timestamp NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "org_member_roles" (
@@ -126,7 +125,6 @@ CREATE INDEX "member_organizationId_role_idx" ON "member" USING btree ("organiza
 CREATE UNIQUE INDEX "organization_slug_uidx" ON "organization" USING btree ("slug");--> statement-breakpoint
 CREATE INDEX "user_role_idx" ON "user" USING btree ("role");--> statement-breakpoint
 CREATE INDEX "user_zoneId_idx" ON "user" USING btree ("zone_id");--> statement-breakpoint
-CREATE INDEX "verification_identifier_idx" ON "verification" USING btree ("identifier");--> statement-breakpoint
 CREATE INDEX "org_member_roles_userRoleId_idx" ON "org_member_roles" USING btree ("user_role_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "org_member_roles_userRoleId_name_uidx" ON "org_member_roles" USING btree ("user_role_id","name");--> statement-breakpoint
 CREATE INDEX "role_permissions_roleId_idx" ON "role_permissions" USING btree ("role_id");--> statement-breakpoint

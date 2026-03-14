@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { orgMemberRole, userRole } from "./rbac";
 import { zone } from "../zone-region";
+import { CompanyType, OrganizationType } from "./enums";
 
 export const user = pgTable(
   "user",
@@ -56,9 +57,14 @@ export const organization = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     logo: text("logo"),
+    type: OrganizationType("type").notNull(),
     createdAt: timestamp("created_at").notNull(),
     metadata: text("metadata"),
     email: text("email"),
+    gstNumber: text("gst_number"),
+    phoneNumber: text("phone_number"),
+    industry: text("industry"),
+    companyType: CompanyType("company_type"),
   },
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)]
 );

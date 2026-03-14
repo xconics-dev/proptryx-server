@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1773486427934,
-      "tag": "0000_certain_chimera",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1773499612208,
-      "tag": "0001_wet_malice",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1773500494311,
-      "tag": "0002_charming_nicolaos",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1773501064793,
-      "tag": "0003_brainy_storm",
+      "when": 1773515362135,
+      "tag": "0000_orange_leo",
       "breakpoints": true
     }
   ]
