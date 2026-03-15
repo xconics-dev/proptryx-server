@@ -72,7 +72,8 @@ CREATE TABLE "org_member_roles" (
 	"name" text NOT NULL,
 	"user_role_id" text NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "org_member_roles_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
 CREATE TABLE "role_permissions" (
@@ -88,14 +89,16 @@ CREATE TABLE "user_roles" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "user_roles_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
 CREATE TABLE "region" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "region_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
 CREATE TABLE "zone" (
@@ -108,9 +111,12 @@ CREATE TABLE "zone" (
 --> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "invitation" ADD CONSTRAINT "invitation_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invitation" ADD CONSTRAINT "invitation_role_org_member_roles_name_fk" FOREIGN KEY ("role") REFERENCES "public"."org_member_roles"("name") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "invitation" ADD CONSTRAINT "invitation_inviter_id_user_id_fk" FOREIGN KEY ("inviter_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "member" ADD CONSTRAINT "member_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "member" ADD CONSTRAINT "member_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "member" ADD CONSTRAINT "member_role_org_member_roles_name_fk" FOREIGN KEY ("role") REFERENCES "public"."org_member_roles"("name") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user" ADD CONSTRAINT "user_role_user_roles_name_fk" FOREIGN KEY ("role") REFERENCES "public"."user_roles"("name") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user" ADD CONSTRAINT "user_zone_id_zone_id_fk" FOREIGN KEY ("zone_id") REFERENCES "public"."zone"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "org_member_roles" ADD CONSTRAINT "org_member_roles_user_role_id_user_roles_id_fk" FOREIGN KEY ("user_role_id") REFERENCES "public"."user_roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_user_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."user_roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -126,10 +132,11 @@ CREATE UNIQUE INDEX "organization_slug_uidx" ON "organization" USING btree ("slu
 CREATE INDEX "user_role_idx" ON "user" USING btree ("role");--> statement-breakpoint
 CREATE INDEX "user_zoneId_idx" ON "user" USING btree ("zone_id");--> statement-breakpoint
 CREATE INDEX "org_member_roles_userRoleId_idx" ON "org_member_roles" USING btree ("user_role_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "org_member_roles_userRoleId_name_uidx" ON "org_member_roles" USING btree ("user_role_id","name");--> statement-breakpoint
+CREATE UNIQUE INDEX "org_member_roles_name_uidx" ON "org_member_roles" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "role_permissions_roleId_idx" ON "role_permissions" USING btree ("role_id");--> statement-breakpoint
 CREATE INDEX "role_permissions_subRoleId_idx" ON "role_permissions" USING btree ("sub_role_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "role_permissions_roleId_subRoleId_uidx" ON "role_permissions" USING btree ("role_id","sub_role_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "role_permissions_roleId_base_uidx" ON "role_permissions" USING btree ("role_id") WHERE "role_permissions"."sub_role_id" is null;--> statement-breakpoint
+CREATE UNIQUE INDEX "role_permissions_roleId_subRoleId_uidx" ON "role_permissions" USING btree ("role_id","sub_role_id") WHERE "role_permissions"."sub_role_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "user_roles_name_uidx" ON "user_roles" USING btree ("name");--> statement-breakpoint
 CREATE UNIQUE INDEX "region_name_uidx" ON "region" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "zone_regionId_idx" ON "zone" USING btree ("region_id");--> statement-breakpoint

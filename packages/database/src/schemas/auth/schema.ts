@@ -12,7 +12,9 @@ export const user = pgTable(
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").default(false).notNull(),
     image: text("image"),
-    role: text("role"),
+    role: text("role").references(() => userRole.name, {
+      onDelete: "set null",
+    }),
     zoneId: text("zone_id").references(() => zone.id, { onDelete: "set null" }),
     banned: boolean("banned").default(false),
     banReason: text("ban_reason"),
@@ -65,6 +67,7 @@ export const organization = pgTable(
     phoneNumber: text("phone_number"),
     industry: text("industry"),
     companyType: CompanyType("company_type"),
+    isActive: boolean("is_active").default(true).notNull(),
   },
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)]
 );
@@ -79,7 +82,9 @@ export const member = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    role: text("role").notNull(),
+    role: text("role")
+      .notNull()
+      .references(() => orgMemberRole.name),
     createdAt: timestamp("created_at").notNull(),
   },
   (table) => [
@@ -97,7 +102,9 @@ export const invitation = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
-    role: text("role").notNull(),
+    role: text("role")
+      .notNull()
+      .references(() => orgMemberRole.name),
     status: text("status").default("pending").notNull(),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -160,5 +167,9 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   user: one(user, {
     fields: [invitation.inviterId],
     references: [user.id],
+  }),
+  orgMemberRole: one(orgMemberRole, {
+    fields: [invitation.role],
+    references: [orgMemberRole.name],
   }),
 }));

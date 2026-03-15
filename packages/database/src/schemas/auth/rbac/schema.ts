@@ -1,6 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import { index, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { member, user } from "../schema";
+import { invitation, member, user } from "../schema";
 
 export type RolePermissionAccessLevel = "company" | "user" | "all";
 
@@ -14,7 +14,7 @@ export const userRole = pgTable(
   "user_roles",
   {
     id: text("id").primaryKey(),
-    name: text("name").notNull(),
+    name: text("name").notNull().unique(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -28,7 +28,7 @@ export const orgMemberRole = pgTable(
   "org_member_roles",
   {
     id: text("id").primaryKey(),
-    name: text("name").notNull(),
+    name: text("name").notNull().unique(),
     userRoleId: text("user_role_id")
       .notNull()
       .references(() => userRole.id, { onDelete: "cascade" }),
@@ -40,7 +40,7 @@ export const orgMemberRole = pgTable(
   },
   (table) => [
     index("org_member_roles_userRoleId_idx").on(table.userRoleId),
-    uniqueIndex("org_member_roles_userRoleId_name_uidx").on(table.userRoleId, table.name),
+    uniqueIndex("org_member_roles_name_uidx").on(table.name),
   ]
 );
 
@@ -65,7 +65,12 @@ export const rolePermission = pgTable(
   (table) => [
     index("role_permissions_roleId_idx").on(table.roleId),
     index("role_permissions_subRoleId_idx").on(table.subRoleId),
-    uniqueIndex("role_permissions_roleId_subRoleId_uidx").on(table.roleId, table.subRoleId),
+    uniqueIndex("role_permissions_roleId_base_uidx")
+      .on(table.roleId)
+      .where(sql`${table.subRoleId} is null`),
+    uniqueIndex("role_permissions_roleId_subRoleId_uidx")
+      .on(table.roleId, table.subRoleId)
+      .where(sql`${table.subRoleId} is not null`),
   ]
 );
 
@@ -77,6 +82,7 @@ export const userRoleRelations = relations(userRole, ({ many }) => ({
 
 export const orgMemberRoleRelations = relations(orgMemberRole, ({ many, one }) => ({
   members: many(member),
+  invitations: many(invitation),
   userRole: one(userRole, {
     fields: [orgMemberRole.userRoleId],
     references: [userRole.id],

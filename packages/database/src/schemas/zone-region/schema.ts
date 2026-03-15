@@ -5,7 +5,7 @@ export const region = pgTable(
   "region",
   {
     id: text("id").primaryKey(),
-    name: text("name").notNull(),
+    name: text("name").notNull().unique(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

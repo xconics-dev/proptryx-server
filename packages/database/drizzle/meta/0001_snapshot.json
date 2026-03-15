@@ -1,6 +1,6 @@
 {
-  "id": "1b7c6491-0ee6-4be9-be41-35719cb89763",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "7a38d0c7-c939-4690-a18d-22cc5249a176",
+  "prevId": "1b7c6491-0ee6-4be9-be41-35719cb89763",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -444,6 +444,13 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         }
       },
       "indexes": {
