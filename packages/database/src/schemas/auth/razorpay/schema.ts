@@ -92,3 +92,7 @@ export const subscriptionRelations = relations(subscription, ({ one }) => ({
     references: [organization.id],
   }),
 }));
+
+export const subscriptionPlanRelations = relations(subscriptionPlan, ({ many }) => ({
+  subscriptions: many(subscription),
+}));
