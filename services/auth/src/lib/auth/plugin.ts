@@ -104,14 +104,31 @@ const createSubscriptionLink = createAuthEndpoint(
     const [planRow] = await db
       .select()
       .from(subscriptionPlan)
-      .where(eq(subscriptionPlan.rzPlanId, ctx.body.planId))
+      .where(eq(subscriptionPlan.id, ctx.body.planId))
       .limit(1);
 
-    const totalCount = ctx.body.totalCount ?? planRow?.totalCount ?? 0;
-    const quantity = ctx.body.quantity ?? planRow?.quantity ?? 1;
+    if (!planRow) {
+      throw new APIError(400, {
+        body: {
+          message: "Subscription plan not found.",
+          code: "SUBSCRIPTION_PLAN_NOT_FOUND",
+        },
+      });
+    }
+
+    const totalCount = ctx.body.totalCount ?? planRow.totalCount ?? 0;
+    if (totalCount <= 0) {
+      throw new APIError(400, {
+        body: {
+          message: "totalCount must be greater than 0.",
+          code: "TOTAL_COUNT_REQUIRED",
+        },
+      });
+    }
+    const quantity = ctx.body.quantity ?? planRow.quantity ?? 1;
 
     const razorpaySub = await rzClient.subscriptions.create({
-      plan_id: ctx.body.planId,
+      plan_id: planRow.rzPlanId,
       total_count: totalCount,
       quantity,
       expire_by: ctx.body.expireBy,
@@ -125,14 +142,14 @@ const createSubscriptionLink = createAuthEndpoint(
       where: [{ field: "razorpaySubscriptionId", value: razorpaySub.id }],
     })) as { id: string } | null;
 
-    const planName = planRow?.name ?? ctx.body.planId;
+    const planName = planRow.name;
     const subscriptionData = {
       plan: planName.toLowerCase(),
-      planId: planRow?.id ?? null,
+      planId: planRow.id,
       referenceId,
       razorpayCustomerId: razorpaySub.customer_id ?? razorpayCustomerId ?? null,
       razorpaySubscriptionId: razorpaySub.id,
-      razorpayPlanId: razorpaySub.plan_id,
+      razorpayPlanId: planRow.rzPlanId,
       status: razorpaySub.status ?? "created",
       quantity: razorpaySub.quantity ?? quantity,
       totalCount: razorpaySub.total_count ?? totalCount,
