@@ -15,6 +15,7 @@ export interface AppSecurityOptions {
   compressionThresholdBytes?: number;
   validateJsonBody?: boolean;
   enableGlobalRateLimit?: boolean;
+  skipBodyLimitPaths?: string[];
 }
 
 function hasJsonContentType(contentType: string | undefined) {
@@ -34,6 +35,7 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
   const exposeCorsRoute = options.exposeCorsRoute ?? true;
   const validateJsonBody = options.validateJsonBody ?? false;
   const enableGlobalRateLimit = options.enableGlobalRateLimit ?? true;
+  const skipBodyLimitPaths = new Set(options.skipBodyLimitPaths ?? []);
 
   app.use(
     "*",
@@ -85,21 +87,27 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
     );
   }
 
-  app.use(
-    "*",
-    bodyLimit({
-      maxSize: options.maxBodySizeBytes ?? 1024 * 1024 * 5, // default to 5MB
-      onError: (c) =>
-        c.json(
-          {
-            success: false,
-            error: "Payload Too Large",
-            message: "Request body exceeds allowed size",
-          },
-          413
-        ),
-    })
-  );
+  const bodyLimitMiddleware = bodyLimit({
+    maxSize: options.maxBodySizeBytes ?? 1024 * 1024 * 5, // default to 5MB
+    onError: (c) =>
+      c.json(
+        {
+          success: false,
+          error: "Payload Too Large",
+          message: "Request body exceeds allowed size",
+        },
+        413
+      ),
+  });
+
+  app.use("*", async (c, next) => {
+    if (skipBodyLimitPaths.has(c.req.path)) {
+      await next();
+      return;
+    }
+
+    await bodyLimitMiddleware(c, next);
+  });
 
   if (!validateJsonBody) {
     return;

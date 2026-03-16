@@ -17,6 +17,8 @@ const app = new Hono();
 applyAppSecurity(app, {
   corsOrigins: env.CORS_ALLOWED_ORIGINS,
   enableGlobalRateLimit: false,
+  validateJsonBody: false,
+  skipBodyLimitPaths: ["/api/auth/razorpay/webhook"],
 });
 app.use("*", createHonoRequestLogger(logger));
 
@@ -35,7 +37,25 @@ await getAuth();
 
 // Razorpay webhooks can sometimes fail due to various reasons (e.g. network issues, temporary unavailability of the auth service, etc.). To prevent missing critical webhook events, we log any failed webhook attempts with as much context as possible for later analysis and reprocessing if needed.
 app.all("/api/auth/razorpay/webhook", async (c) => {
-  const response = await (await getAuth()).handler(c.req.raw);
+  const logContext = {
+    eventId: c.req.header("x-razorpay-event-id") ?? null,
+    path: c.req.path,
+    requestId: c.req.header("request-id") ?? null,
+    contentType: c.req.header("content-type") ?? null,
+    signaturePresent: Boolean(c.req.header("x-razorpay-signature")),
+    userAgent: c.req.header("user-agent") ?? null,
+  };
+
+  let response: Response;
+  try {
+    response = await (await getAuth()).handler(c.req.raw);
+  } catch (error) {
+    logger.warn("razorpay webhook threw before response", {
+      ...logContext,
+      error: error instanceof Error ? error.message : error,
+    });
+    throw error;
+  }
 
   if (response.status >= 400) {
     let errorBody: string | null = null;
@@ -47,10 +67,7 @@ app.all("/api/auth/razorpay/webhook", async (c) => {
 
     logger.warn("razorpay webhook rejected", {
       status: response.status,
-      path: c.req.path,
-      contentType: c.req.header("content-type") ?? null,
-      signaturePresent: Boolean(c.req.header("x-razorpay-signature")),
-      userAgent: c.req.header("user-agent") ?? null,
+      ...logContext,
       errorBody,
     });
   }
