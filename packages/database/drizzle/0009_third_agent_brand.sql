@@ -1,0 +1,2 @@
+ALTER TABLE "subscription" ADD COLUMN "plan_id" text;--> statement-breakpoint
+ALTER TABLE "subscription" ADD CONSTRAINT "subscription_plan_id_subscription_plan_id_fk" FOREIGN KEY ("plan_id") REFERENCES "public"."subscription_plan"("id") ON DELETE no action ON UPDATE no action;

@@ -128,6 +128,7 @@ const createSubscriptionLink = createAuthEndpoint(
     const planName = planRow?.name ?? ctx.body.planId;
     const subscriptionData = {
       plan: planName.toLowerCase(),
+      planId: planRow?.id ?? null,
       referenceId,
       razorpayCustomerId: razorpaySub.customer_id ?? razorpayCustomerId ?? null,
       razorpaySubscriptionId: razorpaySub.id,

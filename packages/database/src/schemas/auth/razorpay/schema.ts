@@ -46,6 +46,7 @@ export const subscription = pgTable(
   {
     id: text("id").primaryKey(),
     plan: text("plan").notNull(),
+    planId: text("plan_id").references(() => subscriptionPlan.id),
     referenceId: text("reference_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
