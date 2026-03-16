@@ -189,6 +189,16 @@ const baseRazorpayPlugin = razorpay({
   razorpayClient: rzClient,
   razorpayWebhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
   createCustomerOnSignUp: false,
+  schema: {
+    subscription: {
+      fields: {
+        planId: {
+          type: "string",
+          required: false,
+        },
+      },
+    },
+  } as unknown as Parameters<typeof razorpay>[0]["schema"],
   organization: {
     enabled: true,
   },
