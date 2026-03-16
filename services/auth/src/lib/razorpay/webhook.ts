@@ -1,6 +1,8 @@
 import { createHmac } from "crypto";
 import type { Context } from "hono";
 import { env } from "@/config/env";
+import { getDB, subscription, subscriptionPlan } from "@proptryx/database";
+import { and, eq, isNull } from "drizzle-orm";
 
 type AuthGetter = () => Promise<{ handler: (request: Request) => Promise<Response> }>;
 type Logger = {
@@ -25,6 +27,7 @@ function createBadRequestResponse(c: Context, message: string) {
 export function createRazorpayWebhookHandler(getAuth: AuthGetter, logger: Logger) {
   return async (c: Context) => {
     let rawBody = "";
+    let parsedBody: Record<string, unknown> | null = null;
     try {
       rawBody = await c.req.raw.clone().text();
     } catch {
@@ -41,7 +44,7 @@ export function createRazorpayWebhookHandler(getAuth: AuthGetter, logger: Logger
     }
 
     try {
-      JSON.parse(rawBody);
+      parsedBody = JSON.parse(rawBody) as Record<string, unknown>;
     } catch (error) {
       logger.warn("razorpay webhook invalid JSON", {
         path: c.req.path,
@@ -85,6 +88,48 @@ export function createRazorpayWebhookHandler(getAuth: AuthGetter, logger: Logger
         ...logContext,
         errorBody,
       });
+    }
+
+    if (response.status < 400 && parsedBody) {
+      try {
+        const event = parsedBody as {
+          event?: string;
+          payload?: {
+            subscription?: {
+              entity?: {
+                id?: string;
+                plan_id?: string;
+              };
+            };
+          };
+        };
+        const razorpaySubscriptionId = event.payload?.subscription?.entity?.id;
+        const razorpayPlanId = event.payload?.subscription?.entity?.plan_id;
+
+        if (razorpaySubscriptionId && razorpayPlanId) {
+          const [planRow] = await getDB()
+            .select({ id: subscriptionPlan.id })
+            .from(subscriptionPlan)
+            .where(eq(subscriptionPlan.rzPlanId, razorpayPlanId))
+            .limit(1);
+
+          if (planRow?.id) {
+            await getDB()
+              .update(subscription)
+              .set({ planId: planRow.id })
+              .where(
+                and(
+                  eq(subscription.razorpaySubscriptionId, razorpaySubscriptionId),
+                  isNull(subscription.planId)
+                )
+              );
+          }
+        }
+      } catch (error) {
+        logger.warn("razorpay webhook plan mapping failed", {
+          error: error instanceof Error ? error.message : error,
+        });
+      }
     }
 
     return response;

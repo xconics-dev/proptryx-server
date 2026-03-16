@@ -101,11 +101,19 @@ const createSubscriptionLink = createAuthEndpoint(
     };
 
     const db = resolveAuthDatabase();
-    const [planRow] = await db
+    let [planRow] = await db
       .select()
       .from(subscriptionPlan)
       .where(eq(subscriptionPlan.id, ctx.body.planId))
       .limit(1);
+
+    if (!planRow) {
+      [planRow] = await db
+        .select()
+        .from(subscriptionPlan)
+        .where(eq(subscriptionPlan.rzPlanId, ctx.body.planId))
+        .limit(1);
+    }
 
     if (!planRow) {
       throw new APIError(400, {
@@ -186,7 +194,6 @@ const baseRazorpayPlugin = razorpay({
   },
   subscription: {
     enabled: true,
-
     requireEmailVerification: false,
     plans: async () => {
       const db = resolveAuthDatabase();
