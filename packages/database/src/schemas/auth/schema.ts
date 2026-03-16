@@ -19,6 +19,7 @@ export const user = pgTable(
     banned: boolean("banned").default(false),
     banReason: text("ban_reason"),
     banExpires: timestamp("ban_expires"),
+    phoneNumber: text("phone_number"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -68,8 +69,12 @@ export const organization = pgTable(
     industry: text("industry"),
     companyType: CompanyType("company_type"),
     isActive: boolean("is_active").default(false).notNull(),
+    razorpayCustomerId: text("razorpay_customer_id"),
   },
-  (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)]
+  (table) => [
+    uniqueIndex("organization_slug_uidx").on(table.slug),
+    index("organization_razorpayCustomerId_idx").on(table.razorpayCustomerId),
+  ]
 );
 
 export const member = pgTable(

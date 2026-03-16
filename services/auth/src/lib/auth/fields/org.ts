@@ -16,6 +16,7 @@ export const orgFields: OrgFields[] = [
     name: "phoneNumber",
     type: "string",
     input: true,
+    required: false,
   },
   {
     name: "gstNumber",
@@ -42,5 +43,10 @@ export const orgFields: OrgFields[] = [
     type: "boolean",
     input: true,
     required: false,
+  },
+  {
+    name: "razorpayCustomerId",
+    type: "string",
+    input: false,
   },
 ];

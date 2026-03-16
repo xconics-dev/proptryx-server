@@ -1,0 +1,1 @@
+ALTER TABLE "subscription" ADD CONSTRAINT "subscription_reference_id_organization_id_fk" FOREIGN KEY ("reference_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;

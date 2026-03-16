@@ -55,6 +55,13 @@ export const env = createEnv({
     BETTER_AUTH_API_KEY: z
       .string()
       .min(1, "BETTER_AUTH_API_KEY is required for Better Auth infrastructure"),
+    RAZORPAY_KEY_ID: z.string().min(1, "RAZORPAY_KEY_ID is required for Razorpay integration"),
+    RAZORPAY_KEY_SECRET: z
+      .string()
+      .min(1, "RAZORPAY_KEY_SECRET is required for Razorpay integration"),
+    RAZORPAY_WEBHOOK_SECRET: z
+      .string()
+      .min(1, "RAZORPAY_WEBHOOK_SECRET is required for Razorpay webhook verification"),
   },
 
   runtimeEnv: {
@@ -70,6 +77,9 @@ export const env = createEnv({
     BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES: process.env.BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES,
     BETTER_AUTH_COOKIE_DOMAIN: process.env.BETTER_AUTH_COOKIE_DOMAIN,
     BETTER_AUTH_API_KEY: process.env.BETTER_AUTH_API_KEY,
+    RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
+    RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
+    RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",

@@ -24,7 +24,9 @@ import {
   generateUID,
   PasswordUtils,
 } from "@proptryx/utils";
-import { allowCustomInputFieldsPlugin } from "./plugin";
+import { allowCustomInputFieldsPlugin, razorpayPlugin } from "./plugin";
+import { rzClient } from "../razorpay/client";
+import { eq } from "drizzle-orm";
 
 const {
   betterAuthSecret,
@@ -125,6 +127,31 @@ async function createAuthInstance() {
               },
             };
           },
+          afterCreateOrganization: async ({ organization, member, user }) => {
+            const userWithTags = user as typeof user & {
+              phoneNumber?: string | null;
+            };
+            const customer = await rzClient.customers.create({
+              name: user.name,
+              email: user.email,
+              contact: userWithTags.phoneNumber || undefined,
+              gstin: organization.gstNumber || undefined,
+              notes: {
+                organizationId: organization.id,
+                memberId: member.id,
+                userId: user.id,
+                createdAt: new Date().toISOString(),
+              },
+            });
+
+            // Update organization with Razorpay customer ID
+            await resolveAuthDatabase()
+              .update(schema.organization)
+              .set({
+                razorpayCustomerId: customer.id,
+              })
+              .where(eq(schema.organization.id, organization.id));
+          },
         },
       }),
       admin({
@@ -137,6 +164,7 @@ async function createAuthInstance() {
       customSession(async ({ session, user }) => {
         const userWithTags = user as typeof user & {
           zoneId?: string | null;
+          phoneNumber?: string | null;
         };
         const location = await resolveUserLocation(userWithTags.zoneId);
 
@@ -149,6 +177,9 @@ async function createAuthInstance() {
           },
         };
       }),
+
+      // Razorpay Plugin for subscription management and payment processing
+      razorpayPlugin,
     ],
     rateLimit: {
       enabled: true,

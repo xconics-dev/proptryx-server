@@ -1,8 +1,11 @@
 import type { BetterAuthPlugin } from "better-auth";
 import { type UserFields, userFields } from "./fields/user";
+import { rzClient } from "../razorpay/client";
+import { razorpay } from "better-auth-razorpay";
+import { env } from "@/config/env";
 
 export const allowCustomInputFieldsPlugin = {
-  id: "all-custom-input-fields",
+  id: "allow-custom-input-fields",
   schema: {
     user: {
       fields: Array.isArray(userFields)
@@ -21,3 +24,23 @@ export const allowCustomInputFieldsPlugin = {
     },
   },
 } satisfies BetterAuthPlugin;
+
+export const razorpayPlugin = razorpay({
+  razorpayClient: rzClient,
+  razorpayWebhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
+  createCustomerOnSignUp: false,
+  organization: {
+    enabled: true,
+  },
+  subscription: {
+    enabled: true,
+
+    requireEmailVerification: false,
+    plans: [
+      {
+        planId: "plan_SPPDk7LHo4Blma",
+        name: "DUMMY",
+      },
+    ],
+  },
+}) as unknown as BetterAuthPlugin;
