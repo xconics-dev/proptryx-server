@@ -33,7 +33,7 @@ export const allowCustomInputFieldsPlugin = {
 
 const subscriptionLinkBodySchema = z.object({
   planId: z.string(),
-  totalCount: z.number(),
+  totalCount: z.number().optional(),
   quantity: z.number().optional(),
   expireBy: z.number().optional(),
   customerNotify: z.boolean().optional(),
