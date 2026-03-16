@@ -17,7 +17,6 @@ const app = new Hono();
 applyAppSecurity(app, {
   corsOrigins: env.CORS_ALLOWED_ORIGINS,
   enableGlobalRateLimit: false,
-  validateJsonBody: false,
   skipBodyLimitPaths: ["/api/auth/razorpay/webhook"],
 });
 app.use("*", createHonoRequestLogger(logger));

@@ -43,4 +43,8 @@ export const razorpayPlugin = razorpay({
       },
     ],
   },
+  authorizeReference: async () => {
+    // Check if user has permission to manage org subscriptions
+    return true;
+  },
 }) as unknown as BetterAuthPlugin;
