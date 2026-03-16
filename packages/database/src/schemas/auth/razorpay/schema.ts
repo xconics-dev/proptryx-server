@@ -1,14 +1,45 @@
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { organization } from "../schema";
-import { relations } from "drizzle-orm";
+
+export type SubscriptionPlanMetadata = Record<string, unknown>;
+export type SubscriptionPlanFeatures = Record<string, unknown>;
+
+export const subscriptionPlan = pgTable(
+  "subscription_plan",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    rzPlanId: text("rz_plan_id").notNull(),
+    rzAnnualPlanId: text("rz_annual_plan_id"),
+    description: text("description"),
+    group: text("group"),
+    totalCount: integer("total_count"),
+    quantity: integer("quantity"),
+    freeTrialDays: integer("free_trial_days"),
+    features: jsonb("features").$type<SubscriptionPlanFeatures>().default(sql`'{}'::jsonb`),
+    metadata: jsonb("metadata").$type<SubscriptionPlanMetadata>().default(sql`'{}'::jsonb`),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("subscription_plan_rzPlanId_uidx").on(table.rzPlanId),
+    index("subscription_plan_isActive_idx").on(table.isActive),
+  ]
+);
 
 export const subscription = pgTable(
   "subscription",

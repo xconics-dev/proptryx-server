@@ -5,7 +5,7 @@ let redisClient: Redis | null = null;
 let redisConnectPromise: Promise<Redis> | null = null;
 
 function createRedisClient() {
-  return new Redis(env.REDIS_URL, {
+  const client = new Redis(env.REDIS_URL, {
     lazyConnect: false,
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
@@ -13,6 +13,13 @@ function createRedisClient() {
     keepAlive: 10_000,
     connectionName: "proptryx-shared",
   });
+
+  client.on("error", (error) => {
+    // Avoid unhandled error events bringing the process down.
+    console.warn("redis connection error", error);
+  });
+
+  return client;
 }
 
 export function getRedisClient() {
