@@ -58,6 +58,9 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       BETTER_AUTH_API_KEY: ${BETTER_AUTH_API_KEY}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
     healthcheck:
       test:
         ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${AUTH_PORT:-6001}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
