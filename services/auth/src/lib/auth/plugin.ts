@@ -1,7 +1,7 @@
 import { APIError } from "better-auth";
 import type { BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint, sessionMiddleware } from "better-auth/api";
-import { subscriptionPlan } from "@proptryx/database";
+import { subscription as subscriptionTable, subscriptionPlan } from "@proptryx/database";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { type UserFields, userFields } from "./fields/user";
@@ -175,6 +175,12 @@ const createSubscriptionLink = createAuthEndpoint(
           model: "subscription",
           data: subscriptionData,
         });
+
+    // Ensure planId is persisted even if adapter schema isn't updated yet.
+    await db
+      .update(subscriptionTable)
+      .set({ planId: planRow.id })
+      .where(eq(subscriptionTable.razorpaySubscriptionId, razorpaySub.id));
 
     return ctx.json({
       subscriptionId: razorpaySub.id,
