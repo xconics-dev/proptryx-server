@@ -57,6 +57,13 @@
       "when": 1773648252583,
       "tag": "0007_broken_whirlwind",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773661855906,
+      "tag": "0008_cuddly_living_tribunal",
+      "breakpoints": true
     }
   ]
 }
