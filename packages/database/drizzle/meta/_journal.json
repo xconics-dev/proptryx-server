@@ -15,6 +15,20 @@
       "when": 1773561178133,
       "tag": "0001_solid_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773563159300,
+      "tag": "0002_opposite_sandman",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773563594611,
+      "tag": "0003_lethal_tony_stark",
+      "breakpoints": true
     }
   ]
 }

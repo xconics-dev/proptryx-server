@@ -1,0 +1,1 @@
+ALTER TABLE "organization" ALTER COLUMN "is_active" SET DEFAULT false;

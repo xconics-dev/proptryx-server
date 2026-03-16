@@ -1,8 +1,8 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
-export const OrganizationType = pgEnum("organization_types", ["SELLER", "BUYER"]);
+export const OrganizationType = pgEnum("organization_type", ["SELLER", "BUYER"]);
 
-export const CompanyType = pgEnum("company_types", [
+export const CompanyType = pgEnum("company_type", [
   "PVT_LTD",
   "LLP",
   "PROPRIETORSHIP",

@@ -41,5 +41,6 @@ export const orgFields: OrgFields[] = [
     name: "isActive",
     type: "boolean",
     input: true,
+    required: false,
   },
 ];

@@ -67,7 +67,7 @@ export const organization = pgTable(
     phoneNumber: text("phone_number"),
     industry: text("industry"),
     companyType: CompanyType("company_type"),
-    isActive: boolean("is_active").default(true).notNull(),
+    isActive: boolean("is_active").default(false).notNull(),
   },
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)]
 );
