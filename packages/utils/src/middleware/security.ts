@@ -48,7 +48,13 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
         return allowedOrigins.has(origin) ? origin : "";
       },
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type", "Authorization", "X-Request-Id", "Set-Auth-Token"],
+      allowHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Request-Id",
+        "Set-Auth-Token",
+        "X-Razorpay-Signature",
+      ],
       exposeHeaders: ["X-Request-Id", "Set-Auth-Token"],
       maxAge: 600,
       credentials: !allowAll,

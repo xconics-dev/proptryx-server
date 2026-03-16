@@ -33,6 +33,31 @@ await initializeAuthSecondaryStorage();
 const { getAuth } = await import("@/lib/auth");
 await getAuth();
 
+// Razorpay webhooks can sometimes fail due to various reasons (e.g. network issues, temporary unavailability of the auth service, etc.). To prevent missing critical webhook events, we log any failed webhook attempts with as much context as possible for later analysis and reprocessing if needed.
+app.all("/api/auth/razorpay/webhook", async (c) => {
+  const response = await (await getAuth()).handler(c.req.raw);
+
+  if (response.status >= 400) {
+    let errorBody: string | null = null;
+    try {
+      errorBody = await response.clone().text();
+    } catch {
+      errorBody = null;
+    }
+
+    logger.warn("razorpay webhook rejected", {
+      status: response.status,
+      path: c.req.path,
+      contentType: c.req.header("content-type") ?? null,
+      signaturePresent: Boolean(c.req.header("x-razorpay-signature")),
+      userAgent: c.req.header("user-agent") ?? null,
+      errorBody,
+    });
+  }
+
+  return response;
+});
+
 app.all("*", async (c) => (await getAuth()).handler(c.req.raw));
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler({ serviceName: "auth", logger }));
