@@ -91,8 +91,13 @@ export const subscriptionRelations = relations(subscription, ({ one }) => ({
     fields: [subscription.referenceId],
     references: [organization.id],
   }),
+  plan: one(subscriptionPlan, {
+    fields: [subscription.planId],
+    references: [subscriptionPlan.id],
+    relationName: "planSubscriptions",
+  }),
 }));
 
 export const subscriptionPlanRelations = relations(subscriptionPlan, ({ many }) => ({
-  subscriptions: many(subscription),
+  subscriptions: many(subscription, { relationName: "planSubscriptions" }),
 }));
