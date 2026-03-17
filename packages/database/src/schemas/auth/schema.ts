@@ -20,6 +20,7 @@ export const user = pgTable(
     banReason: text("ban_reason"),
     banExpires: timestamp("ban_expires"),
     phoneNumber: text("phone_number"),
+    phoneNumberVerified: boolean("phone_number_verified").default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

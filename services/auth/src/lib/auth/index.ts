@@ -2,7 +2,7 @@
 import { dash } from "@better-auth/infra";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { customSession, openAPI } from "better-auth/plugins";
+import { customSession, openAPI, phoneNumber } from "better-auth/plugins";
 import { admin } from "better-auth/plugins/admin";
 import { bearer } from "better-auth/plugins/bearer";
 import { multiSession } from "better-auth/plugins/multi-session";
@@ -95,6 +95,27 @@ async function createAuthInstance() {
     },
     plugins: [
       bearer(),
+      phoneNumber({
+        expiresIn: 60 * 5, // 5 minutes
+        requireVerification: false,
+        allowedAttempts: 5, // 5 attempts
+        sendOTP: ({ phoneNumber, code }, ctx) => {
+          // Implement sending OTP code via SMS
+          logger.info("Sending OTP", {
+            phoneNumber,
+            code,
+            context: ctx,
+          });
+        },
+        callbackOnVerification: async ({ phoneNumber, user }, ctx) => {
+          // Implement any logic after successful phone verification
+          logger.info("Phone number verified", {
+            phoneNumber,
+            userId: user.id,
+            context: ctx,
+          });
+        },
+      }),
       multiSession({
         maximumSessions: 1,
       }),
@@ -198,7 +219,6 @@ async function createAuthInstance() {
       customSession(async ({ session, user }) => {
         const userWithTags = user as typeof user & {
           zoneId?: string | null;
-          phoneNumber?: string | null;
         };
         const location = await resolveUserLocation(userWithTags.zoneId);
 

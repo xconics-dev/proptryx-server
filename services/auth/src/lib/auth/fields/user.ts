@@ -16,9 +16,4 @@ export const userFields: UserFields[] = [
     type: "string",
     input: true,
   },
-  {
-    name: "phoneNumber",
-    type: "string",
-    input: true,
-  },
 ];
