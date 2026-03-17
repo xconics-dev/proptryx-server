@@ -71,6 +71,20 @@
       "when": 1773662260820,
       "tag": "0009_third_agent_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773735546882,
+      "tag": "0010_strong_lucky_pierre",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773735787267,
+      "tag": "0011_shiny_triton",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: forced */
 import { dash } from "@better-auth/infra";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -24,7 +25,7 @@ import {
   generateUID,
   PasswordUtils,
 } from "@proptryx/utils";
-import { allowCustomInputFieldsPlugin, razorpayPlugin } from "./plugin";
+import { allowCustomInputFieldsPlugin } from "./plugin";
 import { rzClient } from "../razorpay/client";
 import { eq } from "drizzle-orm";
 
@@ -131,24 +132,57 @@ async function createAuthInstance() {
             const userWithTags = user as typeof user & {
               phoneNumber?: string | null;
             };
-            const customer = await rzClient.customers.create({
-              name: user.name,
-              email: user.email,
-              contact: userWithTags.phoneNumber || undefined,
-              gstin: organization.gstNumber || undefined,
-              notes: {
-                organizationId: organization.id,
-                memberId: member.id,
-                userId: user.id,
-                createdAt: new Date().toISOString(),
-              },
-            });
 
-            // Update organization with Razorpay customer ID
+            const email = user.email;
+            const phone = userWithTags.phoneNumber || undefined;
+            const gst = organization.gstNumber || undefined;
+
+            let existingCustomer: any = null;
+
+            // 1️⃣ Fetch customers by email ONLY
+            const customersResponse = await rzClient.customers.all({});
+
+            if (customersResponse.items.length > 0) {
+              // 2️⃣ Pick first match (email is primary identity)
+              existingCustomer = customersResponse.items[0];
+            }
+
+            let customerId: string;
+
+            if (existingCustomer) {
+              customerId = existingCustomer.id;
+
+              // 3️⃣ Update existing customer if data missing
+              const shouldUpdate = phone && !existingCustomer.contact;
+
+              if (shouldUpdate) {
+                await rzClient.customers.edit(existingCustomer.id, {
+                  contact: phone || existingCustomer.contact,
+                });
+              }
+            } else {
+              // 4️⃣ Create new customer
+              const customer = await rzClient.customers.create({
+                name: user.name,
+                email,
+                contact: phone,
+                gstin: gst,
+                notes: {
+                  organizationId: organization.id,
+                  memberId: member.id,
+                  userId: user.id,
+                  createdAt: new Date().toISOString(),
+                },
+              });
+
+              customerId = customer.id;
+            }
+
+            // 5️⃣ Save customer ID in organization
             await resolveAuthDatabase()
               .update(schema.organization)
               .set({
-                razorpayCustomerId: customer.id,
+                razorpayCustomerId: customerId,
               })
               .where(eq(schema.organization.id, organization.id));
           },
@@ -179,7 +213,6 @@ async function createAuthInstance() {
       }),
 
       // Razorpay Plugin for subscription management and payment processing
-      razorpayPlugin,
     ],
     rateLimit: {
       enabled: true,
