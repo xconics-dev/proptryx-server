@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/useConst: forced */
 import { APIError } from "better-auth";
 import type { BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint, sessionMiddleware } from "better-auth/api";
@@ -36,7 +37,10 @@ const subscriptionLinkBodySchema = z.object({
   totalCount: z.number().optional(),
   quantity: z.number().optional(),
   expireBy: z.number().optional(),
+  startAt: z.number().optional(),
   customerNotify: z.boolean().optional(),
+  notifyEmail: z.string().email().optional(),
+  notifyPhone: z.string().optional(),
   notes: z.record(z.string(), z.string()).optional(),
 });
 
@@ -75,14 +79,23 @@ const createSubscriptionLink = createAuthEndpoint(
     }
 
     let razorpayCustomerId: string | null | undefined = user.razorpayCustomerId;
+    let notifyEmail: string | undefined;
+    let notifyPhone: string | undefined;
+    let notifyName: string | undefined;
 
     if (customerType === "organization") {
       const org = await ctx.context.adapter.findOne({
         model: "organization",
         where: [{ field: "id", value: referenceId }],
       });
-      razorpayCustomerId = (org as { razorpayCustomerId?: string | null } | null)
-        ?.razorpayCustomerId;
+      const orgData = org as {
+        razorpayCustomerId?: string | null;
+        email?: string | null;
+        phoneNumber?: string | null;
+      } | null;
+      razorpayCustomerId = orgData?.razorpayCustomerId;
+      notifyEmail = orgData?.email ?? undefined;
+      notifyPhone = orgData?.phoneNumber ?? undefined;
       if (!razorpayCustomerId) {
         throw new APIError(400, {
           body: {
@@ -99,6 +112,15 @@ const createSubscriptionLink = createAuthEndpoint(
       referenceId,
       userId: user.id,
     };
+
+    const userWithDetails = user as {
+      email?: string | null;
+      phoneNumber?: string | null;
+      name?: string | null;
+    };
+    notifyEmail ??= userWithDetails.email ?? undefined;
+    notifyPhone ??= userWithDetails.phoneNumber ?? undefined;
+    notifyName ??= userWithDetails.name ?? undefined;
 
     const db = resolveAuthDatabase();
     let [planRow] = await db
@@ -135,15 +157,38 @@ const createSubscriptionLink = createAuthEndpoint(
     }
     const quantity = ctx.body.quantity ?? planRow.quantity ?? 1;
 
-    const razorpaySub = await rzClient.subscriptions.create({
-      plan_id: planRow.rzPlanId,
-      total_count: totalCount,
-      quantity,
-      expire_by: ctx.body.expireBy,
-      customer_notify: ctx.body.customerNotify ?? true,
-      ...(razorpayCustomerId ? { customer_id: razorpayCustomerId } : {}),
-      notes,
-    });
+    const notifyInfo =
+      ctx.body.notifyEmail || ctx.body.notifyPhone || notifyEmail || notifyPhone || notifyName
+        ? {
+            name: notifyName,
+            email: ctx.body.notifyEmail ?? notifyEmail,
+            contact: ctx.body.notifyPhone ?? notifyPhone,
+          }
+        : undefined;
+
+    const razorpaySub = (await (
+      rzClient as { api: { post: (input: unknown) => Promise<unknown> } }
+    ).api.post({
+      url: "/subscriptions",
+      data: {
+        plan_id: planRow.rzPlanId,
+        total_count: totalCount,
+        quantity,
+        expire_by: ctx.body.expireBy,
+        start_at: ctx.body.startAt,
+        customer_notify: ctx.body.customerNotify ?? true,
+        ...(notifyInfo ? { notify_info: notifyInfo } : {}),
+        ...(razorpayCustomerId ? { customer_id: razorpayCustomerId } : {}),
+        notes,
+      },
+    })) as {
+      id: string;
+      customer_id?: string | null;
+      status?: string | null;
+      quantity?: number | null;
+      total_count?: number | null;
+      short_url?: string | null;
+    };
 
     const existing = (await ctx.context.adapter.findOne({
       model: "subscription",
@@ -223,7 +268,6 @@ const baseRazorpayPlugin = razorpay({
         annualPlanId: plan.rzAnnualPlanId ?? undefined,
         name: plan.name,
         limits: plan.features ?? undefined,
-        group: plan.group ?? undefined,
         totalCount: plan.totalCount ?? undefined,
         quantity: plan.quantity ?? undefined,
         freeTrial: plan.freeTrialDays
