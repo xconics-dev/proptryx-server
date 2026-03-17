@@ -125,3 +125,13 @@ export const organizationAdditionalFields = Array.isArray(orgFields)
       ])
     )
   : orgFields;
+
+// Add to utils.ts
+export function resolveEmailExistsCache() {
+  const redis = getRedisClient();
+  const PREFIX = "auth:email-exists:";
+  return {
+    get: (email: string) => redis.get(`${PREFIX}${email}`),
+    set: (email: string, value: "1" | "0") => redis.set(`${PREFIX}${email}`, value, "EX", 60),
+  };
+}

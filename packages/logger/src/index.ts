@@ -149,7 +149,11 @@ function stringifyValue(value: unknown): string {
     return value.toISOString();
   }
 
-  return JSON.stringify(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "[Circular]";
+  }
 }
 
 function shortenUserAgent(userAgent: string | undefined, maxLength = 72): string | null {

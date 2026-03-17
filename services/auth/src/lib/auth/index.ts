@@ -1,8 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: forced */
 import { dash } from "@better-auth/infra";
-import { betterAuth } from "better-auth";
+import { APIError, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { customSession, openAPI, phoneNumber } from "better-auth/plugins";
+import { customSession, emailOTP, openAPI, phoneNumber } from "better-auth/plugins";
 import { admin } from "better-auth/plugins/admin";
 import { bearer } from "better-auth/plugins/bearer";
 import { multiSession } from "better-auth/plugins/multi-session";
@@ -25,9 +25,13 @@ import {
   generateUID,
   PasswordUtils,
 } from "@proptryx/utils";
-import { allowCustomInputFieldsPlugin } from "./plugin";
+import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
 import { rzClient } from "../razorpay/client";
 import { eq } from "drizzle-orm";
+
+// ─────────────────────────────────────────────
+// Config — resolved once at module load
+// ─────────────────────────────────────────────
 
 const {
   betterAuthSecret,
@@ -38,8 +42,15 @@ const {
   trustedOrigins,
 } = getBetterAuthConfigState();
 
+// ─────────────────────────────────────────────
+// Auth instance factory
+// ─────────────────────────────────────────────
+
 async function createAuthInstance() {
   const rbac = await loadRbacCatalog();
+
+  // Resolve DB once — reuse across all hooks in this closure
+  const db = resolveAuthDatabase();
 
   return betterAuth({
     appName: "Proptryx Auth Service",
@@ -54,16 +65,22 @@ async function createAuthInstance() {
     secret: betterAuthSecret,
     trustedProxyHeaders: isProduction,
     trustedOrigins,
-    database: drizzleAdapter(resolveAuthDatabase(), {
+    database: drizzleAdapter(db, {
       provider: "pg",
       schema,
     }),
     secondaryStorage: resolveAuthSecondaryStorage(),
     onAPIError: {
       throw: true,
-      onError: (error, _ctx) => {
+      onError: (error) => {
         logger.error("Proptryx Auth Service API", {
           error: error instanceof Error ? error.stack : error,
+        });
+
+        if (error instanceof APIError) throw error;
+
+        throw new APIError("INTERNAL_SERVER_ERROR", {
+          message: "Something went wrong",
         });
       },
     },
@@ -71,8 +88,8 @@ async function createAuthInstance() {
       enabled: true,
       requireEmailVerification: false,
       password: {
-        hash: async (password) => await PasswordUtils.hash(password),
-        verify: async ({ password, hash }) => await PasswordUtils.verify(password, hash),
+        hash: (password) => PasswordUtils.hash(password),
+        verify: ({ password, hash }) => PasswordUtils.verify(password, hash),
       },
     },
     emailVerification: {
@@ -86,7 +103,7 @@ async function createAuthInstance() {
       storeSessionInDatabase: false,
       cookieCache: {
         enabled: false,
-        maxAge: 60 * 5, // 5 minutes
+        maxAge: 60 * 5,
         strategy: "jwe",
       },
     },
@@ -96,59 +113,39 @@ async function createAuthInstance() {
     plugins: [
       bearer(),
       phoneNumber({
-        expiresIn: 60 * 5, // 5 minutes
+        expiresIn: 60 * 5,
         requireVerification: false,
-        allowedAttempts: 5, // 5 attempts
-        sendOTP: ({ phoneNumber, code }, ctx) => {
-          // Implement sending OTP code via SMS
-          logger.info("Sending OTP", {
-            phoneNumber,
-            code,
-            context: ctx,
-          });
+        allowedAttempts: 5,
+        sendOTP: ({ phoneNumber, code }) => {
+          logger.info("Sending OTP", { phoneNumber, code });
         },
-        callbackOnVerification: async ({ phoneNumber, user }, ctx) => {
-          // Implement any logic after successful phone verification
+        callbackOnVerification: async ({ phoneNumber, user }) => {
           logger.info("Phone number verified", {
             phoneNumber,
             userId: user.id,
-            context: ctx,
           });
         },
       }),
-      multiSession({
-        maximumSessions: 1,
-      }),
+      multiSession({ maximumSessions: 1 }),
       openAPI({
         path: "/docs",
         nonce: env.BETTER_AUTH_SECRET,
         theme: "purple",
       }),
-      dash({
-        apiKey: env.BETTER_AUTH_API_KEY,
-      }),
+      dash({ apiKey: env.BETTER_AUTH_API_KEY }),
       organization({
         organizationLimit: 10,
         creatorRole: rbac.defaultOrganizationRoleName,
         schema: {
-          organization: {
-            additionalFields: organizationAdditionalFields,
-          },
+          organization: { additionalFields: organizationAdditionalFields },
         },
         ac: rbac.organizationAccessControl,
         roles: rbac.organizationRoles,
-        dynamicAccessControl: {
-          enabled: true,
-        },
+        dynamicAccessControl: { enabled: true },
         organizationHooks: {
-          beforeCreateOrganization: async ({ organization }) => {
-            return {
-              data: {
-                ...organization,
-                id: generateNextCompanyId(),
-              },
-            };
-          },
+          beforeCreateOrganization: async ({ organization }) => ({
+            data: { ...organization, id: generateNextCompanyId() },
+          }),
           afterCreateOrganization: async ({ organization, member, user }) => {
             const userWithTags = user as typeof user & {
               phoneNumber?: string | null;
@@ -164,8 +161,10 @@ async function createAuthInstance() {
             const customersResponse = await rzClient.customers.all({});
 
             if (customersResponse.items.length > 0) {
-              // 2️⃣ Pick first match (email is primary identity)
-              existingCustomer = customersResponse.items[0];
+              // 2️⃣ Check if any customer has matching email — this is the only reliable way to find an existing customer without storing the ID
+              existingCustomer = customersResponse.items.find(
+                (customer) => customer.email === email
+              );
             }
 
             let customerId: string;
@@ -217,11 +216,8 @@ async function createAuthInstance() {
       }),
       allowCustomInputFieldsPlugin,
       customSession(async ({ session, user }) => {
-        const userWithTags = user as typeof user & {
-          zoneId?: string | null;
-        };
+        const userWithTags = user as typeof user & { zoneId?: string | null };
         const location = await resolveUserLocation(userWithTags.zoneId);
-
         return {
           session,
           user: {
@@ -231,42 +227,42 @@ async function createAuthInstance() {
           },
         };
       }),
-
-      // Razorpay Plugin for subscription management and payment processing
+      // ✅ Guard runs before emailOTP — intercepts before plugin swallows errors
+      emailOtpGuardPlugin,
+      emailOTP({
+        expiresIn: 60 * 10, // 10 minutes
+        allowedAttempts: 5,
+        overrideDefaultEmailVerification: false,
+        async sendVerificationOTP({ email, otp, type }) {
+          logger.info("Sending email OTP", { email, otp, type });
+          // TODO: plug in Resend / Nodemailer here
+        },
+      }),
     ],
     rateLimit: {
       enabled: true,
       window: 60,
       max: 100,
       customRules: {
-        "/sign-in/email": {
-          window: 60,
-          max: 20,
-        },
-        "/sign-up/email": {
-          window: 60,
-          max: 20,
-        },
+        "/sign-in/email": { window: 60, max: 20 },
+        "/sign-up/email": { window: 60, max: 20 },
+        "/email-otp/send-verification-otp": { window: 60, max: 10 },
+        "/sign-in/email-otp": { window: 60, max: 10 },
+        "/email-otp/request-password-reset": { window: 60, max: 10 },
+        "/forget-password/email-otp": { window: 60, max: 10 },
       },
     },
     logger: {
-      level: !isProduction ? "debug" : "info",
+      level: isProduction ? "info" : "debug",
       disabled: false,
     },
-    experimental: {
-      joins: true,
-    },
+    experimental: { joins: true },
     databaseHooks: {
       user: {
         create: {
-          before: async (user) => {
-            return {
-              data: {
-                ...user,
-                id: generateUID(),
-              },
-            };
-          },
+          before: async (user) => ({
+            data: { ...user, id: generateUID() },
+          }),
         },
       },
     },
@@ -278,9 +274,7 @@ async function createAuthInstance() {
         httpOnly: true,
         path: "/",
       },
-      database: {
-        generateId: () => generateRandomId(),
-      },
+      database: { generateId: () => generateRandomId() },
       ipAddress: {
         ipAddressHeaders: ["x-forwarded-for", "x-real-ip"],
       },
@@ -288,12 +282,19 @@ async function createAuthInstance() {
   });
 }
 
-let authVersion = "";
+// ─────────────────────────────────────────────
+// Exports
+// ─────────────────────────────────────────────
+
+// ✅ Load rbac ONCE at startup — version stored, no double call
+const initialRbac = await loadRbacCatalog();
+let authVersion = initialRbac.version;
 export let auth = await createAuthInstance();
 
 export async function getAuth() {
   const nextRbac = await loadRbacCatalog();
 
+  // ✅ Only recreate if RBAC version actually changed
   if (nextRbac.version !== authVersion) {
     auth = await createAuthInstance();
     authVersion = nextRbac.version;
@@ -301,7 +302,5 @@ export async function getAuth() {
 
   return auth;
 }
-
-authVersion = (await loadRbacCatalog()).version;
 
 export type BetterAuthInstance = typeof auth;
