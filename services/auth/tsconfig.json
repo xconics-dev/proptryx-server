@@ -4,7 +4,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "baseUrl": ".",
-    "paths": { "@/*": ["./src/*"] }
+    "paths": { "@/*": ["./src/*"] },
+    "jsx": "react-jsx",
+    "strict": true,
+    "jsxImportSource": "hono/jsx"
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

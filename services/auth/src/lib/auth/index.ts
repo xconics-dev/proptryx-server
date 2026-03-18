@@ -8,6 +8,12 @@ import { bearer } from "better-auth/plugins/bearer";
 import { multiSession } from "better-auth/plugins/multi-session";
 import { organization } from "better-auth/plugins/organization";
 import * as schema from "@proptryx/database";
+import {
+  renderSignInCodeEmail,
+  renderPasswordResetOtpEmail,
+  sendEmail,
+  emailSubject,
+} from "@proptryx/notification";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { loadRbacCatalog } from "./rbac";
@@ -234,8 +240,27 @@ async function createAuthInstance() {
         allowedAttempts: 5,
         overrideDefaultEmailVerification: false,
         async sendVerificationOTP({ email, otp, type }) {
-          logger.info("Sending email OTP", { email, otp, type });
-          // TODO: plug in Resend / Nodemailer here
+          if (type === "sign-in") {
+            await sendEmail({
+              to: email,
+              subject: emailSubject["sign-in"].subject,
+              html: await renderSignInCodeEmail({
+                otpCode: otp,
+                previewText: emailSubject["sign-in"].previewText,
+              }),
+            });
+          }
+
+          if (type === "forget-password") {
+            await sendEmail({
+              to: email,
+              subject: emailSubject["forget-password"].subject,
+              html: await renderPasswordResetOtpEmail({
+                otpCode: otp,
+                previewText: emailSubject["forget-password"].previewText,
+              }),
+            });
+          }
         },
       }),
     ],

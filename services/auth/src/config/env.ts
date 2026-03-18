@@ -62,6 +62,8 @@ export const env = createEnv({
     RAZORPAY_WEBHOOK_SECRET: z
       .string()
       .min(1, "RAZORPAY_WEBHOOK_SECRET is required for Razorpay webhook verification"),
+    RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required for Resend transport"),
+    RESEND_FROM: z.string().email("RESEND_FROM must be a valid email address"),
   },
 
   runtimeEnv: {
@@ -80,6 +82,8 @@ export const env = createEnv({
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
     RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM: process.env.RESEND_FROM,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
