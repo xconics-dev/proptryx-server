@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Better Auth and Razorpay contexts are runtime-shaped */
 import * as crypto from "node:crypto";
 import * as schema from "@proptryx/database";
-import { sendEmail } from "@proptryx/notification";
+import { emailSubject, renderCompleteSubscriptionEmail, sendEmail } from "@proptryx/notification";
 import { generateRandomId } from "@proptryx/utils";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint, createAuthMiddleware, sessionMiddleware } from "better-auth/api";
@@ -19,6 +19,18 @@ const ACTIVE_SUBSCRIPTION_STATUSES = new Set([
   "halted",
   "paused",
 ]);
+
+const SUBSCRIPTION_NOTIFICATION_CONFIG = {
+  defaultCustomerNotify: true,
+  authLinkExpireWindowSeconds: 24 * 60 * 60,
+} as const;
+
+type SubscriptionNotificationContactInput = {
+  organizationEmail?: string | null;
+  organizationPhoneNumber?: string | null;
+  sessionEmail?: string | null;
+  sessionPhoneNumber?: string | null;
+};
 
 const upsertPlanBodySchema = z.object({
   code: z.string().min(2),
@@ -48,6 +60,7 @@ const createSubscriptionBodySchema = z.object({
   additionalProperties: z.number().int().min(0).optional(),
   addonPropertyOneTimeCostInPaise: z.number().int().min(0).optional(),
   customerNotify: z.boolean().optional(),
+  applicationNotifyOnly: z.boolean().optional(),
   notes: z.record(z.string(), z.string()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
@@ -190,6 +203,18 @@ function normalizeContactForNotify(value?: string | null) {
 
   const digits = value.replace(/\D/g, "");
   return digits.length > 0 ? digits : null;
+}
+
+function resolveSubscriptionNotifyContacts(input: SubscriptionNotificationContactInput) {
+  const notifyEmail = input.organizationEmail || input.sessionEmail || null;
+  const notifyPhone = normalizeContactForNotify(
+    input.organizationPhoneNumber || input.sessionPhoneNumber || null
+  );
+
+  return {
+    notifyEmail,
+    notifyPhone,
+  };
 }
 
 async function resolveOrganizationId(session: any, explicitOrganizationId?: string) {
@@ -589,7 +614,10 @@ const createSubscriptionEndpoint = createAuthEndpoint(
     const razorpayPlanId = plan.razorpayPlanId;
     const quantity = ctx.body.quantity ?? plan.quantity ?? 1;
     const totalCount = ctx.body.totalCount ?? plan.totalCount ?? 12;
-    const customerNotify = ctx.body.customerNotify ?? true;
+    const customerNotifyRequested =
+      ctx.body.customerNotify ?? SUBSCRIPTION_NOTIFICATION_CONFIG.defaultCustomerNotify;
+    const applicationNotifyOnly = ctx.body.applicationNotifyOnly ?? false;
+    const customerNotify = applicationNotifyOnly ? false : customerNotifyRequested;
     const trialDaysApplied = ctx.body.trialDays ?? plan.trialDays ?? 0;
     const includedProperties = plan.includedProperties ?? 0;
     const additionalProperties = ctx.body.additionalProperties ?? 0;
@@ -606,10 +634,12 @@ const createSubscriptionEndpoint = createAuthEndpoint(
 
     const organization = await ensureOrganizationWithCustomer(organizationId, session.user);
     const requestedCustomerId = ctx.body.customerId?.trim() || organization.razorpayCustomerId;
-    const notifyEmail = organization.email || session.user.email || null;
-    const notifyPhone = normalizeContactForNotify(
-      organization.phoneNumber || session.user.phoneNumber || null
-    );
+    const { notifyEmail, notifyPhone } = resolveSubscriptionNotifyContacts({
+      organizationEmail: organization.email,
+      organizationPhoneNumber: organization.phoneNumber,
+      sessionEmail: session.user.email,
+      sessionPhoneNumber: session.user.phoneNumber,
+    });
 
     const notes: Record<string, string> = {
       organizationId,
@@ -623,7 +653,8 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       addonPropertyOneTimeCostInPaise: String(addonPropertyOneTimeCostInPaise),
       addonOneTimeTotalInPaise: String(addonOneTimeTotalInPaise),
       trialDaysApplied: String(trialDaysApplied),
-      customerNotifyRequested: String(customerNotify),
+      customerNotifyRequested: String(customerNotifyRequested),
+      applicationNotifyOnly: String(applicationNotifyOnly),
       ...(ctx.body.notes ?? {}),
     };
 
@@ -635,7 +666,7 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       notes,
     };
 
-    if (notifyEmail || notifyPhone) {
+    if ((notifyEmail || notifyPhone) && !applicationNotifyOnly) {
       createParams.notify_info = {
         ...(notifyEmail ? { notify_email: notifyEmail } : {}),
         ...(notifyPhone ? { notify_phone: notifyPhone } : {}),
@@ -663,7 +694,9 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       trialEnd = new Date(trialStart.getTime() + trialDaysApplied * 24 * 60 * 60 * 1000);
       createParams.start_at = Math.floor(trialEnd.getTime() / 1000);
       // Keep auth window explicit and short-lived as recommended for hosted auth links.
-      createParams.expire_by = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours from now
+      createParams.expire_by =
+        Math.floor(Date.now() / 1000) +
+        SUBSCRIPTION_NOTIFICATION_CONFIG.authLinkExpireWindowSeconds;
     }
 
     let razorpaySubscription: any;
@@ -699,41 +732,27 @@ const createSubscriptionEndpoint = createAuthEndpoint(
 
     const customerBindingApplied = Boolean(razorpaySubscription?.customer_id);
 
-    if (
-      razorpaySubscription?.customer_notify !== undefined &&
-      Boolean(razorpaySubscription.customer_notify) !== customerNotify
-    ) {
-      logger.warn("razorpay customer_notify mismatch", {
-        organizationId,
-        subscriptionPlanId: plan.id,
-        razorpaySubscriptionId: razorpaySubscription?.id,
-        requestedCustomerNotify: customerNotify,
-        razorpayCustomerNotify: razorpaySubscription.customer_notify,
-      });
-    }
-
     let notificationSentByApp = false;
 
-    if (customerNotify && !customerBindingApplied && notifyEmail) {
+    if (notifyEmail && (applicationNotifyOnly || (customerNotify && !customerBindingApplied))) {
       try {
         await sendEmail({
           to: notifyEmail,
-          subject: `Complete subscription setup for ${plan.name}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-              <p>Hello,</p>
-              <p>Your subscription setup is ready. Please complete authorization using the link below:</p>
-              <p><a href="${paymentLink}" target="_blank" rel="noreferrer">Complete Subscription Authorization</a></p>
-              <p>This link is generated for organization <strong>${organization.name}</strong>.</p>
-            </div>
-          `,
+          subject: emailSubject["complete-subscription"].subject,
+          html: await renderCompleteSubscriptionEmail({
+            organizationName: organization.name,
+            planName: plan.name,
+            previewText: emailSubject["complete-subscription"].previewText,
+            paymentLink,
+          }),
         });
         notificationSentByApp = true;
       } catch (error) {
-        logger.warn("fallback subscription notification email failed", {
+        logger.error("Failed to send subscription notification email", {
           organizationId,
           subscriptionPlanId: plan.id,
-          message: getRazorpayErrorMessage(error, "failed to send fallback email"),
+          notifyEmail,
+          error: String(error),
         });
       }
     }
@@ -764,8 +783,13 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       authorizeUrl: paymentLink,
       razorpayPaymentLink: paymentLink,
       customerBindingApplied,
-      customerNotifyHandledBy: customerBindingApplied ? "razorpay" : "application",
-      customerNotifyRequested: customerNotify,
+      customerNotifyHandledBy: applicationNotifyOnly
+        ? "application"
+        : customerBindingApplied
+          ? "razorpay"
+          : "application",
+      customerNotifyRequested,
+      applicationNotifyOnly,
       razorpayCustomerNotify:
         razorpaySubscription?.customer_notify !== undefined
           ? Boolean(razorpaySubscription.customer_notify)
@@ -1172,11 +1196,6 @@ const webhookEndpoint = createAuthEndpoint(
     const organizationId = notes.organizationId || existingSubscription?.organizationId || null;
 
     if (!organizationId) {
-      logger.warn("subscription webhook ignored: organizationId not found", {
-        razorpaySubscriptionId: razorpaySubscription.id,
-        event: event.event,
-      });
-
       return ctx.json({
         received: true,
         ignored: true,

@@ -33,4 +33,8 @@ export const emailSubject: Record<string, EmailSubPrev> = {
     subject: "Reset Your Proptryx Password",
     previewText: "Your Proptryx password reset verification code.",
   },
+  "complete-subscription": {
+    subject: "Complete Your Proptryx Subscription Purchase",
+    previewText: "Confirm purchase to activate your Proptryx Account",
+  },
 };
