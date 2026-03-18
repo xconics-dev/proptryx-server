@@ -25,6 +25,7 @@ import {
   resolveAuthSecondaryStorage,
   resolveUserLocation,
 } from "./utils";
+import { organizationSubscriptionPlugin } from "./subscription";
 import {
   generateNextCompanyId,
   generateRandomId,
@@ -214,6 +215,7 @@ async function createAuthInstance() {
           },
         },
       }),
+      organizationSubscriptionPlugin,
       admin({
         defaultRole: rbac.defaultUserRoleName,
         adminRoles: rbac.adminRoleNames,

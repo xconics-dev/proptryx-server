@@ -1,1 +1,0 @@
-ALTER TABLE "user" ADD COLUMN "phone_number_verified" boolean DEFAULT false;

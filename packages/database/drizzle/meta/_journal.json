@@ -5,106 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1773560444861,
-      "tag": "0000_aromatic_gravity",
+      "when": 1773823155889,
+      "tag": "0000_watery_emma_frost",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1773561178133,
-      "tag": "0001_solid_gateway",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1773563159300,
-      "tag": "0002_opposite_sandman",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1773563594611,
-      "tag": "0003_lethal_tony_stark",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1773644289179,
-      "tag": "0004_rapid_lila_cheney",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1773646159221,
-      "tag": "0005_conscious_speed_demon",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1773647335273,
-      "tag": "0006_robust_matthew_murdock",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1773648252583,
-      "tag": "0007_broken_whirlwind",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1773661855906,
-      "tag": "0008_cuddly_living_tribunal",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1773662260820,
-      "tag": "0009_third_agent_brand",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1773735546882,
-      "tag": "0010_strong_lucky_pierre",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1773735787267,
-      "tag": "0011_shiny_triton",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1773736406928,
-      "tag": "0012_needy_dreadnoughts",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "7",
-      "when": 1773763316894,
-      "tag": "0013_powerful_cargill",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "7",
-      "when": 1773765977914,
-      "tag": "0014_exotic_colleen_wing",
+      "when": 1773823615291,
+      "tag": "0001_black_justice",
       "breakpoints": true
     }
   ]

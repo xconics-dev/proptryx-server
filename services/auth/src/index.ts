@@ -13,9 +13,12 @@ import { env } from "@/config/env";
 import { initializeAuthSecondaryStorage } from "@/lib/auth/utils";
 import { logger } from "@/lib/logger";
 const app = new Hono();
+const authSubscriptionWebhookPath = "/api/auth/organization/subscription/webhook";
 applyAppSecurity(app, {
   corsOrigins: env.CORS_ALLOWED_ORIGINS,
   enableGlobalRateLimit: false,
+  skipBodyLimitPaths: [authSubscriptionWebhookPath],
+  globalRateLimitSkipPaths: [authSubscriptionWebhookPath],
 });
 app.use("*", createHonoRequestLogger(logger));
 

@@ -16,6 +16,7 @@ export interface AppSecurityOptions {
   validateJsonBody?: boolean;
   enableGlobalRateLimit?: boolean;
   skipBodyLimitPaths?: string[];
+  globalRateLimitSkipPaths?: string[];
 }
 
 function hasJsonContentType(contentType: string | undefined) {
@@ -36,6 +37,7 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
   const validateJsonBody = options.validateJsonBody ?? false;
   const enableGlobalRateLimit = options.enableGlobalRateLimit ?? true;
   const skipBodyLimitPaths = new Set(options.skipBodyLimitPaths ?? []);
+  const globalRateLimitSkipPaths = options.globalRateLimitSkipPaths ?? [];
 
   app.use(
     "*",
@@ -65,10 +67,11 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
 
   app.use("*", requestId());
   if (enableGlobalRateLimit) {
+    const defaultRateLimitSkips = exposeCorsRoute ? ["/health", "/cors"] : ["/health"];
     app.use(
       "*",
       createGlobalRateLimit({
-        skipPaths: exposeCorsRoute ? ["/health", "/cors"] : ["/health"],
+        skipPaths: [...defaultRateLimitSkips, ...globalRateLimitSkipPaths],
       })
     );
   }
@@ -101,7 +104,11 @@ export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
   });
 
   app.use("*", async (c, next) => {
-    if (skipBodyLimitPaths.has(c.req.path)) {
+    const shouldSkipBodyLimit = Array.from(skipBodyLimitPaths).some(
+      (skipPath) => c.req.path === skipPath || c.req.path.startsWith(`${skipPath}/`)
+    );
+
+    if (shouldSkipBodyLimit) {
       await next();
       return;
     }

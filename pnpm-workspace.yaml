@@ -6,6 +6,7 @@ packages:
 ignoredBuiltDependencies:
   - '@prisma/engines'
   - prisma
+  - sharp
 
 onlyBuiltDependencies:
   - '@biomejs/biome'
