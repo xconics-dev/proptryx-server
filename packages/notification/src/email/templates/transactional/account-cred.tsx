@@ -21,22 +21,28 @@ import {
 import { imgesdata, metadata } from "../../static/const";
 
 const defaultData = {
-  previewText: "Your Hisaab Sathi Console Account is Ready!",
+  previewText: "Your Proptryx Account is Ready!",
   credEmail: "mondalsuman97322@gmail.com",
   credPassword: "password123",
+  organizationName: "Acme Pvt Ltd",
+  planName: "Pro Plan",
 };
 
-type ConsoleAccountCredEmailProps = {
+type AccountCredEmailProps = {
   previewText: string;
   credEmail?: string;
   credPassword?: string;
+  organizationName?: string;
+  planName?: string;
 };
 
-export const ConsoleAccountCredEmail = ({
+export const AccountCredEmail = ({
   previewText,
   credEmail,
   credPassword,
-}: ConsoleAccountCredEmailProps) => {
+  organizationName,
+  planName,
+}: AccountCredEmailProps) => {
   const getStartedLink = `${metadata.consoleUrl}/auth?cred_email=${encodeURIComponent(
     credEmail || ""
   )}&cred_password=${encodeURIComponent(credPassword || "")}`;
@@ -133,25 +139,34 @@ export const ConsoleAccountCredEmail = ({
                       fontWeight: "700",
                       color: "#161950",
                       marginTop: "14px",
-                      textAlign: "center" as const,
+                      textAlign: "center",
                     }}
                   >
-                    Welcome to Proptryx
+                    Proptryx Account Activated
                   </Text>
                   {/* Main Content */}
                   <Section style={content}>
                     <Text
                       style={{
                         ...emphasizedText,
-                        marginTop: "12px",
                       }}
                     >
                       Hello,
                     </Text>
                     <Text style={paragraph}>
-                      Welcome to Proptryx! We’ve successfully set up your console account, and
-                      you’re all set to access your dashboard.
+                      Your organization{" "}
+                      <span style={{ fontWeight: "600", color: "#161950" }}>
+                        {organizationName}
+                      </span>{" "}
+                      has been successfully activated to Proptryx.
                     </Text>
+
+                    <Text style={paragraph}>
+                      You’re subscribed to the{" "}
+                      <span style={{ fontWeight: "600", color: "#465FFF" }}>{planName}</span>.
+                      Manage your subscription anytime from your dashboard.
+                    </Text>
+
                     <Text style={paragraph}>Here’s your Login Details:</Text>
 
                     {/* Credentials Box */}
@@ -312,24 +327,28 @@ export const ConsoleAccountCredEmail = ({
   );
 };
 
-export default ConsoleAccountCredEmail;
+export default AccountCredEmail;
 
-export const renderConsoleAccountCredEmail = async ({
+export const renderAccountCredEmail = async ({
   previewText,
   credEmail,
   credPassword,
-}: ConsoleAccountCredEmailProps) =>
+  organizationName,
+  planName,
+}: AccountCredEmailProps) =>
   await pretty(
     await render(
-      <ConsoleAccountCredEmail
+      <AccountCredEmail
         credEmail={credEmail}
         credPassword={credPassword}
         previewText={previewText}
+        organizationName={organizationName}
+        planName={planName}
       />
     )
   );
 
-ConsoleAccountCredEmail.PreviewProps = defaultData;
+AccountCredEmail.PreviewProps = defaultData;
 
 // ========== STYLES ==========
 

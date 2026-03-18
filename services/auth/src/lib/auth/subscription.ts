@@ -60,6 +60,7 @@ const createSubscriptionBodySchema = z.object({
   additionalProperties: z.number().int().min(0).optional(),
   addonPropertyOneTimeCostInPaise: z.number().int().min(0).optional(),
   customerNotify: z.boolean().optional(),
+  notificationMode: z.enum(["auto", "razorpay", "application"]).optional(),
   applicationNotifyOnly: z.boolean().optional(),
   notes: z.record(z.string(), z.string()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -616,8 +617,10 @@ const createSubscriptionEndpoint = createAuthEndpoint(
     const totalCount = ctx.body.totalCount ?? plan.totalCount ?? 12;
     const customerNotifyRequested =
       ctx.body.customerNotify ?? SUBSCRIPTION_NOTIFICATION_CONFIG.defaultCustomerNotify;
-    const applicationNotifyOnly = ctx.body.applicationNotifyOnly ?? false;
-    const customerNotify = applicationNotifyOnly ? false : customerNotifyRequested;
+    const notificationMode =
+      ctx.body.notificationMode ?? (ctx.body.applicationNotifyOnly ? "application" : "auto");
+    const applicationNotifyOnly = notificationMode === "application";
+    const customerNotify = notificationMode === "application" ? false : customerNotifyRequested;
     const trialDaysApplied = ctx.body.trialDays ?? plan.trialDays ?? 0;
     const includedProperties = plan.includedProperties ?? 0;
     const additionalProperties = ctx.body.additionalProperties ?? 0;
@@ -654,6 +657,7 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       addonOneTimeTotalInPaise: String(addonOneTimeTotalInPaise),
       trialDaysApplied: String(trialDaysApplied),
       customerNotifyRequested: String(customerNotifyRequested),
+      notificationMode,
       applicationNotifyOnly: String(applicationNotifyOnly),
       ...(ctx.body.notes ?? {}),
     };
@@ -666,7 +670,7 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       notes,
     };
 
-    if ((notifyEmail || notifyPhone) && !applicationNotifyOnly) {
+    if ((notifyEmail || notifyPhone) && notificationMode !== "application") {
       createParams.notify_info = {
         ...(notifyEmail ? { notify_email: notifyEmail } : {}),
         ...(notifyPhone ? { notify_phone: notifyPhone } : {}),
@@ -734,7 +738,11 @@ const createSubscriptionEndpoint = createAuthEndpoint(
 
     let notificationSentByApp = false;
 
-    if (notifyEmail && (applicationNotifyOnly || (customerNotify && !customerBindingApplied))) {
+    const shouldSendFallbackEmail =
+      notificationMode === "application" ||
+      (notificationMode === "auto" && customerNotify && !customerBindingApplied);
+
+    if (notifyEmail && shouldSendFallbackEmail) {
       try {
         await sendEmail({
           to: notifyEmail,
@@ -747,13 +755,8 @@ const createSubscriptionEndpoint = createAuthEndpoint(
           }),
         });
         notificationSentByApp = true;
-      } catch (error) {
-        logger.error("Failed to send subscription notification email", {
-          organizationId,
-          subscriptionPlanId: plan.id,
-          notifyEmail,
-          error: String(error),
-        });
+      } catch {
+        // Keep create subscription successful even when fallback email delivery fails.
       }
     }
 
@@ -789,6 +792,7 @@ const createSubscriptionEndpoint = createAuthEndpoint(
           ? "razorpay"
           : "application",
       customerNotifyRequested,
+      notificationMode,
       applicationNotifyOnly,
       razorpayCustomerNotify:
         razorpaySubscription?.customer_notify !== undefined

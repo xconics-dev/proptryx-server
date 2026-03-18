@@ -154,13 +154,15 @@ async function createAuthInstance() {
             data: { ...organization, id: generateNextCompanyId() },
           }),
           afterCreateOrganization: async ({ organization, member, user }) => {
-            const userWithTags = user as typeof user & {
-              phoneNumber?: string | null;
+            const organizationWithTags = organization as typeof organization & {
+              gstNumber?: string | null;
+              email: string;
+              phoneNumber: string | null;
             };
 
-            const email = user.email;
-            const phone = userWithTags.phoneNumber || undefined;
-            const gst = organization.gstNumber || undefined;
+            const email = organizationWithTags.email;
+            const phone = organizationWithTags.phoneNumber || undefined;
+            const gst = organizationWithTags.gstNumber;
 
             let existingCustomer: any = null;
 
@@ -190,14 +192,14 @@ async function createAuthInstance() {
             } else {
               // 4️⃣ Create new customer
               const customer = await rzClient.customers.create({
-                name: user.name,
-                email,
+                name: organization.name,
+
                 contact: phone,
                 gstin: gst,
                 notes: {
                   organizationId: organization.id,
                   memberId: member.id,
-                  userId: user.id,
+                  ownerUserId: user.id,
                   createdAt: new Date().toISOString(),
                 },
               });
