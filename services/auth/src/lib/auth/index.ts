@@ -167,65 +167,91 @@ async function createAuthInstance() {
             };
           },
           afterCreateOrganization: async ({ organization, member, user }) => {
-            const organizationWithTags = organization as typeof organization & {
-              gstNumber?: string | null;
-              email?: string | null;
-              phoneNumber: string | null;
-            };
+            try {
+              const [savedOrganization] = await db
+                .select({
+                  id: schema.organization.id,
+                  name: schema.organization.name,
+                  email: schema.organization.email,
+                  phoneNumber: schema.organization.phoneNumber,
+                  gstNumber: schema.organization.gstNumber,
+                  razorpayCustomerId: schema.organization.razorpayCustomerId,
+                })
+                .from(schema.organization)
+                .where(eq(schema.organization.id, organization.id))
+                .limit(1);
 
-            const email = organizationWithTags.email;
-            const phone = organizationWithTags.phoneNumber || undefined;
-            const gst = organizationWithTags.gstNumber;
-
-            let existingCustomer: any = null;
-
-            // 1️⃣ Fetch customers by email ONLY
-            const customersResponse = await rzClient.customers.all({});
-
-            if (customersResponse.items.length > 0) {
-              // 2️⃣ Check if any customer has matching email — this is the only reliable way to find an existing customer without storing the ID
-              existingCustomer = customersResponse.items.find(
-                (customer) => customer.email === email
-              );
-            }
-
-            let customerId: string;
-
-            if (existingCustomer) {
-              customerId = existingCustomer.id;
-
-              // 3️⃣ Update existing customer if data missing
-              const shouldUpdate = phone && !existingCustomer.contact;
-
-              if (shouldUpdate) {
-                await rzClient.customers.edit(existingCustomer.id, {
-                  contact: phone || existingCustomer.contact,
-                });
-              }
-            } else {
-              // 4️⃣ Create new customer
-              const customer = await rzClient.customers.create({
-                name: organization.name,
-                contact: phone,
-                gstin: gst,
-                notes: {
+              if (!savedOrganization) {
+                logger.warn("Organization not found for Razorpay customer bootstrap", {
                   organizationId: organization.id,
-                  memberId: member.id,
-                  ownerUserId: user.id,
-                  createdAt: new Date().toISOString(),
-                },
+                });
+                return;
+              }
+
+              if (savedOrganization.razorpayCustomerId) {
+                return;
+              }
+
+              const email = savedOrganization.email || user.email || undefined;
+              const phone = savedOrganization.phoneNumber || undefined;
+              const gst = savedOrganization.gstNumber || undefined;
+
+              let existingCustomer: any = null;
+
+              if (email) {
+                const customersResponse = await rzClient.customers.all({});
+                if (customersResponse.items.length > 0) {
+                  existingCustomer =
+                    customersResponse.items.find((customer) => customer.email === email) || null;
+                }
+              }
+
+              let customerId: string;
+
+              if (existingCustomer) {
+                customerId = existingCustomer.id;
+
+                const shouldUpdate =
+                  (email && !existingCustomer.email) ||
+                  (phone && !existingCustomer.contact) ||
+                  (gst && !existingCustomer.gstin);
+
+                if (shouldUpdate) {
+                  await rzClient.customers.edit(existingCustomer.id, {
+                    ...(email && !existingCustomer.email ? { email } : {}),
+                    ...(phone && !existingCustomer.contact ? { contact: phone } : {}),
+                    ...(gst && !existingCustomer.gstin ? { gstin: gst } : {}),
+                  });
+                }
+              } else {
+                const customer = await rzClient.customers.create({
+                  name: savedOrganization.name,
+                  email,
+                  contact: phone,
+                  gstin: gst,
+                  notes: {
+                    organizationId: organization.id,
+                    memberId: member.id,
+                    ownerUserId: user.id,
+                    createdAt: new Date().toISOString(),
+                  },
+                });
+
+                customerId = customer.id;
+              }
+
+              await db
+                .update(schema.organization)
+                .set({
+                  razorpayCustomerId: customerId,
+                })
+                .where(eq(schema.organization.id, organization.id));
+            } catch (error) {
+              logger.error("Failed to bootstrap Razorpay customer for organization", {
+                organizationId: organization.id,
+                error: error instanceof Error ? error.stack : error,
               });
-
-              customerId = customer.id;
             }
-
-            // 5️⃣ Save customer ID in organization
-            await db
-              .update(schema.organization)
-              .set({
-                razorpayCustomerId: customerId,
-              })
-              .where(eq(schema.organization.id, organization.id));
           },
         },
       }),
