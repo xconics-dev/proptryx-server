@@ -5,6 +5,7 @@ const shouldExecute = args.has("--execute");
 const shouldHelp = args.has("--help") || args.has("-h");
 
 const LEGACY_PATTERNS = [
+  "proptryx-ratelimiter:*|*|*",
   "proptryx-ratelimiter:*:unknown:*",
   "proptryx-ratelimiter:*:127.0.0.1:*",
   "proptryx-ratelimiter:*:localhost:*",

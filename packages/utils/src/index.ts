@@ -19,6 +19,7 @@ export {
   RATE_LIMIT_PRESETS,
   type CreateRateLimitOptions,
   type RateLimitDefinition,
+  type RateLimitKeyScope,
   type RateLimitProfile,
 } from "./middleware/rate-limit";
 

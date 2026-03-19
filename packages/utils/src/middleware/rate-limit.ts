@@ -3,6 +3,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { getRatelimiterRedisStorage } from "../redis";
 
 export type RateLimitProfile = "global" | "transactional" | "operational";
+export type RateLimitKeyScope = "client" | "client-method" | "client-route";
 
 export interface RateLimitDefinition {
   keyPrefix: string;
@@ -18,7 +19,20 @@ export interface CreateRateLimitOptions {
   windowMs?: number;
   message?: string;
   skipPaths?: string[];
+  skipMethods?: string[];
+  keyScope?: RateLimitKeyScope;
 }
+
+const RATE_LIMIT_KEY_SCOPE_DEFAULTS: Record<RateLimitProfile, RateLimitKeyScope> = {
+  global: "client",
+  transactional: "client-route",
+  operational: "client-method",
+};
+
+const DEFAULT_RATE_LIMIT_SKIP_METHODS = ["OPTIONS"];
+const LARGE_NUMERIC_SEGMENT_PATTERN = /^\d{4,}$/;
+const UUID_LIKE_SEGMENT_PATTERN = /^[0-9a-f]{8}-[0-9a-f-]{13,}$/i;
+const LIKELY_IDENTIFIER_SEGMENT_PATTERN = /^[a-z0-9_-]{16,}$/i;
 
 export const RATE_LIMIT_PRESETS: Record<RateLimitProfile, RateLimitDefinition> = {
   global: {
@@ -41,10 +55,36 @@ export const RATE_LIMIT_PRESETS: Record<RateLimitProfile, RateLimitDefinition> =
   },
 };
 
+function normalizeMethod(method: string) {
+  return method.trim().toUpperCase();
+}
+
+function normalizeClientIdentifier(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const first = value
+    .split(",")[0]
+    ?.trim()
+    .replace(/^\[|\]$/g, "");
+  if (!first) {
+    return undefined;
+  }
+
+  // Handle IPv4 with port, e.g. 203.0.113.10:52341
+  if (first.includes(".") && first.includes(":")) {
+    const [host] = first.split(":");
+    return host?.trim() || undefined;
+  }
+
+  return first;
+}
+
 function getClientIdentifier(c: Context): string {
-  const forwardedFor = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-  const realIp = c.req.header("x-real-ip")?.trim();
-  const cfIp = c.req.header("cf-connecting-ip")?.trim();
+  const forwardedFor = normalizeClientIdentifier(c.req.header("x-forwarded-for"));
+  const realIp = normalizeClientIdentifier(c.req.header("x-real-ip"));
+  const cfIp = normalizeClientIdentifier(c.req.header("cf-connecting-ip"));
 
   if (forwardedFor || realIp || cfIp) {
     return forwardedFor || realIp || cfIp || "unknown";
@@ -58,17 +98,62 @@ function getClientIdentifier(c: Context): string {
   return "anonymous-client";
 }
 
+function normalizeRateLimitPathSegment(segment: string) {
+  const normalizedSegment = segment.trim().toLowerCase();
+  if (!normalizedSegment) {
+    return "";
+  }
+
+  if (
+    normalizedSegment.length > 48 ||
+    LARGE_NUMERIC_SEGMENT_PATTERN.test(normalizedSegment) ||
+    UUID_LIKE_SEGMENT_PATTERN.test(normalizedSegment) ||
+    LIKELY_IDENTIFIER_SEGMENT_PATTERN.test(normalizedSegment)
+  ) {
+    return ":id";
+  }
+
+  return normalizedSegment;
+}
+
 function normalizeRateLimitPath(path: string) {
   const normalizedPath = path.trim().replace(/^\/+/, "");
   if (!normalizedPath) {
     return "root";
   }
 
-  return normalizedPath.replaceAll("/", "_");
+  const normalizedSegments = normalizedPath
+    .split("/")
+    .map(normalizeRateLimitPathSegment)
+    .filter((segment) => segment.length > 0);
+
+  if (normalizedSegments.length === 0) {
+    return "root";
+  }
+
+  return normalizedSegments.join("_");
 }
 
 function shouldSkipPath(path: string, skipPaths: string[]) {
   return skipPaths.some((skipPath) => path === skipPath || path.startsWith(`${skipPath}/`));
+}
+
+function shouldSkipMethod(method: string, skipMethods: Set<string>) {
+  return skipMethods.has(normalizeMethod(method));
+}
+
+function buildRateLimitKey(c: Context, keyScope: RateLimitKeyScope) {
+  const clientIdentifier = getClientIdentifier(c);
+  if (keyScope === "client") {
+    return clientIdentifier;
+  }
+
+  const method = normalizeMethod(c.req.method);
+  if (keyScope === "client-method") {
+    return `${clientIdentifier}:${method}`;
+  }
+
+  return `${clientIdentifier}:${method}:${normalizeRateLimitPath(c.req.path)}`;
 }
 
 export function createRateLimit(options: CreateRateLimitOptions): MiddlewareHandler {
@@ -78,6 +163,10 @@ export function createRateLimit(options: CreateRateLimitOptions): MiddlewareHand
   const windowMs = options.windowMs ?? preset.windowMs;
   const message = options.message ?? preset.message;
   const skipPaths = options.skipPaths ?? [];
+  const skipMethods = new Set(
+    (options.skipMethods ?? DEFAULT_RATE_LIMIT_SKIP_METHODS).map(normalizeMethod)
+  );
+  const keyScope = options.keyScope ?? RATE_LIMIT_KEY_SCOPE_DEFAULTS[options.profile];
 
   return rateLimiter({
     windowMs,
@@ -87,9 +176,9 @@ export function createRateLimit(options: CreateRateLimitOptions): MiddlewareHand
       storage: getRatelimiterRedisStorage(),
       prefix: `${keyPrefix}:`,
     }),
-    keyGenerator: (c) =>
-      `${getClientIdentifier(c)}|${c.req.method}|${normalizeRateLimitPath(c.req.path)}`,
-    skip: (c) => shouldSkipPath(c.req.path, skipPaths),
+    keyGenerator: (c) => buildRateLimitKey(c, keyScope),
+    skip: (c) =>
+      shouldSkipMethod(c.req.method, skipMethods) || shouldSkipPath(c.req.path, skipPaths),
     message: {
       success: false,
       error: "Too Many Requests",
