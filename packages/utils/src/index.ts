@@ -36,3 +36,6 @@ export {
 // Functions
 export { generateUID, generateRandomId, generateNextCompanyId } from "./functions/gen-id";
 export { PasswordUtils } from "./functions/password";
+
+// Schema
+export * from "./schema";

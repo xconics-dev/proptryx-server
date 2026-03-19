@@ -11,7 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { orgMemberRole, userRole } from "./rbac";
 import { zone } from "../zone-region";
-import { CompanyType, OrganizationType } from "./enums";
+import { BusinessType, OrganizationType } from "./enums";
 
 export const user = pgTable(
   "user",
@@ -63,30 +63,6 @@ export const account = pgTable(
   (table) => [index("account_userId_idx").on(table.userId)]
 );
 
-export const organization = pgTable(
-  "organization",
-  {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
-    logo: text("logo"),
-    type: OrganizationType("type").notNull(),
-    createdAt: timestamp("created_at").notNull(),
-    metadata: text("metadata"),
-    email: text("email"),
-    gstNumber: text("gst_number"),
-    phoneNumber: text("phone_number"),
-    industry: text("industry"),
-    companyType: CompanyType("company_type"),
-    isActive: boolean("is_active").default(false).notNull(),
-    razorpayCustomerId: text("razorpay_customer_id"),
-  },
-  (table) => [
-    uniqueIndex("organization_slug_uidx").on(table.slug),
-    index("organization_razorpayCustomerId_idx").on(table.razorpayCustomerId),
-  ]
-);
-
 export const session = pgTable(
   "session",
   {
@@ -113,6 +89,31 @@ export const session = pgTable(
     index("session_userId_idx").on(table.userId),
     index("session_activeOrganizationId_idx").on(table.activeOrganizationId),
     index("session_expiresAt_idx").on(table.expiresAt),
+  ]
+);
+
+export const organization = pgTable(
+  "organization",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    logo: text("logo"),
+    type: OrganizationType("type").notNull(),
+    businessType: BusinessType("business_type").default("GENERAL"),
+    createdAt: timestamp("created_at").notNull(),
+    metadata: text("metadata"),
+    email: text("email"),
+    gstNumber: text("gst_number"),
+    phoneNumber: text("phone_number"),
+    industry: text("industry"),
+    companyType: text("company_type"),
+    isActive: boolean("is_active").default(false).notNull(),
+    razorpayCustomerId: text("razorpay_customer_id"),
+  },
+  (table) => [
+    uniqueIndex("organization_slug_uidx").on(table.slug),
+    index("organization_razorpayCustomerId_idx").on(table.razorpayCustomerId),
   ]
 );
 

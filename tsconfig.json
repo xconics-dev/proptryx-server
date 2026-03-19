@@ -12,7 +12,8 @@
     { "path": "./packages/database" },
     { "path": "./services/gateway" },
     { "path": "./services/auth" },
-    { "path": "./services/property" }
+    { "path": "./services/property" },
+    { "path": "./services/kernel" }
   ],
   "include": [],
   "exclude": ["node_modules", "**/dist", "**/.turbo"]

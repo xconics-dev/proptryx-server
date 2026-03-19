@@ -10,6 +10,7 @@ export const proxyRoutes: ProxyRoute[] = [
   // Keep /api/auth prefix for Better Auth basePath/public URL consistency.
   { prefix: "/api/auth", target: env.AUTH_SERVICE_URL, stripPrefix: false },
   { prefix: "/api/property", target: env.PROPERTY_SERVICE_URL, stripPrefix: true },
+  { prefix: "/api/kernel", target: env.KERNEL_SERVICE_URL, stripPrefix: true },
 ];
 
 export function createUpstreamUrl(requestUrl: string, route: ProxyRoute) {
