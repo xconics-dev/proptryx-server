@@ -87,6 +87,35 @@ export const organization = pgTable(
   ]
 );
 
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at").notNull(),
+    token: text("token").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    activeOrganizationId: text("active_organization_id").references(() => organization.id, {
+      onDelete: "set null",
+    }),
+    impersonatedBy: text("impersonated_by"),
+  },
+  (table) => [
+    uniqueIndex("session_token_uidx").on(table.token),
+    index("session_userId_idx").on(table.userId),
+    index("session_activeOrganizationId_idx").on(table.activeOrganizationId),
+    index("session_expiresAt_idx").on(table.expiresAt),
+  ]
+);
+
 export const member = pgTable(
   "member",
   {
@@ -234,6 +263,7 @@ export const organizationSubscription = pgTable(
 
 export const userRelations = relations(user, ({ many, one }) => ({
   accounts: many(account),
+  sessions: many(session),
   members: many(member),
   invitations: many(invitation),
   roleDefinition: one(userRole, {
@@ -253,7 +283,19 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, {
+    fields: [session.userId],
+    references: [user.id],
+  }),
+  activeOrganization: one(organization, {
+    fields: [session.activeOrganizationId],
+    references: [organization.id],
+  }),
+}));
+
 export const organizationRelations = relations(organization, ({ many, one }) => ({
+  activeSessions: many(session),
   members: many(member),
   invitations: many(invitation),
   subscription: one(organizationSubscription, {

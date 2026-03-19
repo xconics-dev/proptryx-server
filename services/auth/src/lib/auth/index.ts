@@ -196,7 +196,7 @@ async function createAuthInstance() {
       expiresIn: 60 * 60 * 24 * 30, // 30 days
       updateAge: 60 * 60 * 24, // 24 hours
       deferSessionRefresh: true,
-      storeSessionInDatabase: false,
+      storeSessionInDatabase: true,
       cookieCache: {
         enabled: false,
         maxAge: 60 * 5,
@@ -290,6 +290,7 @@ async function createAuthInstance() {
       emailOTP({
         expiresIn: 60 * 10, // 10 minutes
         allowedAttempts: 5,
+        storeOTP: "hashed",
         overrideDefaultEmailVerification: false,
         async sendVerificationOTP({ email, otp, type }) {
           if (type === "sign-in") {
