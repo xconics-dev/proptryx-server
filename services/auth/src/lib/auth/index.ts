@@ -60,6 +60,94 @@ async function createAuthInstance() {
   // Resolve DB once — reuse across all hooks in this closure
   const db = resolveAuthDatabase();
 
+  async function bootstrapOrganizationCustomer(params: {
+    organizationId: string;
+    memberId: string;
+    ownerUserId: string;
+    fallbackEmail?: string | null;
+  }) {
+    try {
+      const [savedOrganization] = await db
+        .select({
+          id: schema.organization.id,
+          name: schema.organization.name,
+          email: schema.organization.email,
+          phoneNumber: schema.organization.phoneNumber,
+          gstNumber: schema.organization.gstNumber,
+          razorpayCustomerId: schema.organization.razorpayCustomerId,
+        })
+        .from(schema.organization)
+        .where(eq(schema.organization.id, params.organizationId))
+        .limit(1);
+
+      if (!savedOrganization) {
+        logger.warn("Organization not found for Razorpay customer bootstrap", {
+          organizationId: params.organizationId,
+        });
+        return;
+      }
+
+      if (savedOrganization.razorpayCustomerId) {
+        return;
+      }
+
+      const email = savedOrganization.email || params.fallbackEmail || undefined;
+      const phone = savedOrganization.phoneNumber || undefined;
+      const gst = savedOrganization.gstNumber || undefined;
+
+      let customerId: string | undefined;
+
+      try {
+        const customer = await rzClient.customers.create({
+          name: savedOrganization.name,
+          email,
+          contact: phone,
+          gstin: gst,
+          notes: {
+            organizationId: params.organizationId,
+            memberId: params.memberId,
+            ownerUserId: params.ownerUserId,
+            createdAt: new Date().toISOString(),
+          },
+        });
+
+        customerId = customer.id;
+      } catch (createError) {
+        if (email) {
+          try {
+            const customersResponse = await rzClient.customers.all({});
+            customerId = customersResponse.items.find((customer) => customer.email === email)?.id;
+          } catch (lookupError) {
+            logger.warn("Failed to lookup existing Razorpay customer after create failure", {
+              organizationId: params.organizationId,
+              error: lookupError instanceof Error ? lookupError.stack : lookupError,
+            });
+          }
+        }
+
+        if (!customerId) {
+          logger.error("Failed to create Razorpay customer for organization", {
+            organizationId: params.organizationId,
+            error: createError instanceof Error ? createError.stack : createError,
+          });
+          return;
+        }
+      }
+
+      await db
+        .update(schema.organization)
+        .set({
+          razorpayCustomerId: customerId,
+        })
+        .where(eq(schema.organization.id, params.organizationId));
+    } catch (error) {
+      logger.error("Failed to bootstrap Razorpay customer for organization", {
+        organizationId: params.organizationId,
+        error: error instanceof Error ? error.stack : error,
+      });
+    }
+  }
+
   return betterAuth({
     appName: "Proptryx Auth Service",
     baseURL: isProduction
@@ -167,91 +255,12 @@ async function createAuthInstance() {
             };
           },
           afterCreateOrganization: async ({ organization, member, user }) => {
-            try {
-              const [savedOrganization] = await db
-                .select({
-                  id: schema.organization.id,
-                  name: schema.organization.name,
-                  email: schema.organization.email,
-                  phoneNumber: schema.organization.phoneNumber,
-                  gstNumber: schema.organization.gstNumber,
-                  razorpayCustomerId: schema.organization.razorpayCustomerId,
-                })
-                .from(schema.organization)
-                .where(eq(schema.organization.id, organization.id))
-                .limit(1);
-
-              if (!savedOrganization) {
-                logger.warn("Organization not found for Razorpay customer bootstrap", {
-                  organizationId: organization.id,
-                });
-                return;
-              }
-
-              if (savedOrganization.razorpayCustomerId) {
-                return;
-              }
-
-              const email = savedOrganization.email || user.email || undefined;
-              const phone = savedOrganization.phoneNumber || undefined;
-              const gst = savedOrganization.gstNumber || undefined;
-
-              let existingCustomer: any = null;
-
-              if (email) {
-                const customersResponse = await rzClient.customers.all({});
-                if (customersResponse.items.length > 0) {
-                  existingCustomer =
-                    customersResponse.items.find((customer) => customer.email === email) || null;
-                }
-              }
-
-              let customerId: string;
-
-              if (existingCustomer) {
-                customerId = existingCustomer.id;
-
-                const shouldUpdate =
-                  (email && !existingCustomer.email) ||
-                  (phone && !existingCustomer.contact) ||
-                  (gst && !existingCustomer.gstin);
-
-                if (shouldUpdate) {
-                  await rzClient.customers.edit(existingCustomer.id, {
-                    ...(email && !existingCustomer.email ? { email } : {}),
-                    ...(phone && !existingCustomer.contact ? { contact: phone } : {}),
-                    ...(gst && !existingCustomer.gstin ? { gstin: gst } : {}),
-                  });
-                }
-              } else {
-                const customer = await rzClient.customers.create({
-                  name: savedOrganization.name,
-                  email,
-                  contact: phone,
-                  gstin: gst,
-                  notes: {
-                    organizationId: organization.id,
-                    memberId: member.id,
-                    ownerUserId: user.id,
-                    createdAt: new Date().toISOString(),
-                  },
-                });
-
-                customerId = customer.id;
-              }
-
-              await db
-                .update(schema.organization)
-                .set({
-                  razorpayCustomerId: customerId,
-                })
-                .where(eq(schema.organization.id, organization.id));
-            } catch (error) {
-              logger.error("Failed to bootstrap Razorpay customer for organization", {
-                organizationId: organization.id,
-                error: error instanceof Error ? error.stack : error,
-              });
-            }
+            void bootstrapOrganizationCustomer({
+              organizationId: organization.id,
+              memberId: member.id,
+              ownerUserId: user.id,
+              fallbackEmail: user.email,
+            });
           },
         },
       }),

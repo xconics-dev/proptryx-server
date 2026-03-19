@@ -180,7 +180,8 @@ async function createRazorpaySubscriptionWithLink(createParams: any) {
 
   let paymentLink = razorpaySubscription.short_url || null;
 
-  if (razorpaySubscription?.id) {
+  // Fetch only when create response does not include short_url.
+  if (!paymentLink && razorpaySubscription?.id) {
     try {
       const latestSubscription: any = await (rzClient.subscriptions.fetch as any)(
         razorpaySubscription.id
@@ -418,35 +419,27 @@ async function upsertOrganizationSubscription(params: {
   };
 
   if (existing) {
-    await db
+    const [updated] = await db
       .update(schema.organizationSubscription)
       .set(payload)
-      .where(eq(schema.organizationSubscription.id, existing.id));
-
-    const [updated] = await db
-      .select()
-      .from(schema.organizationSubscription)
       .where(eq(schema.organizationSubscription.id, existing.id))
-      .limit(1);
+      .returning();
 
-    return updated;
+    return updated ?? existing;
   }
 
   const createdAt = new Date();
 
-  await db.insert(schema.organizationSubscription).values({
-    id: generateRandomId(),
-    organizationId: params.organizationId,
-    ...payload,
-    createdAt,
-    updatedAt: createdAt,
-  });
-
   const [created] = await db
-    .select()
-    .from(schema.organizationSubscription)
-    .where(eq(schema.organizationSubscription.organizationId, params.organizationId))
-    .limit(1);
+    .insert(schema.organizationSubscription)
+    .values({
+      id: generateRandomId(),
+      organizationId: params.organizationId,
+      ...payload,
+      createdAt,
+      updatedAt: createdAt,
+    })
+    .returning();
 
   return created;
 }
@@ -591,7 +584,10 @@ const createSubscriptionEndpoint = createAuthEndpoint(
 
     await assertOrganizationAccess(session.user.id, organizationId);
 
-    const plan = await getPlanById(ctx.body.subscriptionPlanId);
+    const [plan, currentSubscription] = await Promise.all([
+      getPlanById(ctx.body.subscriptionPlanId),
+      getOrganizationSubscription(organizationId),
+    ]);
 
     if (!plan) {
       throw new APIError("BAD_REQUEST", {
@@ -605,7 +601,6 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       });
     }
 
-    const currentSubscription = await getOrganizationSubscription(organizationId);
     if (currentSubscription && isActiveSubscriptionStatus(currentSubscription.status)) {
       throw new APIError("BAD_REQUEST", {
         message: "Organization already has an active or pending subscription.",
@@ -742,23 +737,27 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       notificationMode === "application" ||
       (notificationMode === "auto" && customerNotify && !customerBindingApplied);
 
-    if (notifyEmail && shouldSendFallbackEmail) {
-      try {
-        await sendEmail({
-          to: notifyEmail,
-          subject: emailSubject["complete-subscription"].subject,
-          html: await renderCompleteSubscriptionEmail({
-            organizationName: organization.name,
-            planName: plan.name,
-            previewText: emailSubject["complete-subscription"].previewText,
-            paymentLink,
-          }),
-        });
-        notificationSentByApp = true;
-      } catch {
-        // Keep create subscription successful even when fallback email delivery fails.
-      }
-    }
+    const fallbackEmailPromise: Promise<boolean> =
+      notifyEmail && shouldSendFallbackEmail
+        ? (async () => {
+            try {
+              await sendEmail({
+                to: notifyEmail,
+                subject: emailSubject["complete-subscription"].subject,
+                html: await renderCompleteSubscriptionEmail({
+                  organizationName: organization.name,
+                  planName: plan.name,
+                  previewText: emailSubject["complete-subscription"].previewText,
+                  paymentLink,
+                }),
+              });
+              return true;
+            } catch {
+              // Keep create subscription successful even when fallback email delivery fails.
+              return false;
+            }
+          })()
+        : Promise.resolve(false);
 
     const subscription = await upsertOrganizationSubscription({
       organizationId,
@@ -780,6 +779,8 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       notes,
       razorpayCustomerId: requestedCustomerId,
     });
+
+    notificationSentByApp = await fallbackEmailPromise;
 
     return ctx.json({
       subscription,
