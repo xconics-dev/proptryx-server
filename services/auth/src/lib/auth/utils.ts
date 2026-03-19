@@ -71,7 +71,7 @@ export async function initializeAuthSecondaryStorage() {
   await initializeRedisClient();
 }
 
-export async function resolveUserLocation(zoneId?: string | null) {
+export async function resolveUserZone(zoneId?: string | null) {
   if (!zoneId) {
     return {
       region: null,

@@ -23,9 +23,10 @@ import {
   organizationAdditionalFields,
   resolveAuthDatabase,
   resolveAuthSecondaryStorage,
-  resolveUserLocation,
+  resolveUserZone,
 } from "./utils";
-import { organizationSubscriptionPlugin } from "./subscription";
+import { organizationSubscriptionPlugin } from "../razorpay/subscription";
+import { organizationControlsPlugin } from "./organization";
 import {
   generateNextCompanyId,
   generateRandomId,
@@ -34,7 +35,7 @@ import {
 } from "@proptryx/utils";
 import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
 import { rzClient } from "../razorpay/client";
-import { eq } from "drizzle-orm";
+import { desc, eq, like } from "drizzle-orm";
 
 // ─────────────────────────────────────────────
 // Config — resolved once at module load
@@ -150,13 +151,25 @@ async function createAuthInstance() {
         roles: rbac.organizationRoles,
         dynamicAccessControl: { enabled: true },
         organizationHooks: {
-          beforeCreateOrganization: async ({ organization }) => ({
-            data: { ...organization, id: generateNextCompanyId() },
-          }),
+          beforeCreateOrganization: async ({ organization }) => {
+            const [latestOrganization] = await db
+              .select({ id: schema.organization.id })
+              .from(schema.organization)
+              .where(like(schema.organization.id, "PTCO%"))
+              .orderBy(desc(schema.organization.createdAt))
+              .limit(1);
+
+            return {
+              data: {
+                ...organization,
+                id: generateNextCompanyId(latestOrganization?.id),
+              },
+            };
+          },
           afterCreateOrganization: async ({ organization, member, user }) => {
             const organizationWithTags = organization as typeof organization & {
               gstNumber?: string | null;
-              email: string;
+              email?: string | null;
               phoneNumber: string | null;
             };
 
@@ -193,7 +206,6 @@ async function createAuthInstance() {
               // 4️⃣ Create new customer
               const customer = await rzClient.customers.create({
                 name: organization.name,
-
                 contact: phone,
                 gstin: gst,
                 notes: {
@@ -208,7 +220,7 @@ async function createAuthInstance() {
             }
 
             // 5️⃣ Save customer ID in organization
-            await resolveAuthDatabase()
+            await db
               .update(schema.organization)
               .set({
                 razorpayCustomerId: customerId,
@@ -217,6 +229,7 @@ async function createAuthInstance() {
           },
         },
       }),
+      organizationControlsPlugin,
       organizationSubscriptionPlugin,
       admin({
         defaultRole: rbac.defaultUserRoleName,
@@ -227,7 +240,7 @@ async function createAuthInstance() {
       allowCustomInputFieldsPlugin,
       customSession(async ({ session, user }) => {
         const userWithTags = user as typeof user & { zoneId?: string | null };
-        const location = await resolveUserLocation(userWithTags.zoneId);
+        const location = await resolveUserZone(userWithTags.zoneId);
         return {
           session,
           user: {
@@ -310,10 +323,6 @@ async function createAuthInstance() {
     },
   });
 }
-
-// ─────────────────────────────────────────────
-// Exports
-// ─────────────────────────────────────────────
 
 // ✅ Load rbac ONCE at startup — version stored, no double call
 const initialRbac = await loadRbacCatalog();

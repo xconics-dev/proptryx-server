@@ -8,8 +8,8 @@ import { createAuthEndpoint, createAuthMiddleware, sessionMiddleware } from "bet
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
-import { rzClient } from "../razorpay/client";
-import { resolveAuthDatabase } from "./utils";
+import { rzClient } from "./client";
+import { resolveAuthDatabase } from "../auth/utils";
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set([
   "created",
