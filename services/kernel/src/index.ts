@@ -45,7 +45,7 @@ app.doc("/doc", openApiInfo);
 app.get(
   "/",
   Scalar({
-    url: "/doc",
+    url: "./doc",
     theme: "purple",
     pageTitle: `Proptryx Kernel Service API`,
     hideClientButton: true,
