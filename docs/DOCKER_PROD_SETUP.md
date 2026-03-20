@@ -13,7 +13,7 @@ This guide explains the new Docker setup for performance, scalability, and safer
 `docker/docker-compose.prod.yml` uses:
 
 - `gateway` as the only public entrypoint
-- internal-only `auth` and `property` services (via `expose`, not host ports)
+- internal-only `auth` and `kernel` services (via `expose`, not host ports)
 - Traefik labels on `gateway`
 - service health checks and dependency health gating
 - per-service resource limits/reservations
@@ -38,7 +38,7 @@ Tune in `env/.env.prod`:
 - replicas:
   - `GATEWAY_REPLICAS`
   - `AUTH_REPLICAS`
-  - `PROPERTY_REPLICAS`
+  - `KERNEL_REPLICAS`
 - CPU/memory limits and reservations:
   - `*_CPU_LIMIT`, `*_MEM_LIMIT`
   - `*_CPU_RESERVATION`, `*_MEM_RESERVATION`

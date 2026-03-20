@@ -22,6 +22,21 @@ export {
   type RateLimitKeyScope,
   type RateLimitProfile,
 } from "./middleware/rate-limit";
+export {
+  AUTH_CONTEXT_KEY,
+  createBetterAuthSessionMiddleware,
+  createRequiredAuthSessionMiddleware,
+  type BetterAuthContextEntityOptions,
+  getBetterAuthContext,
+  type BetterAuthContextValue,
+  type BetterAuthOrganizationRecord,
+  type BetterAuthRequiredEntity,
+  type BetterAuthSessionPayload,
+  type BetterAuthSessionRecord,
+  type BetterAuthUserRecord,
+  type BetterAuthVariables,
+  type CreateBetterAuthSessionMiddlewareOptions,
+} from "./middleware/auth";
 
 // Redis
 export {
@@ -29,6 +44,7 @@ export {
   getRedisClient,
   getRatelimiterRedisStorage,
   initializeRedisClient,
+  AUTH_MIDDLEWARE_REDIS_NAMESPACE,
   AUTH_SESSION_REDIS_PREFIX,
   RATE_LIMIT_REDIS_NAMESPACE,
 } from "./redis";

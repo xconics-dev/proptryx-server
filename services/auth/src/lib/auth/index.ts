@@ -16,7 +16,7 @@ import {
 } from "@proptryx/notification";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
-import { loadRbacCatalog } from "./rbac";
+import { loadRbacCatalog, type RbacCatalog } from "./rbac";
 import {
   getBetterAuthConfigState,
   normalizeBasePath,
@@ -54,9 +54,7 @@ const {
 // Auth instance factory
 // ─────────────────────────────────────────────
 
-async function createAuthInstance() {
-  const rbac = await loadRbacCatalog();
-
+async function createAuthInstance(rbac: RbacCatalog) {
   // Resolve DB once — reuse across all hooks in this closure
   const db = resolveAuthDatabase();
 
@@ -360,21 +358,69 @@ async function createAuthInstance() {
   });
 }
 
-// ✅ Load rbac ONCE at startup — version stored, no double call
-const initialRbac = await loadRbacCatalog();
-let authVersion = initialRbac.version;
-export let auth = await createAuthInstance();
+const RBAC_VERSION_CHECK_INTERVAL_MS = 5_000;
 
-export async function getAuth() {
-  const nextRbac = await loadRbacCatalog();
+let authVersion: string | null = null;
+let authInstance: BetterAuthInstance | null = null;
+let authInitializationPromise: Promise<BetterAuthInstance> | null = null;
+let lastRbacVersionCheckAt = 0;
 
-  // ✅ Only recreate if RBAC version actually changed
-  if (nextRbac.version !== authVersion) {
-    auth = await createAuthInstance();
-    authVersion = nextRbac.version;
+async function initializeAuthInstance(options?: {
+  forceRefresh?: boolean;
+  knownCatalog?: RbacCatalog;
+}): Promise<BetterAuthInstance> {
+  const forceRefresh = options?.forceRefresh ?? false;
+
+  if (!forceRefresh && authInstance) {
+    return authInstance;
   }
 
-  return auth;
+  if (authInitializationPromise) {
+    return authInitializationPromise;
+  }
+
+  authInitializationPromise = (async () => {
+    const rbacCatalog = options?.knownCatalog ?? (await loadRbacCatalog(forceRefresh));
+    const nextAuthInstance = await createAuthInstance(rbacCatalog);
+
+    authInstance = nextAuthInstance;
+    authVersion = rbacCatalog.version;
+    lastRbacVersionCheckAt = Date.now();
+
+    return nextAuthInstance;
+  })();
+
+  try {
+    return await authInitializationPromise;
+  } finally {
+    authInitializationPromise = null;
+  }
 }
 
-export type BetterAuthInstance = typeof auth;
+export async function warmAuth() {
+  await initializeAuthInstance();
+}
+
+export async function getAuth() {
+  if (!authInstance) {
+    return initializeAuthInstance();
+  }
+
+  const now = Date.now();
+  if (now - lastRbacVersionCheckAt < RBAC_VERSION_CHECK_INTERVAL_MS) {
+    return authInstance;
+  }
+
+  const nextRbac = await loadRbacCatalog();
+  if (nextRbac.version === authVersion) {
+    lastRbacVersionCheckAt = now;
+    return authInstance;
+  }
+
+  return initializeAuthInstance({
+    forceRefresh: true,
+    knownCatalog: nextRbac,
+  });
+}
+
+export type BetterAuthInstance = Awaited<ReturnType<typeof createAuthInstance>>;

@@ -180,12 +180,18 @@ importers:
       '@hono/node-server':
         specifier: ^1.19.11
         version: 1.19.11(hono@4.12.7)
+      '@proptryx/database':
+        specifier: workspace:*
+        version: link:../database
       '@proptryx/static':
         specifier: workspace:*
         version: link:../static
       '@t3-oss/env-core':
         specifier: ^0.13.10
         version: 0.13.10(typescript@5.9.3)(zod@4.3.6)
+      drizzle-orm:
+        specifier: ^0.45.1
+        version: 0.45.1(@types/pg@8.18.0)(kysely@0.28.12)(pg@8.20.0)
       hono:
         specifier: ^4.12.5
         version: 4.12.7
@@ -296,6 +302,9 @@ importers:
       '@hono/node-server':
         specifier: ^1.19.11
         version: 1.19.11(hono@4.12.7)
+      '@hono/zod-openapi':
+        specifier: ^1.2.2
+        version: 1.2.2(hono@4.12.7)(zod@4.3.6)
       '@proptryx/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -305,6 +314,9 @@ importers:
       '@proptryx/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@scalar/hono-api-reference':
+        specifier: ^0.10.4
+        version: 0.10.4(hono@4.12.7)
       '@t3-oss/env-core':
         specifier: ^0.13.10
         version: 0.13.10(typescript@5.9.3)(zod@4.3.6)
@@ -354,49 +366,6 @@ importers:
       '@scalar/hono-api-reference':
         specifier: ^0.10.4
         version: 0.10.4(hono@4.12.7)
-      '@t3-oss/env-core':
-        specifier: ^0.13.10
-        version: 0.13.10(typescript@5.9.3)(zod@4.3.6)
-      hono:
-        specifier: ^4.12.5
-        version: 4.12.7
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
-    devDependencies:
-      '@biomejs/biome':
-        specifier: ^2.4.6
-        version: 2.4.7
-      '@proptryx/typescript-config':
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
-      '@types/node':
-        specifier: ^25.3.5
-        version: 25.5.0
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(jiti@2.6.1)(postcss@8.4.31)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
-  services/property:
-    dependencies:
-      '@hono/node-server':
-        specifier: ^1.19.11
-        version: 1.19.11(hono@4.12.7)
-      '@proptryx/database':
-        specifier: workspace:*
-        version: link:../../packages/database
-      '@proptryx/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
-      '@proptryx/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
       '@t3-oss/env-core':
         specifier: ^0.13.10
         version: 0.13.10(typescript@5.9.3)(zod@4.3.6)

@@ -23,12 +23,6 @@ export interface CreateRateLimitOptions {
   keyScope?: RateLimitKeyScope;
 }
 
-const RATE_LIMIT_KEY_SCOPE_DEFAULTS: Record<RateLimitProfile, RateLimitKeyScope> = {
-  global: "client",
-  transactional: "client-route",
-  operational: "client-method",
-};
-
 const DEFAULT_RATE_LIMIT_SKIP_METHODS = ["OPTIONS"];
 const LARGE_NUMERIC_SEGMENT_PATTERN = /^\d{4,}$/;
 const UUID_LIKE_SEGMENT_PATTERN = /^[0-9a-f]{8}-[0-9a-f-]{13,}$/i;
@@ -49,7 +43,7 @@ export const RATE_LIMIT_PRESETS: Record<RateLimitProfile, RateLimitDefinition> =
   },
   operational: {
     keyPrefix: "operational",
-    maxRequests: 300,
+    maxRequests: 200,
     windowMs: 60_000,
     message: "Too many operational requests. Please retry shortly.",
   },
@@ -156,6 +150,18 @@ function buildRateLimitKey(c: Context, keyScope: RateLimitKeyScope) {
   return `${clientIdentifier}:${method}:${normalizeRateLimitPath(c.req.path)}`;
 }
 
+function resolveDefaultKeyScope(profile: RateLimitProfile): RateLimitKeyScope {
+  if (profile === "global") {
+    return "client";
+  }
+
+  if (profile === "transactional") {
+    return "client-route";
+  }
+
+  return "client-method";
+}
+
 export function createRateLimit(options: CreateRateLimitOptions): MiddlewareHandler {
   const preset = RATE_LIMIT_PRESETS[options.profile];
   const keyPrefix = options.keyPrefix ?? preset.keyPrefix;
@@ -166,7 +172,7 @@ export function createRateLimit(options: CreateRateLimitOptions): MiddlewareHand
   const skipMethods = new Set(
     (options.skipMethods ?? DEFAULT_RATE_LIMIT_SKIP_METHODS).map(normalizeMethod)
   );
-  const keyScope = options.keyScope ?? RATE_LIMIT_KEY_SCOPE_DEFAULTS[options.profile];
+  const keyScope = options.keyScope ?? resolveDefaultKeyScope(options.profile);
 
   return rateLimiter({
     windowMs,

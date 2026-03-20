@@ -25,6 +25,7 @@ export const env = createEnv({
     CORS_ALLOWED_ORIGINS: corsOriginsSchema,
     DATABASE_URL: z.url("DATABASE_URL must be a valid PostgreSQL connection string"),
     REDIS_URL: z.url("REDIS_URL must be a valid Redis connection string"),
+    AUTH_SERVICE_URL: z.url("AUTH_SERVICE_URL must be a valid URL — e.g. http://auth:6001"),
   },
 
   runtimeEnv: {
@@ -35,6 +36,7 @@ export const env = createEnv({
     CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
+    AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",

@@ -4,7 +4,6 @@ Proptryx Server is a TypeScript microservice monorepo built around Hono, with:
 
 - `gateway` (edge/API router + reverse proxy)
 - `auth` (authentication domain service)
-- `property` (property domain service)
 - `kernel` (shared core domain service)
 - shared packages (`logger`, `typescript-config`)
 
@@ -21,7 +20,6 @@ The stack is optimized for:
 
 - `gateway` is the entrypoint service
 - `gateway` proxies `/api/auth/*` to `auth`
-- `gateway` proxies `/api/property/*` to `property`
 - `gateway` proxies `/api/kernel/*` to `kernel`
 - each service also exposes its own `/health` endpoint
 
@@ -52,7 +50,6 @@ The stack is optimized for:
 │   ├── docker-compose.dockploy.yml
 │   ├── gateway.Dockerfile
 │   ├── auth.Dockerfile
-│   ├── property.Dockerfile
 │   └── kernel.Dockerfile
 ├── env/
 │   ├── .env
@@ -77,8 +74,6 @@ The stack is optimized for:
     ├── gateway
     │   └── src
     ├── auth
-    │   └── src
-    ├── property
     │   └── src
     └── kernel
         └── src

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVICES=(gateway auth property)
+SERVICES=(gateway auth kernel)
 BUILD_FIRST=false
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -12,13 +12,13 @@ PROJECT_NAME="proptryx"
 print_usage() {
   cat <<'USAGE'
 Usage:
-  scripts/docker-image-size.sh [--build] [all|gateway|auth|property ...]
+  scripts/docker-image-size.sh [--build] [all|gateway|auth|kernel ...]
 
 Examples:
   pnpm docker:size
   pnpm docker:size -- all
   pnpm docker:size -- gateway auth
-  pnpm docker:size:build -- property
+  pnpm docker:size:build -- kernel
 USAGE
 }
 
@@ -34,6 +34,128 @@ contains_service() {
 
 compose() {
   docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "$@"
+}
+
+create_sanitized_docker_config_file() {
+  local temp_file
+  local source_config
+
+  temp_file="$(mktemp)"
+  source_config="${HOME}/.docker/config.json"
+
+  if [[ -f "$source_config" ]]; then
+    if command -v jq >/dev/null 2>&1; then
+      if jq 'del(.credsStore, .credStore, .credHelpers)' "$source_config" >"$temp_file"; then
+        echo "$temp_file"
+        return 0
+      fi
+    fi
+
+    if command -v node >/dev/null 2>&1; then
+      node -e '
+const fs = require("fs");
+const sourcePath = process.argv[1];
+const targetPath = process.argv[2];
+let config = { auths: {} };
+
+if (fs.existsSync(sourcePath)) {
+  try {
+    const raw = fs.readFileSync(sourcePath, "utf8");
+    config = JSON.parse(raw);
+  } catch {
+    config = { auths: {} };
+  }
+}
+
+delete config.credsStore;
+delete config.credStore;
+delete config.credHelpers;
+
+if (!config.auths || typeof config.auths !== "object") {
+  config.auths = {};
+}
+
+fs.writeFileSync(targetPath, JSON.stringify(config, null, 2));
+' "$source_config" "$temp_file" >/dev/null 2>&1 || true
+
+      if [[ -s "$temp_file" ]]; then
+        echo "$temp_file"
+        return 0
+      fi
+    fi
+  fi
+
+  printf '{"auths":{}}\n' >"$temp_file"
+  echo "$temp_file"
+}
+
+restore_docker_config() {
+  local had_original_config="$1"
+  local docker_config_path="$2"
+  local original_backup_path="$3"
+
+  if [[ "$had_original_config" == "true" ]]; then
+    if [[ -n "$original_backup_path" && -f "$original_backup_path" ]]; then
+      cp "$original_backup_path" "$docker_config_path"
+    fi
+  else
+    rm -f "$docker_config_path"
+  fi
+
+  if [[ -n "$original_backup_path" ]]; then
+    rm -f "$original_backup_path"
+  fi
+}
+
+build_selected_services() {
+  local output
+
+  if output="$(compose build "$@" 2>&1)"; then
+    printf "%s\n" "$output"
+    return 0
+  fi
+
+  local status=$?
+  printf "%s\n" "$output" >&2
+
+  if [[ "$output" != *"docker-credential-desktop"* ]]; then
+    return "$status"
+  fi
+
+  echo "Detected missing docker-credential-desktop. Retrying build by temporarily disabling Docker credential helpers." >&2
+
+  local docker_config_dir
+  local docker_config_path
+  local original_backup_path=""
+  local had_original_config="false"
+  local sanitized_config_file
+
+  docker_config_dir="${HOME}/.docker"
+  docker_config_path="${docker_config_dir}/config.json"
+  mkdir -p "$docker_config_dir"
+
+  if [[ -f "$docker_config_path" ]]; then
+    had_original_config="true"
+    original_backup_path="$(mktemp)"
+    cp "$docker_config_path" "$original_backup_path"
+  fi
+
+  sanitized_config_file="$(create_sanitized_docker_config_file)"
+  cp "$sanitized_config_file" "$docker_config_path"
+  rm -f "$sanitized_config_file"
+
+  if output="$(compose build "$@" 2>&1)"; then
+    printf "%s\n" "$output"
+    restore_docker_config "$had_original_config" "$docker_config_path" "$original_backup_path"
+    return 0
+  fi
+
+  local fallback_status=$?
+  printf "%s\n" "$output" >&2
+  restore_docker_config "$had_original_config" "$docker_config_path" "$original_backup_path"
+
+  echo "Retry failed. Fix Docker credential helper config in ~/.docker/config.json or reinstall docker-credential-desktop." >&2
+  return "$fallback_status"
 }
 
 compose_image_ref_for_service() {
@@ -136,7 +258,7 @@ fi
 
 if $BUILD_FIRST; then
   echo "Building selected services: ${selected[*]}"
-  compose build "${selected[@]}"
+  build_selected_services "${selected[@]}"
 fi
 
 printf "\n%-10s %-40s %12s\n" "SERVICE" "IMAGE" "SIZE"

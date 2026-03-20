@@ -35,10 +35,6 @@ export const env = createEnv({
 
     AUTH_SERVICE_URL: z.url("AUTH_SERVICE_URL must be a valid URL — e.g. http://auth:6001"),
 
-    PROPERTY_SERVICE_URL: z.url(
-      "PROPERTY_SERVICE_URL must be a valid URL — e.g. http://property:6002"
-    ),
-
     KERNEL_SERVICE_URL: z.url("KERNEL_SERVICE_URL must be a valid URL — e.g. http://kernel:6003"),
   },
 
@@ -51,7 +47,6 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
     AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL,
-    PROPERTY_SERVICE_URL: process.env.PROPERTY_SERVICE_URL,
     KERNEL_SERVICE_URL: process.env.KERNEL_SERVICE_URL,
   },
 

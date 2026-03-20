@@ -2,11 +2,11 @@ import { bodyLimit } from "hono/body-limit";
 import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
-import type { Context, Hono } from "hono";
+import type { Context, Env, Hono } from "hono";
 import { requestId } from "hono/request-id";
 import { createGlobalRateLimit } from "./rate-limit";
 
-type AppLike = Pick<Hono, "use" | "get">;
+type AppLike<E extends Env = Env> = Pick<Hono<E>, "use" | "get">;
 
 export interface AppSecurityOptions {
   corsOrigins: string[];
@@ -27,7 +27,7 @@ function hasJsonContentType(contentType: string | undefined) {
   return contentType.toLowerCase().includes("application/json");
 }
 
-export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
+export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSecurityOptions) {
   const normalizedOrigins = options.corsOrigins
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);

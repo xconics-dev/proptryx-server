@@ -58,14 +58,3 @@ updates:
       - "dependencies"
       - "bot:dependabot"
 
-  - package-ecosystem: "docker"
-    directory: "/services/property"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "05:30"
-      timezone: "Asia/Kolkata"
-    target-branch: "main"
-    labels:
-      - "dependencies"
-      - "bot:dependabot"

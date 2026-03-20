@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noTsIgnore: forced */
 import { serve } from "@hono/node-server";
 import { initDB } from "@proptryx/database";
 import { createHonoRequestLogger } from "@proptryx/logger";
@@ -8,19 +9,21 @@ import {
   createHealthCheckHandler,
   createNotFoundHandler,
 } from "@proptryx/utils";
-import { Hono } from "hono";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { openApiInfo } from "./config/openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { clientGroup } from "@/routers/client/handler";
+import type { AppBindings } from "@/types/app";
 
-const app = new OpenAPIHono();
+const app = new OpenAPIHono<AppBindings>();
 
 applyAppSecurity(app, {
   corsOrigins: env.CORS_ALLOWED_ORIGINS,
   enableGlobalRateLimit: false,
 });
+
 app.use("*", createHonoRequestLogger(logger));
 
 const faviconHandler = createFaviconHandler();
@@ -51,6 +54,9 @@ app.get(
 
 await initDB({ logger, serviceName: "kernel" });
 
+// @ts-ignore
+const routes = app.route("/client", clientGroup);
+
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info("service started", {
     port: info.port,
@@ -58,5 +64,8 @@ serve({ fetch: app.fetch, port: env.PORT }, (info) => {
     healthPath: "/health",
   });
 });
+
+/* for hono RPC */
+export type AppType = typeof routes;
 
 export default app;

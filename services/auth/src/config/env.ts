@@ -66,7 +66,6 @@ export const env = createEnv({
     RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required for Resend transport"),
     RESEND_FROM: z.string().email("RESEND_FROM must be a valid email address"),
   },
-
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.AUTH_PORT,

@@ -16,7 +16,7 @@ proptryx/
 │   ├── docker-compose.dockploy.yml
 │   ├── gateway.Dockerfile
 │   ├── auth.Dockerfile
-│   └── property.Dockerfile
+│   └── kernel.Dockerfile
 ├── env/
 │   ├── .env
 │   ├── .env.example
@@ -49,7 +49,7 @@ proptryx/
     │       ├── config/env.ts
     │       └── routes/health.ts
     │
-    └── property/                    ← @proptryx/property :3002
+    └── kernel/                      ← @proptryx/kernel   :3002
         ├── package.json
         ├── tsconfig.json
         └── src/
@@ -95,7 +95,7 @@ Workspace packages resolved:
 | `@proptryx/typescript-config` | packages/typescript-config   |
 | `@proptryx/gateway`           | services/gateway             |
 | `@proptryx/auth`              | services/auth                |
-| `@proptryx/property`          | services/property            |
+| `@proptryx/kernel`            | services/kernel              |
 
 ---
 
@@ -116,7 +116,7 @@ Use `env/.env.prod` as the production baseline when running `docker/docker-compo
 # Runtime dep to a specific service
 pnpm --filter @proptryx/gateway  add <package>
 pnpm --filter @proptryx/auth     add <package>
-pnpm --filter @proptryx/property add <package>
+pnpm --filter @proptryx/kernel   add <package>
 
 # Dev dep to a specific service
 pnpm --filter @proptryx/gateway  add -D <package>
@@ -142,12 +142,12 @@ pnpm dev
 # ─── Single service only ──────────────────────────────────────────────────────
 pnpm dev:gateway
 pnpm dev:auth
-pnpm dev:property
+pnpm dev:kernel
 
 # Raw pnpm --filter equivalents
 pnpm --filter @proptryx/gateway  run dev
 pnpm --filter @proptryx/auth     run dev
-pnpm --filter @proptryx/property run dev
+pnpm --filter @proptryx/kernel   run dev
 ```
 
 ---
@@ -158,12 +158,12 @@ pnpm --filter @proptryx/property run dev
 pnpm build                   # all services
 pnpm build:gateway           # gateway only
 pnpm build:auth              # auth only
-pnpm build:property          # property only
+pnpm build:kernel            # kernel only
 
 # Raw equivalents
 pnpm --filter @proptryx/gateway  run build
 pnpm --filter @proptryx/auth     run build
-pnpm --filter @proptryx/property run build
+pnpm --filter @proptryx/kernel   run build
 ```
 
 ---
@@ -174,7 +174,7 @@ pnpm --filter @proptryx/property run build
 pnpm type-check              # all
 pnpm type-check:gateway
 pnpm type-check:auth
-pnpm type-check:property
+pnpm type-check:kernel
 
 pnpm --filter @proptryx/auth run type-check   # raw
 ```
@@ -188,7 +188,7 @@ pnpm lint            # all (Turbo cached)
 pnpm lint:fix        # auto-fix all
 pnpm lint:gateway    # single service
 pnpm lint:auth
-pnpm lint:property
+pnpm lint:kernel
 
 pnpm format          # Biome format all
 pnpm check:fix       # Biome lint + format all
@@ -205,7 +205,6 @@ pnpm docker:ps          # status
 pnpm docker:logs        # tail all
 pnpm docker:logs:gateway
 pnpm docker:logs:auth
-pnpm docker:logs:property
 pnpm docker:down        # stop
 pnpm docker:down:v      # stop + remove volumes
 docker compose --env-file env/.env -f docker/docker-compose.yml build --no-cache   # force full rebuild
@@ -227,7 +226,7 @@ pnpm docker:prod:down
 ```bash
 pnpm health:gateway    # GET :3000/health                (gateway)
 pnpm health:auth       # GET :3000/api/auth/health       (proxied → auth)
-pnpm health:property   # GET :3000/api/property/health   (proxied → property)
+pnpm health:kernel     # GET :3000/api/kernel/health     (proxied → kernel)
 ```
 
 Expected response:
@@ -243,7 +242,7 @@ Expected response:
 |----------|----------------------|-------|------------------|
 | gateway  | `@proptryx/gateway`  | 3000  | `gateway`        |
 | auth     | `@proptryx/auth`     | 3001  | `auth`           |
-| property | `@proptryx/property` | 3002  | `property`       |
+| kernel   | `@proptryx/kernel`   | 3002  | `kernel`         |
 
 ---
 
@@ -253,7 +252,7 @@ Expected response:
 pnpm clean              # all dist/ + .turbo/ + node_modules
 pnpm clean:gateway
 pnpm clean:auth
-pnpm clean:property
+pnpm clean:kernel
 
 # Full reset
 pnpm clean && pnpm install
