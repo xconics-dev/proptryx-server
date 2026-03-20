@@ -12,11 +12,11 @@ const requireClientSession = createRequiredAuthSessionMiddleware({
   entities: {
     data: false,
     user: true,
-    session: true,
+    session: false,
     organization: true,
     hasOrganization: true,
   },
-  requiredEntities: ["user", "session"],
+  requiredEntities: ["user"],
 });
 
 const clientMethodsRateLimit = createOperationalRateLimit({
