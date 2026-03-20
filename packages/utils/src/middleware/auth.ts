@@ -10,6 +10,7 @@ import { and, eq } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 import type { Context, ContextVariableMap, MiddlewareHandler } from "hono";
 import { env } from "../env";
+import { AUTH_SESSION_FORWARD_HEADERS } from "../functions/network";
 import { AUTH_MIDDLEWARE_REDIS_NAMESPACE, getRedisClient } from "../redis";
 
 export const AUTH_CONTEXT_KEY = "auth" as const;
@@ -74,6 +75,8 @@ export interface CreateBetterAuthSessionMiddlewareOptions {
   retryAttempts?: number;
   retryDelayMs?: number;
   retryOnStatuses?: number[];
+  unavailableFailCacheTtlMs?: number;
+  unavailableFailureThreshold?: number;
   skipPaths?: string[];
   fetchImplementation?: typeof fetch;
   cacheTtlMs?: number;
@@ -100,24 +103,30 @@ type AuthSessionFetchOutcome =
   | { type: "unauthorized" }
   | { type: "unavailable" };
 
+type AuthContextResolutionOutcome =
+  | { unavailable: true }
+  | { unavailable: false; context: SerializableAuthContext };
+
 const DEFAULT_SESSION_ENDPOINT_PATH = "/api/auth/get-session";
 const DEFAULT_TIMEOUT_MS = 1_500;
 const DEFAULT_RETRY_ATTEMPTS = 1;
 const DEFAULT_RETRY_DELAY_MS = 100;
+const DEFAULT_UNAVAILABLE_FAIL_CACHE_TTL_MS = 1_500;
+const DEFAULT_UNAVAILABLE_FAILURE_THRESHOLD = 2;
 const DEFAULT_RETRYABLE_STATUS_CODES = [408, 425, 429, 500, 502, 503, 504] as const;
 const DEFAULT_SKIP_PATHS = ["/health", "/favicon.ico", "/favicon.png"];
 const DEFAULT_CACHE_TTL_MS = 3_000;
 const DEFAULT_CACHE_MAX_ENTRIES = 2_000;
-const DEFAULT_FORWARDED_HEADERS = [
-  "authorization",
-  "cookie",
-  "user-agent",
-  "x-forwarded-for",
-  "x-real-ip",
-  "x-request-id",
-] as const;
 
 const authSessionCache = new Map<string, AuthSessionCacheRecord>();
+const authContextResolutionInFlight = new Map<string, Promise<AuthContextResolutionOutcome>>();
+
+type AuthUpstreamCircuitState = {
+  consecutiveFailures: number;
+  unavailableUntilMs: number;
+};
+
+const authUpstreamCircuitByEndpoint = new Map<string, AuthUpstreamCircuitState>();
 
 function normalizeRequiredEntities(requiredEntities: BetterAuthRequiredEntity[] | undefined) {
   if (!requiredEntities || requiredEntities.length === 0) {
@@ -285,7 +294,7 @@ function createAuthCacheKey(headers: Headers, sessionEndpointUrl: string, entity
 function buildForwardedHeaders(sourceHeaders: Headers) {
   const headers = new Headers();
 
-  for (const headerName of DEFAULT_FORWARDED_HEADERS) {
+  for (const headerName of AUTH_SESSION_FORWARD_HEADERS) {
     const value = sourceHeaders.get(headerName);
     if (value) {
       headers.set(headerName, value);
@@ -578,6 +587,145 @@ async function fetchAuthSessionPayloadWithRetry(options: {
   return { type: "unavailable" };
 }
 
+function getOrCreateAuthContextResolution(
+  cacheKey: string,
+  resolver: () => Promise<AuthContextResolutionOutcome>
+) {
+  const inFlightResolution = authContextResolutionInFlight.get(cacheKey);
+  if (inFlightResolution) {
+    return inFlightResolution;
+  }
+
+  const resolutionPromise = resolver().finally(() => {
+    authContextResolutionInFlight.delete(cacheKey);
+  });
+
+  authContextResolutionInFlight.set(cacheKey, resolutionPromise);
+  return resolutionPromise;
+}
+
+function getOrCreateAuthUpstreamCircuitState(sessionEndpointUrl: string) {
+  const existingState = authUpstreamCircuitByEndpoint.get(sessionEndpointUrl);
+  if (existingState) {
+    return existingState;
+  }
+
+  const state: AuthUpstreamCircuitState = {
+    consecutiveFailures: 0,
+    unavailableUntilMs: 0,
+  };
+  authUpstreamCircuitByEndpoint.set(sessionEndpointUrl, state);
+
+  return state;
+}
+
+function isAuthUpstreamCircuitOpen(sessionEndpointUrl: string) {
+  const state = authUpstreamCircuitByEndpoint.get(sessionEndpointUrl);
+  if (!state) {
+    return false;
+  }
+
+  const now = Date.now();
+  if (state.unavailableUntilMs <= now) {
+    state.unavailableUntilMs = 0;
+    return false;
+  }
+
+  return true;
+}
+
+function markAuthUpstreamUnavailable(options: {
+  sessionEndpointUrl: string;
+  unavailableFailCacheTtlMs: number;
+  unavailableFailureThreshold: number;
+}) {
+  if (options.unavailableFailCacheTtlMs <= 0) {
+    return;
+  }
+
+  const state = getOrCreateAuthUpstreamCircuitState(options.sessionEndpointUrl);
+  const now = Date.now();
+
+  if (state.unavailableUntilMs > now) {
+    return;
+  }
+
+  state.consecutiveFailures += 1;
+  if (state.consecutiveFailures < options.unavailableFailureThreshold) {
+    return;
+  }
+
+  state.consecutiveFailures = 0;
+  state.unavailableUntilMs = now + options.unavailableFailCacheTtlMs;
+}
+
+function markAuthUpstreamAvailable(sessionEndpointUrl: string) {
+  const state = authUpstreamCircuitByEndpoint.get(sessionEndpointUrl);
+  if (!state) {
+    return;
+  }
+
+  if (state.consecutiveFailures === 0 && state.unavailableUntilMs === 0) {
+    return;
+  }
+
+  state.consecutiveFailures = 0;
+  state.unavailableUntilMs = 0;
+}
+
+async function resolveFreshAuthContext(options: {
+  requestHeaders: Headers;
+  fetchImplementation: typeof fetch;
+  sessionEndpointUrl: string;
+  timeoutMs: number;
+  retryAttempts: number;
+  retryDelayMs: number;
+  retryOnStatuses: Set<number>;
+  entityOptions: ResolvedAuthContextEntityOptions;
+}): Promise<AuthContextResolutionOutcome> {
+  if (!hasAuthSignal(options.requestHeaders)) {
+    return {
+      unavailable: false,
+      context: createUnauthenticatedContext(),
+    };
+  }
+
+  const authSessionOutcome = await fetchAuthSessionPayloadWithRetry({
+    fetchImplementation: options.fetchImplementation,
+    sessionEndpointUrl: options.sessionEndpointUrl,
+    requestHeaders: buildForwardedHeaders(options.requestHeaders),
+    timeoutMs: options.timeoutMs,
+    retryAttempts: options.retryAttempts,
+    retryDelayMs: options.retryDelayMs,
+    retryOnStatuses: options.retryOnStatuses,
+  });
+
+  if (authSessionOutcome.type === "unavailable") {
+    return { unavailable: true };
+  }
+
+  if (authSessionOutcome.type === "unauthorized") {
+    return {
+      unavailable: false,
+      context: createUnauthenticatedContext(),
+    };
+  }
+
+  const payload = authSessionOutcome.payload;
+
+  const organizationResolution = await resolveOrganizationContext({
+    userId: normalizeId(payload.user.id),
+    activeOrganizationId: normalizeId(payload.session.activeOrganizationId),
+    includeOrganization: options.entityOptions.organization,
+    includeHasOrganization: options.entityOptions.hasOrganization,
+  });
+
+  return {
+    unavailable: false,
+    context: buildHydratedAuthContext(payload, options.entityOptions, organizationResolution),
+  };
+}
+
 async function resolveOrganizationContext(options: {
   userId: string | null;
   activeOrganizationId: string | null;
@@ -686,6 +834,14 @@ export function createBetterAuthSessionMiddleware(
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const retryAttempts = Math.max(0, options.retryAttempts ?? DEFAULT_RETRY_ATTEMPTS);
   const retryDelayMs = Math.max(0, options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS);
+  const unavailableFailCacheTtlMs = Math.max(
+    0,
+    options.unavailableFailCacheTtlMs ?? DEFAULT_UNAVAILABLE_FAIL_CACHE_TTL_MS
+  );
+  const unavailableFailureThreshold = Math.max(
+    1,
+    options.unavailableFailureThreshold ?? DEFAULT_UNAVAILABLE_FAILURE_THRESHOLD
+  );
   const retryOnStatuses = new Set(options.retryOnStatuses ?? DEFAULT_RETRYABLE_STATUS_CODES);
   const required = options.required ?? false;
   const requiredEntities = normalizeRequiredEntities(options.requiredEntities);
@@ -766,87 +922,7 @@ export function createBetterAuthSessionMiddleware(
       }
     }
 
-    if (!hasAuthSignal(c.req.raw.headers)) {
-      const unauthenticatedContext = createUnauthenticatedContext();
-      setAuthContext(c, unauthenticatedContext);
-
-      if (authCacheKey) {
-        setCachedAuthContextInMemory(
-          authCacheKey,
-          unauthenticatedContext,
-          cacheTtlMs,
-          cacheMaxEntries
-        );
-        if (enableRedisCache) {
-          void setCachedAuthContextInRedis(
-            authCacheKey,
-            unauthenticatedContext,
-            cacheTtlMs,
-            options.redisCacheTtlSeconds
-          );
-        }
-      }
-
-      const accessErrorResponse = ensureRequiredAccess(
-        c,
-        unauthenticatedContext,
-        required,
-        requiredEntities
-      );
-      if (accessErrorResponse) {
-        return accessErrorResponse;
-      }
-
-      await next();
-      return;
-    }
-
-    const authSessionOutcome = await fetchAuthSessionPayloadWithRetry({
-      fetchImplementation,
-      sessionEndpointUrl,
-      requestHeaders: buildForwardedHeaders(c.req.raw.headers),
-      timeoutMs,
-      retryAttempts,
-      retryDelayMs,
-      retryOnStatuses,
-    });
-
-    if (authSessionOutcome.type === "unauthorized") {
-      const unauthenticatedContext = createUnauthenticatedContext();
-      setAuthContext(c, unauthenticatedContext);
-
-      if (authCacheKey) {
-        setCachedAuthContextInMemory(
-          authCacheKey,
-          unauthenticatedContext,
-          cacheTtlMs,
-          cacheMaxEntries
-        );
-        if (enableRedisCache) {
-          void setCachedAuthContextInRedis(
-            authCacheKey,
-            unauthenticatedContext,
-            cacheTtlMs,
-            options.redisCacheTtlSeconds
-          );
-        }
-      }
-
-      const accessErrorResponse = ensureRequiredAccess(
-        c,
-        unauthenticatedContext,
-        required,
-        requiredEntities
-      );
-      if (accessErrorResponse) {
-        return accessErrorResponse;
-      }
-
-      await next();
-      return;
-    }
-
-    if (authSessionOutcome.type === "unavailable") {
+    if (isAuthUpstreamCircuitOpen(sessionEndpointUrl)) {
       if (required) {
         return authServiceUnavailableResponse(c);
       }
@@ -856,43 +932,63 @@ export function createBetterAuthSessionMiddleware(
       return;
     }
 
-    const payload = authSessionOutcome.payload;
-
-    const organizationResolution = await resolveOrganizationContext({
-      userId: normalizeId(payload.user.id),
-      activeOrganizationId: normalizeId(payload.session.activeOrganizationId),
-      includeOrganization: entityOptions.organization,
-      includeHasOrganization: entityOptions.hasOrganization,
-    });
-
-    const authenticatedContext = buildHydratedAuthContext(
-      payload,
+    const authContextResolutionOptions = {
+      requestHeaders: c.req.raw.headers,
+      fetchImplementation,
+      sessionEndpointUrl,
+      timeoutMs,
+      retryAttempts,
+      retryDelayMs,
+      retryOnStatuses,
       entityOptions,
-      organizationResolution
-    );
+    };
+
+    const authContextResolution = authCacheKey
+      ? await getOrCreateAuthContextResolution(authCacheKey, () =>
+          resolveFreshAuthContext(authContextResolutionOptions)
+        )
+      : await resolveFreshAuthContext(authContextResolutionOptions);
+
+    if (authContextResolution.unavailable) {
+      markAuthUpstreamUnavailable({
+        sessionEndpointUrl,
+        unavailableFailCacheTtlMs,
+        unavailableFailureThreshold,
+      });
+
+      if (required) {
+        return authServiceUnavailableResponse(c);
+      }
+
+      setAuthContext(c, createUnauthenticatedContext());
+      await next();
+      return;
+    }
+
+    const resolvedAuthContext = authContextResolution.context;
+    markAuthUpstreamAvailable(sessionEndpointUrl);
+    setAuthContext(c, resolvedAuthContext);
+
+    if (authCacheKey) {
+      setCachedAuthContextInMemory(authCacheKey, resolvedAuthContext, cacheTtlMs, cacheMaxEntries);
+      if (enableRedisCache) {
+        void setCachedAuthContextInRedis(
+          authCacheKey,
+          resolvedAuthContext,
+          cacheTtlMs,
+          options.redisCacheTtlSeconds
+        );
+      }
+    }
 
     const accessErrorResponse = ensureRequiredAccess(
       c,
-      authenticatedContext,
+      resolvedAuthContext,
       required,
       requiredEntities
     );
     if (accessErrorResponse) {
       return accessErrorResponse;
-    }
-
-    setAuthContext(c, authenticatedContext);
-
-    if (authCacheKey) {
-      setCachedAuthContextInMemory(authCacheKey, authenticatedContext, cacheTtlMs, cacheMaxEntries);
-      if (enableRedisCache) {
-        void setCachedAuthContextInRedis(
-          authCacheKey,
-          authenticatedContext,
-          cacheTtlMs,
-          options.redisCacheTtlSeconds
-        );
-      }
     }
 
     await next();

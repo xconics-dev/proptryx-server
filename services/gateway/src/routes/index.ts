@@ -1,7 +1,11 @@
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import { proxy } from "hono/proxy";
 import type { Context } from "hono";
-import { createFaviconHandler, createHealthCheckHandler } from "@proptryx/utils";
+import {
+  createFaviconHandler,
+  createHealthCheckHandler,
+  resolveClientIpFromHeaderGetter,
+} from "@proptryx/utils";
 import { logger } from "@/lib/logger";
 import { createUpstreamUrl, proxyRoutes, type ProxyRoute } from "@/proxy";
 
@@ -80,39 +84,13 @@ const kernelHealthProxyRoute = createRoute({
   },
 });
 
-function normalizeForwardedIp(value?: string) {
-  if (!value) {
-    return undefined;
-  }
-
-  const first = value
-    .split(",")[0]
-    ?.trim()
-    .replace(/^\[|\]$/g, "");
-  if (!first) {
-    return undefined;
-  }
-
-  if (first.includes(".") && first.includes(":")) {
-    const [host] = first.split(":");
-    return host?.trim() || undefined;
-  }
-
-  return first;
-}
-
 function createProxyHandler(route: ProxyRoute) {
   return async (c: Context) => {
     try {
       const upstreamUrl = createUpstreamUrl(c.req.url, route);
       const headers = new Headers(c.req.raw.headers);
-      const rawForwardedFor =
-        c.req.header("x-forwarded-for") ??
-        c.req.header("x-real-ip") ??
-        c.req.header("cf-connecting-ip") ??
-        c.req.header("true-client-ip") ??
-        c.req.header("x-client-ip");
-      const clientIp = normalizeForwardedIp(rawForwardedFor) ?? "127.0.0.1";
+      const clientIp =
+        resolveClientIpFromHeaderGetter((headerName) => c.req.header(headerName)) ?? "127.0.0.1";
 
       headers.set("host", new URL(route.target).host);
       headers.set("x-forwarded-host", new URL(c.req.url).host);

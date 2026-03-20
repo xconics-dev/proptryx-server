@@ -4,6 +4,11 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import type { Context, Env, Hono } from "hono";
 import { requestId } from "hono/request-id";
+import {
+  SECURITY_CORS_ALLOW_HEADERS,
+  SECURITY_CORS_ALLOW_METHODS,
+  SECURITY_CORS_EXPOSE_HEADERS,
+} from "../functions/network";
 import { createGlobalRateLimit } from "./rate-limit";
 
 type AppLike<E extends Env = Env> = Pick<Hono<E>, "use" | "get">;
@@ -27,6 +32,10 @@ function hasJsonContentType(contentType: string | undefined) {
   return contentType.toLowerCase().includes("application/json");
 }
 
+function matchesPathPrefix(path: string, candidatePath: string) {
+  return path === candidatePath || path.startsWith(`${candidatePath}/`);
+}
+
 export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSecurityOptions) {
   const normalizedOrigins = options.corsOrigins
     .map((origin) => origin.trim())
@@ -36,7 +45,13 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
   const exposeCorsRoute = options.exposeCorsRoute ?? true;
   const validateJsonBody = options.validateJsonBody ?? false;
   const enableGlobalRateLimit = options.enableGlobalRateLimit ?? true;
-  const skipBodyLimitPaths = new Set(options.skipBodyLimitPaths ?? []);
+  const skipBodyLimitPaths = Array.from(
+    new Set(
+      (options.skipBodyLimitPaths ?? [])
+        .map((path) => path.trim())
+        .filter((path) => path.length > 0)
+    )
+  );
   const globalRateLimitSkipPaths = options.globalRateLimitSkipPaths ?? [];
 
   app.use(
@@ -51,15 +66,9 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
         }
         return allowedOrigins.has(origin) ? origin : "";
       },
-      allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowHeaders: [
-        "Content-Type",
-        "Authorization",
-        "X-Request-Id",
-        "Set-Auth-Token",
-        "X-Razorpay-Signature",
-      ],
-      exposeHeaders: ["X-Request-Id", "Set-Auth-Token"],
+      allowMethods: [...SECURITY_CORS_ALLOW_METHODS],
+      allowHeaders: [...SECURITY_CORS_ALLOW_HEADERS],
+      exposeHeaders: [...SECURITY_CORS_EXPOSE_HEADERS],
       maxAge: 600,
       credentials: !allowAll,
     })
@@ -104,8 +113,8 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
   });
 
   app.use("*", async (c, next) => {
-    const shouldSkipBodyLimit = Array.from(skipBodyLimitPaths).some(
-      (skipPath) => c.req.path === skipPath || c.req.path.startsWith(`${skipPath}/`)
+    const shouldSkipBodyLimit = skipBodyLimitPaths.some((skipPath) =>
+      matchesPathPrefix(c.req.path, skipPath)
     );
 
     if (shouldSkipBodyLimit) {

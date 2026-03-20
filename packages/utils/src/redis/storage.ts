@@ -6,6 +6,7 @@ import { RATE_LIMIT_REDIS_NAMESPACE } from "./namespaces";
 
 let redisStorage: ReturnType<typeof createStorage> | null = null;
 let cleanupPromise: Promise<void> | null = null;
+let cleanupScheduled = false;
 
 const LEGACY_RATE_LIMIT_PATTERNS = [
   `${RATE_LIMIT_REDIS_NAMESPACE}:*|*|*`,
@@ -19,6 +20,7 @@ const LEGACY_CLEANUP_LOCK_TTL_SECONDS = 6 * 60 * 60;
 const LEGACY_CLEANUP_SCAN_COUNT = 200;
 const LEGACY_CLEANUP_BATCH_SIZE = 250;
 const LEGACY_CLEANUP_MAX_KEYS = 20_000;
+const LEGACY_CLEANUP_DELAY_MS = 30_000;
 
 async function deleteKeys(keys: string[]) {
   if (keys.length === 0) {
@@ -90,17 +92,25 @@ async function cleanupLegacyRateLimitKeys() {
 }
 
 function scheduleLegacyRateLimitCleanup() {
-  if (cleanupPromise) {
+  if (cleanupPromise || cleanupScheduled) {
     return;
   }
 
-  cleanupPromise = cleanupLegacyRateLimitKeys()
-    .catch((error) => {
-      console.warn("rate limiter legacy cleanup failed", error);
-    })
-    .finally(() => {
-      cleanupPromise = null;
-    });
+  cleanupScheduled = true;
+
+  const timer = setTimeout(() => {
+    cleanupScheduled = false;
+
+    cleanupPromise = cleanupLegacyRateLimitKeys()
+      .catch((error) => {
+        console.warn("rate limiter legacy cleanup failed", error);
+      })
+      .finally(() => {
+        cleanupPromise = null;
+      });
+  }, LEGACY_CLEANUP_DELAY_MS);
+
+  timer.unref?.();
 }
 
 export function getRatelimiterRedisStorage() {
