@@ -24,13 +24,13 @@
     "@proptryx/utils": "workspace:*",
     "@scalar/hono-api-reference": "^0.10.4",
     "@t3-oss/env-core": "^0.13.10",
-    "hono": "^4.12.5",
+    "hono": "^4.12.8",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.6",
+    "@biomejs/biome": "^2.4.8",
     "@proptryx/typescript-config": "workspace:*",
-    "@types/node": "^25.3.5",
+    "@types/node": "^25.5.0",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
