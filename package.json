@@ -64,6 +64,7 @@
     "lint-staged": "lint-staged",
     "commitlint": "commitlint",
     "deps:check": "NO_UPDATE_NOTIFIER=1 ncu --workspaces --root",
+    "deps:size": "tsx scripts/deps-size-report.ts",
     "deps:bump": "NO_UPDATE_NOTIFIER=1 ncu -u --workspaces --root && pnpm install --no-frozen-lockfile",
     "db:generate": "pnpm --filter @proptryx/database db:generate",
     "db:migrate": "pnpm --filter @proptryx/database db:migrate",
@@ -86,6 +87,7 @@
     "npm-check-updates": "^19.6.5",
     "pg": "^8.20.0",
     "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
     "turbo": "^2.8.20",
     "typescript": "^5.9.3",
     "ultracite": "^7.3.2"
