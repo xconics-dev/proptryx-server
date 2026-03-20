@@ -2,8 +2,12 @@ import { serve } from "@hono/node-server";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { initDB } from "@proptryx/database";
 import { createHonoRequestLogger } from "@proptryx/logger";
-import { Scalar } from "@scalar/hono-api-reference";
-import { applyAppSecurity, createErrorHandler, createNotFoundHandler } from "@proptryx/utils";
+import {
+  applyAppSecurity,
+  createErrorHandler,
+  createNotFoundHandler,
+  createOpenApiDocsHandler,
+} from "@proptryx/utils";
 import { openApiInfo } from "@/config/openapi";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
@@ -21,8 +25,8 @@ app.onError(createErrorHandler({ serviceName: "gateway", logger }));
 app.doc("/doc", openApiInfo);
 app.get(
   "/",
-  Scalar({
-    url: "/doc",
+  createOpenApiDocsHandler({
+    specUrl: "./doc",
     theme: "purple",
     pageTitle: "Proptryx Gateway Service API",
     hideClientButton: true,

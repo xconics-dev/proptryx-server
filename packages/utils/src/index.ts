@@ -5,6 +5,7 @@ export {
   type HealthCheckOptions,
   type HealthCheckProbe,
 } from "./handlers/healthcheck";
+export { createOpenApiDocsHandler, type OpenApiDocsHandlerOptions } from "./handlers/openapi-docs";
 export { createNotFoundHandler } from "./handlers/not-found";
 export { createErrorHandler, type ErrorHandlerOptions } from "./handlers/error";
 

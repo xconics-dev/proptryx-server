@@ -8,11 +8,11 @@ import {
   createFaviconHandler,
   createHealthCheckHandler,
   createNotFoundHandler,
+  createOpenApiDocsHandler,
 } from "@proptryx/utils";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { openApiInfo } from "./config/openapi";
-import { Scalar } from "@scalar/hono-api-reference";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { clientGroup } from "@/routers/client/handler";
 import type { AppBindings } from "@/types/app";
@@ -37,25 +37,24 @@ app.get(
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
 
-app.notFound(createNotFoundHandler());
-app.onError(createErrorHandler({ serviceName: "kernel", logger }));
+// @ts-ignore
+const routes = app.route("/client", clientGroup);
 
 /* openapi */
 app.doc("/doc", openApiInfo);
-app.get(
-  "/",
-  Scalar({
-    url: "./doc",
-    theme: "purple",
-    pageTitle: `Proptryx Kernel Service API`,
-    hideClientButton: true,
-  })
-);
+const docsHandler = createOpenApiDocsHandler({
+  specUrl: "./doc",
+  pageTitle: "Proptryx Kernel Service API",
+  hideClientButton: true,
+});
+
+app.get("/", docsHandler);
+app.get("/docs", docsHandler);
+
+app.notFound(createNotFoundHandler());
+app.onError(createErrorHandler({ serviceName: "kernel", logger }));
 
 await initDB({ logger, serviceName: "kernel" });
-
-// @ts-ignore
-const routes = app.route("/client", clientGroup);
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info("service started", {
