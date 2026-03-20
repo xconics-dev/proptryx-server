@@ -1,5 +1,5 @@
-CREATE TYPE "public"."company_type" AS ENUM('PVT_LTD', 'LLP', 'PROPRIETORSHIP', 'PARTNERSHIP', 'CORPORATION', 'LLC', 'NON_PROFIT', 'OTHER');--> statement-breakpoint
-CREATE TYPE "public"."organization_type" AS ENUM('SELLER', 'BUYER', 'MANAGEMENT');--> statement-breakpoint
+CREATE TYPE "public"."business_type" AS ENUM('B2B', 'B2C', 'BOTH', 'GENERAL');--> statement-breakpoint
+CREATE TYPE "public"."organization_type" AS ENUM('SELLER', 'DEVELOPER', 'MANAGEMENT', 'APPLICATION');--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -41,13 +41,14 @@ CREATE TABLE "organization" (
 	"slug" text NOT NULL,
 	"logo" text,
 	"type" "organization_type" NOT NULL,
+	"business_type" "business_type" DEFAULT 'GENERAL',
 	"created_at" timestamp NOT NULL,
 	"metadata" text,
 	"email" text,
 	"gst_number" text,
 	"phone_number" text,
 	"industry" text,
-	"company_type" "company_type",
+	"company_type" text,
 	"is_active" boolean DEFAULT false NOT NULL,
 	"razorpay_customer_id" text,
 	CONSTRAINT "organization_slug_unique" UNIQUE("slug")
@@ -88,6 +89,19 @@ CREATE TABLE "organization_subscription" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "session" (
+	"id" text PRIMARY KEY NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"token" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"ip_address" text,
+	"user_agent" text,
+	"user_id" text NOT NULL,
+	"active_organization_id" text,
+	"impersonated_by" text
+);
+--> statement-breakpoint
 CREATE TABLE "subscription_plans" (
 	"id" text PRIMARY KEY NOT NULL,
 	"code" text NOT NULL,
@@ -97,7 +111,6 @@ CREATE TABLE "subscription_plans" (
 	"currency" text DEFAULT 'INR' NOT NULL,
 	"billing_interval" text DEFAULT 'monthly' NOT NULL,
 	"razorpay_plan_id" text NOT NULL,
-	"razorpay_annual_plan_id" text,
 	"total_count" integer,
 	"quantity" integer DEFAULT 1 NOT NULL,
 	"trial_days" integer DEFAULT 0 NOT NULL,
@@ -129,32 +142,6 @@ CREATE TABLE "user" (
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
-CREATE TABLE "org_member_roles" (
-	"id" text PRIMARY KEY NOT NULL,
-	"name" text NOT NULL,
-	"user_role_id" text NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "org_member_roles_name_unique" UNIQUE("name")
-);
---> statement-breakpoint
-CREATE TABLE "role_permissions" (
-	"id" text PRIMARY KEY NOT NULL,
-	"role_id" text NOT NULL,
-	"sub_role_id" text,
-	"permissions" jsonb DEFAULT '[]'::jsonb NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "user_roles" (
-	"id" text PRIMARY KEY NOT NULL,
-	"name" text NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "user_roles_name_unique" UNIQUE("name")
-);
---> statement-breakpoint
 CREATE TABLE "region" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -173,18 +160,14 @@ CREATE TABLE "zone" (
 --> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "invitation" ADD CONSTRAINT "invitation_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "invitation" ADD CONSTRAINT "invitation_role_org_member_roles_name_fk" FOREIGN KEY ("role") REFERENCES "public"."org_member_roles"("name") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "invitation" ADD CONSTRAINT "invitation_inviter_id_user_id_fk" FOREIGN KEY ("inviter_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "member" ADD CONSTRAINT "member_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "member" ADD CONSTRAINT "member_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "member" ADD CONSTRAINT "member_role_org_member_roles_name_fk" FOREIGN KEY ("role") REFERENCES "public"."org_member_roles"("name") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_subscription" ADD CONSTRAINT "organization_subscription_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_subscription" ADD CONSTRAINT "organization_subscription_subscription_plan_id_subscription_plans_id_fk" FOREIGN KEY ("subscription_plan_id") REFERENCES "public"."subscription_plans"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "user" ADD CONSTRAINT "user_role_user_roles_name_fk" FOREIGN KEY ("role") REFERENCES "public"."user_roles"("name") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "session" ADD CONSTRAINT "session_active_organization_id_organization_id_fk" FOREIGN KEY ("active_organization_id") REFERENCES "public"."organization"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user" ADD CONSTRAINT "user_zone_id_zone_id_fk" FOREIGN KEY ("zone_id") REFERENCES "public"."zone"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "org_member_roles" ADD CONSTRAINT "org_member_roles_user_role_id_user_roles_id_fk" FOREIGN KEY ("user_role_id") REFERENCES "public"."user_roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_user_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."user_roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_sub_role_id_org_member_roles_id_fk" FOREIGN KEY ("sub_role_id") REFERENCES "public"."org_member_roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "zone" ADD CONSTRAINT "zone_region_id_region_id_fk" FOREIGN KEY ("region_id") REFERENCES "public"."region"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_userId_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "invitation_organizationId_idx" ON "invitation" USING btree ("organization_id");--> statement-breakpoint
@@ -199,19 +182,15 @@ CREATE UNIQUE INDEX "organization_subscription_razorpaySubscriptionId_uidx" ON "
 CREATE INDEX "organization_subscription_status_idx" ON "organization_subscription" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "organization_subscription_planCode_idx" ON "organization_subscription" USING btree ("plan_code");--> statement-breakpoint
 CREATE INDEX "organization_subscription_subscriptionPlanId_idx" ON "organization_subscription" USING btree ("subscription_plan_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "session_token_uidx" ON "session" USING btree ("token");--> statement-breakpoint
+CREATE INDEX "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "session_activeOrganizationId_idx" ON "session" USING btree ("active_organization_id");--> statement-breakpoint
+CREATE INDEX "session_expiresAt_idx" ON "session" USING btree ("expires_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "subscription_plans_code_uidx" ON "subscription_plans" USING btree ("code");--> statement-breakpoint
 CREATE UNIQUE INDEX "subscription_plans_razorpayPlanId_uidx" ON "subscription_plans" USING btree ("razorpay_plan_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "subscription_plans_razorpayAnnualPlanId_uidx" ON "subscription_plans" USING btree ("razorpay_annual_plan_id");--> statement-breakpoint
 CREATE INDEX "subscription_plans_isActive_idx" ON "subscription_plans" USING btree ("is_active");--> statement-breakpoint
 CREATE INDEX "user_role_idx" ON "user" USING btree ("role");--> statement-breakpoint
 CREATE INDEX "user_zoneId_idx" ON "user" USING btree ("zone_id");--> statement-breakpoint
-CREATE INDEX "org_member_roles_userRoleId_idx" ON "org_member_roles" USING btree ("user_role_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "org_member_roles_name_uidx" ON "org_member_roles" USING btree ("name");--> statement-breakpoint
-CREATE INDEX "role_permissions_roleId_idx" ON "role_permissions" USING btree ("role_id");--> statement-breakpoint
-CREATE INDEX "role_permissions_subRoleId_idx" ON "role_permissions" USING btree ("sub_role_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "role_permissions_roleId_base_uidx" ON "role_permissions" USING btree ("role_id") WHERE "role_permissions"."sub_role_id" is null;--> statement-breakpoint
-CREATE UNIQUE INDEX "role_permissions_roleId_subRoleId_uidx" ON "role_permissions" USING btree ("role_id","sub_role_id") WHERE "role_permissions"."sub_role_id" is not null;--> statement-breakpoint
-CREATE UNIQUE INDEX "user_roles_name_uidx" ON "user_roles" USING btree ("name");--> statement-breakpoint
 CREATE UNIQUE INDEX "region_name_uidx" ON "region" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "zone_regionId_idx" ON "zone" USING btree ("region_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "zone_regionId_name_uidx" ON "zone" USING btree ("region_id","name");

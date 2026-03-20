@@ -1,5 +1,5 @@
 {
-  "id": "a056052d-6fcb-4aa2-aa91-a960cc260a27",
+  "id": "59b679d1-98df-4f99-ab76-bb4d8d3c8f6e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -219,15 +219,6 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "invitation_role_org_member_roles_name_fk": {
-          "name": "invitation_role_org_member_roles_name_fk",
-          "tableFrom": "invitation",
-          "tableTo": "org_member_roles",
-          "columnsFrom": ["role"],
-          "columnsTo": ["name"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "invitation_inviter_id_user_id_fk": {
           "name": "invitation_inviter_id_user_id_fk",
           "tableFrom": "invitation",
@@ -350,15 +341,6 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "member_role_org_member_roles_name_fk": {
-          "name": "member_role_org_member_roles_name_fk",
-          "tableFrom": "member",
-          "tableTo": "org_member_roles",
-          "columnsFrom": ["role"],
-          "columnsTo": ["name"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -402,6 +384,14 @@
           "primaryKey": false,
           "notNull": true
         },
+        "business_type": {
+          "name": "business_type",
+          "type": "business_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'GENERAL'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -440,8 +430,7 @@
         },
         "company_type": {
           "name": "company_type",
-          "type": "company_type",
-          "typeSchema": "public",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -819,6 +808,161 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.session": {
+      "name": "session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active_organization_id": {
+          "name": "active_organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "impersonated_by": {
+          "name": "impersonated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "session_token_uidx": {
+          "name": "session_token_uidx",
+          "columns": [
+            {
+              "expression": "token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "session_userId_idx": {
+          "name": "session_userId_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "session_activeOrganizationId_idx": {
+          "name": "session_activeOrganizationId_idx",
+          "columns": [
+            {
+              "expression": "active_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "session_expiresAt_idx": {
+          "name": "session_expiresAt_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "session_user_id_user_id_fk": {
+          "name": "session_user_id_user_id_fk",
+          "tableFrom": "session",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "session_active_organization_id_organization_id_fk": {
+          "name": "session_active_organization_id_organization_id_fk",
+          "tableFrom": "session",
+          "tableTo": "organization",
+          "columnsFrom": ["active_organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.subscription_plans": {
       "name": "subscription_plans",
       "schema": "",
@@ -872,12 +1016,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "razorpay_annual_plan_id": {
-          "name": "razorpay_annual_plan_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "total_count": {
           "name": "total_count",
@@ -970,21 +1108,6 @@
           "columns": [
             {
               "expression": "razorpay_plan_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "subscription_plans_razorpayAnnualPlanId_uidx": {
-          "name": "subscription_plans_razorpayAnnualPlanId_uidx",
-          "columns": [
-            {
-              "expression": "razorpay_annual_plan_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1151,15 +1274,6 @@
         }
       },
       "foreignKeys": {
-        "user_role_user_roles_name_fk": {
-          "name": "user_role_user_roles_name_fk",
-          "tableFrom": "user",
-          "tableTo": "user_roles",
-          "columnsFrom": ["role"],
-          "columnsTo": ["name"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
         "user_zone_id_zone_id_fk": {
           "name": "user_zone_id_zone_id_fk",
           "tableFrom": "user",
@@ -1176,299 +1290,6 @@
           "name": "user_email_unique",
           "nullsNotDistinct": false,
           "columns": ["email"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.org_member_roles": {
-      "name": "org_member_roles",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_role_id": {
-          "name": "user_role_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "org_member_roles_userRoleId_idx": {
-          "name": "org_member_roles_userRoleId_idx",
-          "columns": [
-            {
-              "expression": "user_role_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "org_member_roles_name_uidx": {
-          "name": "org_member_roles_name_uidx",
-          "columns": [
-            {
-              "expression": "name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "org_member_roles_user_role_id_user_roles_id_fk": {
-          "name": "org_member_roles_user_role_id_user_roles_id_fk",
-          "tableFrom": "org_member_roles",
-          "tableTo": "user_roles",
-          "columnsFrom": ["user_role_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "org_member_roles_name_unique": {
-          "name": "org_member_roles_name_unique",
-          "nullsNotDistinct": false,
-          "columns": ["name"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.role_permissions": {
-      "name": "role_permissions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "role_id": {
-          "name": "role_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sub_role_id": {
-          "name": "sub_role_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "permissions": {
-          "name": "permissions",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "role_permissions_roleId_idx": {
-          "name": "role_permissions_roleId_idx",
-          "columns": [
-            {
-              "expression": "role_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "role_permissions_subRoleId_idx": {
-          "name": "role_permissions_subRoleId_idx",
-          "columns": [
-            {
-              "expression": "sub_role_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "role_permissions_roleId_base_uidx": {
-          "name": "role_permissions_roleId_base_uidx",
-          "columns": [
-            {
-              "expression": "role_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"role_permissions\".\"sub_role_id\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "role_permissions_roleId_subRoleId_uidx": {
-          "name": "role_permissions_roleId_subRoleId_uidx",
-          "columns": [
-            {
-              "expression": "role_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "sub_role_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"role_permissions\".\"sub_role_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "role_permissions_role_id_user_roles_id_fk": {
-          "name": "role_permissions_role_id_user_roles_id_fk",
-          "tableFrom": "role_permissions",
-          "tableTo": "user_roles",
-          "columnsFrom": ["role_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "role_permissions_sub_role_id_org_member_roles_id_fk": {
-          "name": "role_permissions_sub_role_id_org_member_roles_id_fk",
-          "tableFrom": "role_permissions",
-          "tableTo": "org_member_roles",
-          "columnsFrom": ["sub_role_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.user_roles": {
-      "name": "user_roles",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "user_roles_name_uidx": {
-          "name": "user_roles_name_uidx",
-          "columns": [
-            {
-              "expression": "name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "user_roles_name_unique": {
-          "name": "user_roles_name_unique",
-          "nullsNotDistinct": false,
-          "columns": ["name"]
         }
       },
       "policies": {},
@@ -1630,24 +1451,15 @@
     }
   },
   "enums": {
-    "public.company_type": {
-      "name": "company_type",
+    "public.business_type": {
+      "name": "business_type",
       "schema": "public",
-      "values": [
-        "PVT_LTD",
-        "LLP",
-        "PROPRIETORSHIP",
-        "PARTNERSHIP",
-        "CORPORATION",
-        "LLC",
-        "NON_PROFIT",
-        "OTHER"
-      ]
+      "values": ["B2B", "B2C", "BOTH", "GENERAL"]
     },
     "public.organization_type": {
       "name": "organization_type",
       "schema": "public",
-      "values": ["SELLER", "BUYER", "MANAGEMENT"]
+      "values": ["SELLER", "DEVELOPER", "MANAGEMENT", "APPLICATION"]
     }
   },
   "schemas": {},

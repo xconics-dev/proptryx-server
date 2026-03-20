@@ -9,7 +9,6 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { orgMemberRole, userRole } from "./rbac";
 import { zone } from "../zone-region";
 import { BusinessType, OrganizationType } from "./enums";
 
@@ -21,9 +20,7 @@ export const user = pgTable(
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").default(false).notNull(),
     image: text("image"),
-    role: text("role").references(() => userRole.name, {
-      onDelete: "set null",
-    }),
+    role: text("role"),
     zoneId: text("zone_id").references(() => zone.id, { onDelete: "set null" }),
     banned: boolean("banned").default(false),
     banReason: text("ban_reason"),
@@ -127,9 +124,7 @@ export const member = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    role: text("role")
-      .notNull()
-      .references(() => orgMemberRole.name),
+    role: text("role").notNull(),
     createdAt: timestamp("created_at").notNull(),
   },
   (table) => [
@@ -147,9 +142,7 @@ export const invitation = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
-    role: text("role")
-      .notNull()
-      .references(() => orgMemberRole.name),
+    role: text("role").notNull(),
     status: text("status").default("pending").notNull(),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -267,10 +260,6 @@ export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   members: many(member),
   invitations: many(invitation),
-  roleDefinition: one(userRole, {
-    fields: [user.role],
-    references: [userRole.name],
-  }),
   zone: one(zone, {
     fields: [user.zoneId],
     references: [zone.id],
@@ -314,10 +303,6 @@ export const memberRelations = relations(member, ({ one }) => ({
     fields: [member.userId],
     references: [user.id],
   }),
-  orgMemberRole: one(orgMemberRole, {
-    fields: [member.role],
-    references: [orgMemberRole.name],
-  }),
 }));
 
 export const invitationRelations = relations(invitation, ({ one }) => ({
@@ -328,10 +313,6 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   user: one(user, {
     fields: [invitation.inviterId],
     references: [user.id],
-  }),
-  orgMemberRole: one(orgMemberRole, {
-    fields: [invitation.role],
-    references: [orgMemberRole.name],
   }),
 }));
 

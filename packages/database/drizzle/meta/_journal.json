@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1773823155889,
-      "tag": "0000_watery_emma_frost",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1773823615291,
-      "tag": "0001_black_justice",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1773898240345,
-      "tag": "0002_light_big_bertha",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1773903697825,
-      "tag": "0003_colossal_joshua_kane",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1773915797906,
-      "tag": "0004_amazing_namorita",
+      "when": 1774007469063,
+      "tag": "0000_shallow_valeria_richards",
       "breakpoints": true
     }
   ]
