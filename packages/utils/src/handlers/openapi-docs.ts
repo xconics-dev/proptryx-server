@@ -12,6 +12,6 @@ export function createOpenApiDocsHandler(options: OpenApiDocsHandlerOptions) {
   return Scalar({
     ...scalarOptions,
     theme: scalarOptions.theme || "purple",
-    url: specUrl,
+    ...(!("sources" in scalarOptions) ? { url: specUrl } : {}),
   });
 }

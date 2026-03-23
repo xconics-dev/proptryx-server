@@ -26,10 +26,24 @@ app.doc("/doc", openApiInfo);
 app.get(
   "/",
   createOpenApiDocsHandler({
-    specUrl: "./doc",
     theme: "purple",
     pageTitle: "Proptryx Gateway Service API",
     hideClientButton: true,
+    sources: [
+      {
+        title: "Gateway",
+        url: "./doc",
+        default: true,
+      },
+      {
+        title: "Auth Service",
+        url: "/api/auth/open-api/generate-schema",
+      },
+      {
+        title: "Kernel Service",
+        url: "/api/kernel/doc",
+      },
+    ],
   })
 );
 
