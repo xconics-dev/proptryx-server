@@ -26,6 +26,7 @@ import {
 } from "./utils";
 import { organizationSubscriptionPlugin } from "../razorpay/subscription";
 import { organizationControlsPlugin } from "./organization";
+import { ensureDefaultOrganizationRoles } from "./rbac";
 import { generateRandomId, generateUID, PasswordUtils } from "@proptryx/utils";
 import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
 
@@ -136,11 +137,16 @@ async function createAuthInstance() {
         schema: {
           organization: { additionalFields: organizationAdditionalFields },
         },
+        organizationHooks: {
+          afterCreateOrganization: async ({ organization }) => {
+            await ensureDefaultOrganizationRoles(db, organization.id);
+          },
+        },
       }),
       organizationControlsPlugin,
       organizationSubscriptionPlugin,
       admin({
-        defaultRole: "admin",
+        defaultRole: "user",
       }),
       allowCustomInputFieldsPlugin,
       customSession(async ({ session, user }) => {
@@ -209,7 +215,12 @@ async function createAuthInstance() {
       user: {
         create: {
           before: async (user) => ({
-            data: { ...user, id: generateUID() },
+            data: {
+              ...user,
+              id: generateUID(),
+              panel: user.panel ?? null,
+              role: user.role ?? "user",
+            },
           }),
         },
       },

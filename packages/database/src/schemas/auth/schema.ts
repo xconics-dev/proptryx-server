@@ -10,7 +10,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { zone } from "../zone-region";
-import { BusinessType, OrganizationType } from "./enums";
+import { AccessPanel, BusinessType, OrganizationType, PermissionAccessLevel } from "./enums";
+import { rbacRole } from "./rbac/schema";
 
 export const user = pgTable(
   "user",
@@ -21,6 +22,7 @@ export const user = pgTable(
     emailVerified: boolean("email_verified").default(false).notNull(),
     image: text("image"),
     role: text("role"),
+    panel: AccessPanel("panel"),
     zoneId: text("zone_id").references(() => zone.id, { onDelete: "set null" }),
     banned: boolean("banned").default(false),
     banReason: text("ban_reason"),
@@ -33,7 +35,11 @@ export const user = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("user_role_idx").on(table.role), index("user_zoneId_idx").on(table.zoneId)]
+  (table) => [
+    index("user_role_idx").on(table.role),
+    index("user_panel_idx").on(table.panel),
+    index("user_zoneId_idx").on(table.zoneId),
+  ]
 );
 
 export const account = pgTable(
@@ -125,11 +131,13 @@ export const member = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     role: text("role").notNull(),
+    panel: AccessPanel("panel").default("company").notNull(),
     createdAt: timestamp("created_at").notNull(),
   },
   (table) => [
     index("member_organizationId_idx").on(table.organizationId),
     index("member_userId_idx").on(table.userId),
+    index("member_panel_idx").on(table.panel),
     index("member_organizationId_role_idx").on(table.organizationId, table.role),
   ]
 );
@@ -288,6 +296,7 @@ export const organizationRelations = relations(organization, ({ many, one }) => 
   activeSessions: many(session),
   members: many(member),
   invitations: many(invitation),
+  roles: many(rbacRole),
   subscription: one(organizationSubscription, {
     fields: [organization.id],
     references: [organizationSubscription.organizationId],

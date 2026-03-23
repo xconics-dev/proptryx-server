@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1774007469063,
-      "tag": "0000_shallow_valeria_richards",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1774096804501,
-      "tag": "0001_next_donald_blake",
+      "when": 1774243569561,
+      "tag": "0000_wandering_firebird",
       "breakpoints": true
     }
   ]

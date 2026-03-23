@@ -9,7 +9,12 @@ export const userFields: UserFields[] = [
   {
     name: "role",
     type: "string",
-    input: true,
+    input: false,
+  },
+  {
+    name: "panel",
+    type: "string",
+    input: false,
   },
   {
     name: "zoneId",

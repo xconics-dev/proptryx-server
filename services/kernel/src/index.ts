@@ -14,7 +14,7 @@ import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { openApiInfo } from "./config/openapi";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { clientGroup } from "@/routers/client/handler";
+import { companyGroup } from "@/routers/company";
 import type { AppBindings } from "@/types/app";
 
 const app = new OpenAPIHono<AppBindings>();
@@ -38,7 +38,7 @@ app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
 
 // @ts-ignore
-const routes = app.route("/client", clientGroup);
+const routes = app.route("/company", companyGroup);
 
 /* openapi */
 app.doc("/doc", openApiInfo);

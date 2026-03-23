@@ -3,10 +3,12 @@ import {
   getDB,
   member,
   organization as authOrganizationTable,
+  rbacRole,
+  rbacRolePermission,
   type session as authSessionTable,
   type user as authUserTable,
 } from "@proptryx/database";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 import type { Context, ContextVariableMap, MiddlewareHandler } from "hono";
 import { env } from "../env";
@@ -18,10 +20,34 @@ export const AUTH_CONTEXT_KEY = "auth" as const;
 export type BetterAuthDbUserRecord = InferSelectModel<typeof authUserTable>;
 export type BetterAuthDbSessionRecord = InferSelectModel<typeof authSessionTable>;
 export type BetterAuthDbOrganizationRecord = InferSelectModel<typeof authOrganizationTable>;
+export type BetterAuthDbMemberRecord = InferSelectModel<typeof member>;
+export type BetterAuthDbRoleRecord = InferSelectModel<typeof rbacRole>;
+export type BetterAuthDbRolePermissionRecord = InferSelectModel<typeof rbacRolePermission>;
 
 export type BetterAuthSessionRecord = BetterAuthDbSessionRecord & Record<string, unknown>;
 export type BetterAuthUserRecord = BetterAuthDbUserRecord & Record<string, unknown>;
 export type BetterAuthOrganizationRecord = BetterAuthDbOrganizationRecord & Record<string, unknown>;
+export type BetterAuthMemberRecord = BetterAuthDbMemberRecord & Record<string, unknown>;
+export type BetterAuthRoleRecord = BetterAuthDbRoleRecord & Record<string, unknown>;
+export type BetterAuthRolePermissionRecord = BetterAuthDbRolePermissionRecord &
+  Record<string, unknown>;
+
+export type BetterAuthPermissionActionMap = Record<string, boolean>;
+
+export interface BetterAuthResolvedPermission {
+  accessLevel: BetterAuthRolePermissionRecord["accessLevel"];
+  actions: BetterAuthPermissionActionMap;
+}
+
+export interface BetterAuthAuthorizationContext {
+  panel:
+    | BetterAuthRoleRecord["panel"]
+    | BetterAuthMemberRecord["panel"]
+    | BetterAuthUserRecord["panel"];
+  role: string | null;
+  roleId: string | null;
+  permissions: Record<string, BetterAuthResolvedPermission>;
+}
 
 export interface BetterAuthSessionPayload<
   TUser extends BetterAuthUserRecord = BetterAuthUserRecord,
@@ -39,7 +65,7 @@ export interface BetterAuthContextEntityOptions {
   hasOrganization?: boolean;
 }
 
-export type BetterAuthRequiredEntity = "user" | "session" | "organization";
+export type BetterAuthRequiredEntity = "user" | "session" | "organization" | "member";
 
 interface ResolvedAuthContextEntityOptions {
   data: boolean;
@@ -57,7 +83,9 @@ export interface BetterAuthContextValue<
   user: TPayload["user"] | null;
   session: TPayload["session"] | null;
   organization: BetterAuthOrganizationRecord | null;
+  member: BetterAuthMemberRecord | null;
   hasOrganization: boolean;
+  authorization: BetterAuthAuthorizationContext;
 }
 
 export type BetterAuthVariables<
@@ -93,9 +121,15 @@ type AuthSessionCacheRecord = {
   context: SerializableAuthContext;
 };
 
+type AuthorizationCacheRecord = {
+  authorization: BetterAuthAuthorizationContext;
+  expiresAt: number;
+};
+
 type OrganizationResolution = {
   organization: BetterAuthOrganizationRecord | null;
   hasOrganization: boolean;
+  member: BetterAuthMemberRecord | null;
 };
 
 type AuthSessionFetchOutcome =
@@ -117,8 +151,11 @@ const DEFAULT_RETRYABLE_STATUS_CODES = [408, 425, 429, 500, 502, 503, 504] as co
 const DEFAULT_SKIP_PATHS = ["/health", "/favicon.ico", "/favicon.png"];
 const DEFAULT_CACHE_TTL_MS = 3_000;
 const DEFAULT_CACHE_MAX_ENTRIES = 2_000;
+const DEFAULT_AUTHORIZATION_CACHE_TTL_MS = 60_000;
+const DEFAULT_AUTHORIZATION_CACHE_MAX_ENTRIES = 2_000;
 
 const authSessionCache = new Map<string, AuthSessionCacheRecord>();
+const authorizationCache = new Map<string, AuthorizationCacheRecord>();
 const authContextResolutionInFlight = new Map<string, Promise<AuthContextResolutionOutcome>>();
 
 type AuthUpstreamCircuitState = {
@@ -139,7 +176,8 @@ function normalizeRequiredEntities(requiredEntities: BetterAuthRequiredEntity[] 
     if (
       requiredEntity === "user" ||
       requiredEntity === "session" ||
-      requiredEntity === "organization"
+      requiredEntity === "organization" ||
+      requiredEntity === "member"
     ) {
       uniqueRequiredEntities.add(requiredEntity);
     }
@@ -182,7 +220,14 @@ function createUnauthenticatedContext<
     user: null,
     session: null,
     organization: null,
+    member: null,
     hasOrganization: false,
+    authorization: {
+      panel: null,
+      role: null,
+      roleId: null,
+      permissions: {},
+    },
   };
 }
 
@@ -346,6 +391,7 @@ function requiredEntityUnauthorizedResponse(c: Context, requiredEntity: BetterAu
     user: "Required user access",
     session: "Required session access",
     organization: "Required organization access",
+    member: "Required organization member access",
   };
 
   return c.json(
@@ -373,6 +419,10 @@ function findMissingRequiredEntity(
     }
 
     if (requiredEntity === "organization" && !context.organization) {
+      return requiredEntity;
+    }
+
+    if (requiredEntity === "member" && !context.member) {
       return requiredEntity;
     }
   }
@@ -413,6 +463,24 @@ function pruneMemoryCache(maxEntries: number) {
     }
 
     authSessionCache.delete(next.value);
+  }
+}
+
+function pruneAuthorizationMemoryCache(maxEntries: number) {
+  if (authorizationCache.size <= maxEntries) {
+    return;
+  }
+
+  const overflow = authorizationCache.size - maxEntries;
+  const keyIterator = authorizationCache.keys();
+
+  for (let index = 0; index < overflow; index += 1) {
+    const next = keyIterator.next();
+    if (next.done) {
+      return;
+    }
+
+    authorizationCache.delete(next.value);
   }
 }
 
@@ -518,6 +586,113 @@ async function setCachedAuthContextInRedis(
     );
   } catch {
     // Ignore Redis cache write errors to avoid impacting request flow.
+  }
+}
+
+function createAuthorizationCacheKey(options: {
+  panel: string | null;
+  role: string | null;
+  organizationId: string | null;
+}) {
+  if (!options.panel || !options.role) {
+    return null;
+  }
+
+  return `${AUTH_MIDDLEWARE_REDIS_NAMESPACE}:rbac:${hashIdentity(
+    `${options.panel}|${options.role}|${options.organizationId ?? "global"}`
+  )}`;
+}
+
+function getCachedAuthorizationFromMemory(cacheKey: string): BetterAuthAuthorizationContext | null {
+  const cached = authorizationCache.get(cacheKey);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    authorizationCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.authorization;
+}
+
+function setCachedAuthorizationInMemory(
+  cacheKey: string,
+  authorization: BetterAuthAuthorizationContext,
+  ttlMs = DEFAULT_AUTHORIZATION_CACHE_TTL_MS,
+  maxEntries = DEFAULT_AUTHORIZATION_CACHE_MAX_ENTRIES
+) {
+  if (ttlMs <= 0) {
+    return;
+  }
+
+  authorizationCache.set(cacheKey, {
+    authorization,
+    expiresAt: Date.now() + ttlMs,
+  });
+  pruneAuthorizationMemoryCache(maxEntries);
+}
+
+async function readCachedAuthorizationFromRedis(
+  cacheKey: string
+): Promise<BetterAuthAuthorizationContext | null> {
+  const client = getReadyRedisClient();
+  if (!client) {
+    return null;
+  }
+
+  try {
+    const raw = await client.get(cacheKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as {
+      expiresAt?: number;
+      authorization?: BetterAuthAuthorizationContext;
+    };
+
+    if (typeof parsed.expiresAt !== "number" || parsed.expiresAt <= Date.now()) {
+      void client.del(cacheKey);
+      return null;
+    }
+
+    if (!parsed.authorization || typeof parsed.authorization !== "object") {
+      void client.del(cacheKey);
+      return null;
+    }
+
+    return parsed.authorization;
+  } catch {
+    return null;
+  }
+}
+
+async function setCachedAuthorizationInRedis(
+  cacheKey: string,
+  authorization: BetterAuthAuthorizationContext,
+  ttlMs = DEFAULT_AUTHORIZATION_CACHE_TTL_MS
+) {
+  const client = getReadyRedisClient();
+  if (!client || ttlMs <= 0) {
+    return;
+  }
+
+  const ttlSeconds = Math.max(1, Math.ceil(ttlMs / 1_000));
+
+  try {
+    await client.set(
+      cacheKey,
+      JSON.stringify({
+        authorization,
+        expiresAt: Date.now() + ttlSeconds * 1_000,
+      }),
+      "EX",
+      ttlSeconds
+    );
+  } catch {
+    // Ignore Redis cache write errors.
   }
 }
 
@@ -720,9 +895,20 @@ async function resolveFreshAuthContext(options: {
     includeHasOrganization: options.entityOptions.hasOrganization,
   });
 
+  const authorization = await resolveAuthorizationContext({
+    user: payload.user,
+    member: organizationResolution.member,
+    activeOrganizationId: normalizeId(payload.session.activeOrganizationId),
+  });
+
   return {
     unavailable: false,
-    context: buildHydratedAuthContext(payload, options.entityOptions, organizationResolution),
+    context: buildHydratedAuthContext(
+      payload,
+      options.entityOptions,
+      organizationResolution,
+      authorization
+    ),
   };
 }
 
@@ -732,10 +918,11 @@ async function resolveOrganizationContext(options: {
   includeOrganization: boolean;
   includeHasOrganization: boolean;
 }): Promise<OrganizationResolution> {
-  if (!options.userId || (!options.includeOrganization && !options.includeHasOrganization)) {
+  if (!options.userId) {
     return {
       organization: null,
       hasOrganization: false,
+      member: null,
     };
   }
 
@@ -746,16 +933,18 @@ async function resolveOrganizationContext(options: {
     return {
       organization: null,
       hasOrganization: false,
+      member: null,
     };
   }
 
   try {
     let hasOrganization = false;
     let organization: BetterAuthOrganizationRecord | null = null;
+    let memberRecord: BetterAuthMemberRecord | null = null;
 
     if (options.activeOrganizationId) {
       const [activeMembership] = await db
-        .select({ organizationId: member.organizationId })
+        .select()
         .from(member)
         .where(
           and(
@@ -767,6 +956,7 @@ async function resolveOrganizationContext(options: {
 
       if (activeMembership) {
         hasOrganization = true;
+        memberRecord = activeMembership as BetterAuthMemberRecord;
 
         if (options.includeOrganization) {
           const [organizationRecord] = await db
@@ -799,11 +989,135 @@ async function resolveOrganizationContext(options: {
     return {
       organization,
       hasOrganization,
+      member: memberRecord,
     };
   } catch {
     return {
       organization: null,
       hasOrganization: false,
+      member: null,
+    };
+  }
+}
+
+async function resolveAuthorizationContext(options: {
+  user: BetterAuthSessionPayload["user"];
+  member: BetterAuthMemberRecord | null;
+  activeOrganizationId: string | null;
+}): Promise<BetterAuthAuthorizationContext> {
+  const memberRole = typeof options.member?.role === "string" ? options.member.role : null;
+  const memberPanel = options.member?.panel ?? null;
+  const userRole = typeof options.user.role === "string" ? options.user.role : null;
+  const userPanel = typeof options.user.panel === "string" ? options.user.panel : null;
+  const organizationRoleOrganizationId =
+    options.activeOrganizationId ?? options.member?.organizationId ?? null;
+  const role = memberRole ?? userRole;
+  const panel = memberRole ? memberPanel : userPanel;
+  const authorizationCacheKey = createAuthorizationCacheKey({
+    panel,
+    role,
+    organizationId: memberRole ? organizationRoleOrganizationId : null,
+  });
+
+  if (!role) {
+    return {
+      panel,
+      role: null,
+      roleId: null,
+      permissions: {},
+    };
+  }
+
+  let db;
+  try {
+    db = getDB();
+  } catch {
+    return {
+      panel,
+      role,
+      roleId: null,
+      permissions: {},
+    };
+  }
+
+  if (memberRole && !organizationRoleOrganizationId) {
+    return {
+      panel,
+      role,
+      roleId: null,
+      permissions: {},
+    };
+  }
+
+  if (authorizationCacheKey) {
+    const memoryCachedAuthorization = getCachedAuthorizationFromMemory(authorizationCacheKey);
+    if (memoryCachedAuthorization) {
+      return memoryCachedAuthorization;
+    }
+
+    const redisCachedAuthorization = await readCachedAuthorizationFromRedis(authorizationCacheKey);
+    if (redisCachedAuthorization) {
+      setCachedAuthorizationInMemory(authorizationCacheKey, redisCachedAuthorization);
+      return redisCachedAuthorization;
+    }
+  }
+
+  try {
+    const roleWhereClause = memberRole
+      ? and(
+          eq(rbacRole.panel, "company"),
+          eq(rbacRole.slug, memberRole),
+          eq(rbacRole.organizationId, organizationRoleOrganizationId as string)
+        )
+      : and(
+          eq(rbacRole.panel, "proptryx"),
+          eq(rbacRole.slug, userRole ?? ""),
+          isNull(rbacRole.organizationId)
+        );
+
+    const [roleRecord] = await db.select().from(rbacRole).where(roleWhereClause).limit(1);
+
+    if (!roleRecord) {
+      return {
+        panel,
+        role,
+        roleId: null,
+        permissions: {},
+      };
+    }
+
+    const permissionRows = await db
+      .select()
+      .from(rbacRolePermission)
+      .where(eq(rbacRolePermission.roleId, roleRecord.id));
+
+    const authorization = {
+      panel: roleRecord.panel ?? panel,
+      role,
+      roleId: roleRecord.id,
+      permissions: Object.fromEntries(
+        permissionRows.map((permissionRow) => [
+          permissionRow.resource,
+          {
+            accessLevel: permissionRow.accessLevel,
+            actions: permissionRow.actions ?? {},
+          },
+        ])
+      ),
+    };
+
+    if (authorizationCacheKey) {
+      setCachedAuthorizationInMemory(authorizationCacheKey, authorization);
+      void setCachedAuthorizationInRedis(authorizationCacheKey, authorization);
+    }
+
+    return authorization;
+  } catch {
+    return {
+      panel,
+      role,
+      roleId: null,
+      permissions: {},
     };
   }
 }
@@ -811,7 +1125,8 @@ async function resolveOrganizationContext(options: {
 function buildHydratedAuthContext(
   payload: BetterAuthSessionPayload,
   entityOptions: ResolvedAuthContextEntityOptions,
-  organizationResolution: OrganizationResolution
+  organizationResolution: OrganizationResolution,
+  authorization: BetterAuthAuthorizationContext
 ): SerializableAuthContext {
   const hasOrganization = entityOptions.hasOrganization
     ? organizationResolution.hasOrganization
@@ -823,7 +1138,9 @@ function buildHydratedAuthContext(
     user: entityOptions.user ? payload.user : null,
     session: entityOptions.session ? payload.session : null,
     organization: entityOptions.organization ? organizationResolution.organization : null,
+    member: organizationResolution.member,
     hasOrganization,
+    authorization,
   };
 }
 
