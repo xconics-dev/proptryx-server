@@ -37,7 +37,6 @@ app.get(
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
 
-// @ts-ignore
 const routes = app.route("/company", companyGroup);
 
 /* openapi */

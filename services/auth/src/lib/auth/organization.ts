@@ -1,26 +1,7 @@
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
 import { env } from "@/config/env";
-import { gstCheckBodySchema, gstInfoResponseSchema } from "@/schema";
-
-// const signedInSessionMiddleware = createAuthMiddleware(
-//   {
-//     use: [sessionMiddleware],
-//   },
-//   async (ctx) => {
-//     const session = ctx.context.session as { user?: { id?: string } } | undefined;
-
-//     if (!session?.user?.id) {
-//       throw new APIError("UNAUTHORIZED", {
-//         message: "Authentication required.",
-//       });
-//     }
-
-//     return {
-//       session,
-//     };
-//   }
-// );
+import { gstCheckBodySchema, gstInfoResponseSchema } from "@proptryx/database";
 
 const gstCheckEndpoint = createAuthEndpoint(
   "/organization/gst-check",

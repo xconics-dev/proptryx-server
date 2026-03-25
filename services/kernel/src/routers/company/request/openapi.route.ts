@@ -1,6 +1,7 @@
-import { z } from "zod";
 import { DATABASE_RESOURCES } from "@proptryx/database";
 import {
+  createApiJsonBody,
+  ApiNotFoundOpenApi,
   createApiSuccessResponse,
   createOperationalRateLimit,
   createResourceRbacGuards,
@@ -8,6 +9,7 @@ import {
   IdStringParamSchema,
 } from "@proptryx/utils";
 import { createKernelRoute } from "@/config/route";
+import { companyRequestCreateSchema, companyRequestSchema } from "./schema";
 
 const tags = ["Company Request Operations"];
 
@@ -20,15 +22,6 @@ const companyMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "company-methods",
 });
 
-const companyRequestGetResponseSchema = z.object({
-  requestedCompanyRequestId: z.string(),
-  permission: z.object({
-    resource: z.literal(DATABASE_RESOURCES.company_request),
-    action: z.literal("get"),
-    accessLevel: z.enum(["company", "user", "all"]).nullable(),
-  }),
-});
-
 export const get = createKernelRoute({
   method: "get",
   path: "/{id}",
@@ -39,6 +32,21 @@ export const get = createKernelRoute({
     params: IdStringParamSchema,
   },
   responses: {
-    200: createApiSuccessResponse(z.any(), "Company request fetched successfully"),
+    404: ApiNotFoundOpenApi,
+    200: createApiSuccessResponse(companyRequestSchema, "Company request fetched successfully"),
+  },
+});
+
+export const create = createKernelRoute({
+  method: "post",
+  path: "/",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("create")],
+  summary: "Create a new company request",
+  request: {
+    body: createApiJsonBody(companyRequestCreateSchema),
+  },
+  responses: {
+    201: createApiSuccessResponse(companyRequestSchema, "Company request created successfully"),
   },
 });

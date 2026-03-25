@@ -1,21 +1,17 @@
-import { z } from "zod";
-
-export const IdNumberParamSchema = z.object({
-  id: z.number().int().min(1).pipe(z.coerce.number()),
-});
+import { z } from "@hono/zod-openapi";
 
 export const IdStringParamSchema = z.object({
   id: z.string().min(1),
 });
 
-export const ApiErrorSchema = z.object({
+const ApiErrorSchema = z.object({
   success: z.literal(false),
   error: z.string(),
   message: z.string(),
   details: z.unknown().optional(),
 });
 
-export const ApiValidationErrorSchema = z.object({
+const ApiValidationErrorSchema = z.object({
   success: z.literal(false),
   error: z.literal("ValidationError"),
   message: z.string(),
@@ -32,17 +28,14 @@ export const ApiValidationErrorSchema = z.object({
   }),
 });
 
-export function createApiSuccessSchema<TSchema extends z.ZodTypeAny>(dataSchema: TSchema) {
+function createApiSuccessSchema<TSchema extends z.ZodTypeAny>(dataSchema: TSchema) {
   return z.object({
     success: z.literal(true),
     data: dataSchema,
   });
 }
 
-export function createOpenApiJsonResponse<TSchema extends z.ZodTypeAny>(
-  schema: TSchema,
-  description: string
-) {
+function createApiJsonResponse<TSchema extends z.ZodTypeAny>(schema: TSchema, description: string) {
   return {
     description,
     content: {
@@ -53,15 +46,25 @@ export function createOpenApiJsonResponse<TSchema extends z.ZodTypeAny>(
   };
 }
 
-export function createApiErrorResponse(description: string) {
-  return createOpenApiJsonResponse(ApiErrorSchema, description);
+export function createApiJsonBody<TSchema extends z.ZodTypeAny>(schema: TSchema) {
+  return {
+    content: {
+      "application/json": {
+        schema,
+      },
+    },
+  } as const;
+}
+
+function createApiErrorResponse(description: string) {
+  return createApiJsonResponse(ApiErrorSchema, description);
 }
 
 export function createApiSuccessResponse<TSchema extends z.ZodTypeAny>(
   dataSchema: TSchema,
   description: string
 ) {
-  return createOpenApiJsonResponse(createApiSuccessSchema(dataSchema), description);
+  return createApiJsonResponse(createApiSuccessSchema(dataSchema), description);
 }
 
 export function createSuccessResponse<TData>(data: TData) {
@@ -84,67 +87,18 @@ export function createErrorResponse<TDetails = unknown>(options: {
   };
 }
 
-export const ZodHttpErrorSchema = z
-  .object({
-    success: z.literal(false),
-    error: z.object({
-      issues: z.array(
-        z.object({
-          received: z.string(),
-          code: z.string(),
-          path: z.array(z.union([z.string(), z.number()])),
-          message: z.string(),
-        })
-      ),
-      name: z.string(),
-    }),
-  })
-  .partial()
-  .optional();
+export function createInternalServerErrorResponse<TDetails = unknown>(
+  message = "Internal server error",
+  details?: TDetails
+) {
+  return createErrorResponse({
+    error: "Internal Server Error",
+    message,
+    details,
+  });
+}
 
-export const ZodNotFoundSchema = z.object({
-  success: z.literal(false),
-  error: z.object({
-    message: z.string(),
-  }),
-});
-
-export const ZodConflictSchema = z.object({
-  success: z.literal(false),
-  error: z.object({
-    name: z.string(),
-    message: z.string(),
-  }),
-});
-
-export const ZodBadRequestOpenApi = {
-  description: "Validation error",
-  content: {
-    "application/json": {
-      schema: ZodHttpErrorSchema,
-    },
-  },
-};
-
-export const ZodNotFoundOpenApi = {
-  description: "Resource not found",
-  content: {
-    "application/json": {
-      schema: ZodNotFoundSchema,
-    },
-  },
-};
-
-export const ZodConflictOpenApi = {
-  description: "Conflict error",
-  content: {
-    "application/json": {
-      schema: ZodConflictSchema,
-    },
-  },
-};
-
-export const ApiBadRequestOpenApi = createOpenApiJsonResponse(
+export const ApiBadRequestOpenApi = createApiJsonResponse(
   ApiValidationErrorSchema,
   "Validation error"
 );
@@ -154,7 +108,5 @@ export const ApiUnauthorizedOpenApi = createApiErrorResponse("Unauthorized");
 export const ApiForbiddenOpenApi = createApiErrorResponse("Forbidden");
 
 export const ApiNotFoundOpenApi = createApiErrorResponse("Resource not found");
-
-export const ApiConflictOpenApi = createApiErrorResponse("Conflict error");
 
 export const ApiInternalServerErrorOpenApi = createApiErrorResponse("Internal server error");

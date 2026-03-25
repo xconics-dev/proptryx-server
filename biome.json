@@ -16,7 +16,8 @@
       "suspicious": {
         "noConsole": "off",
         "noExplicitAny": "warn",
-        "noImplicitAnyLet": "off"
+        "noImplicitAnyLet": "off",
+        "noTsIgnore": "off"
       }
     }
   },

@@ -22,6 +22,7 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
+    "@hono/zod-openapi": "^1.2.2",
     "@hono/node-server": "^1.19.11",
     "@proptryx/database": "workspace:*",
     "@proptryx/static": "workspace:*",

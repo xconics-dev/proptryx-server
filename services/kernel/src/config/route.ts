@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import type { RouteConfig } from "@hono/zod-openapi";
 import {
   ApiBadRequestOpenApi,
   ApiForbiddenOpenApi,
@@ -15,13 +16,19 @@ const DEFAULT_ROUTE_RESPONSES = {
   500: ApiInternalServerErrorOpenApi,
 } as const;
 
-export const createKernelRoute: typeof createRoute = ((config: Parameters<typeof createRoute>[0]) =>
-  createRoute({
+export function createKernelRoute<
+  P extends string,
+  R extends Omit<RouteConfig, "path"> & {
+    path: P;
+  },
+>(config: R) {
+  return createRoute({
     ...config,
     responses: {
       ...DEFAULT_ROUTE_RESPONSES,
       ...config.responses,
     },
-  })) as typeof createRoute;
+  });
+}
 
 export { DEFAULT_ROUTE_RESPONSES };
