@@ -29,7 +29,7 @@ import { organizationControlsPlugin } from "./organization";
 import { ensureDefaultOrganizationRoles } from "./rbac";
 import { generateRandomId, generateUID, PasswordUtils } from "@proptryx/utils";
 import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
-import { count, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createAuthMiddleware } from "better-auth/api";
 
 // ─────────────────────────────────────────────
@@ -44,6 +44,27 @@ const {
   isProduction,
   trustedOrigins,
 } = getBetterAuthConfigState();
+
+const AUTH_RESPONSE_ENRICH_PATHS = new Set([
+  "/sign-in/email",
+  "/sign-up/email",
+  "/sign-in/email-otp",
+  "/two-factor/verify-otp",
+  "/two-factor/verify-totp",
+]);
+
+function getReturnedUserId(returned: unknown): string | null {
+  if (!returned || typeof returned !== "object" || !("user" in returned)) {
+    return null;
+  }
+
+  const maybeUser = returned.user;
+  if (!maybeUser || typeof maybeUser !== "object" || !("id" in maybeUser)) {
+    return null;
+  }
+
+  return typeof maybeUser.id === "string" ? maybeUser.id : null;
+}
 
 // ─────────────────────────────────────────────
 // Auth instance factory
@@ -244,50 +265,56 @@ async function createAuthInstance() {
     hooks: {
       // Enhance the returned user object
       after: createAuthMiddleware(async (ctx) => {
-        const path = ctx.path;
+        if (!AUTH_RESPONSE_ENRICH_PATHS.has(ctx.path)) {
+          return ctx.context.returned;
+        }
+
         const returned = ctx.context.returned;
-        const isAuthPath =
-          path === "/sign-in/email" ||
-          path === "/sign-up/email" ||
-          path === "/sign-in/email-otp" ||
-          path === "/two-factor/verify-otp" ||
-          path === "/two-factor/verify-totp";
+        const userId = getReturnedUserId(returned);
 
-        if (
-          isAuthPath &&
-          returned &&
-          typeof returned === "object" &&
-          "user" in returned &&
-          returned.user &&
-          typeof returned.user === "object" &&
-          "id" in returned.user
-        ) {
-          const userId = returned.user.id as string;
+        if (!userId) {
+          return returned;
+        }
 
-          const [user] = await db
-            .select({
-              id: schema.user.id,
-              name: schema.user.name,
-              email: schema.user.email,
-              role: schema.user.role,
-              emailVerified: schema.user.emailVerified,
-              memberId: schema.member.id,
-              banned: schema.user.banned,
-              banReason: schema.user.banReason,
-              zoneId: schema.user.zoneId,
-              panel: schema.user.panel,
-            })
-            .from(schema.user)
-            .leftJoin(schema.member, eq(schema.user.id, schema.member.userId))
-            .where(eq(schema.user.id, userId))
-            .limit(1);
+        try {
+          const [userRows, membershipRows] = await Promise.all([
+            db
+              .select({
+                id: schema.user.id,
+                name: schema.user.name,
+                email: schema.user.email,
+                role: schema.user.role,
+                emailVerified: schema.user.emailVerified,
+                banned: schema.user.banned,
+                banReason: schema.user.banReason,
+                zoneId: schema.user.zoneId,
+                panel: schema.user.panel,
+              })
+              .from(schema.user)
+              .where(eq(schema.user.id, userId))
+              .limit(1),
+            db
+              .select({ id: schema.member.id })
+              .from(schema.member)
+              .where(eq(schema.member.userId, userId))
+              .limit(1),
+          ]);
 
-          if (user) {
-            returned.user = {
+          const user = userRows[0];
+          const membership = membershipRows[0];
+
+          if (user && returned && typeof returned === "object") {
+            (returned as { user?: unknown }).user = {
               ...user,
-              hasOrganization: !!user.memberId,
+              hasOrganization: Boolean(membership),
             };
           }
+        } catch (error) {
+          logger.warn("Skipping auth response enrichment", {
+            path: ctx.path,
+            userId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         return returned;

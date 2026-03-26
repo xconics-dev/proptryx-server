@@ -101,6 +101,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      GST_API_KEY: ${GST_API_KEY}
     healthcheck:
       test:
         [

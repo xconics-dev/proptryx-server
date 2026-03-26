@@ -119,6 +119,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      GST_API_KEY: ${GST_API_KEY}
     healthcheck:
       test:
         ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${KERNEL_PORT}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
