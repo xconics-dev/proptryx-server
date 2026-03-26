@@ -109,8 +109,8 @@ export const organization = pgTable(
     email: text("email"),
     gstNumber: text("gst_number"),
     phoneNumber: text("phone_number"),
-    industry: text("industry"),
-    companyType: text("company_type"),
+    industry: text("industry"), // IT, Manufacturing, etc.
+    companyType: text("company_type"), // Pvt Ltd, LLP, etc.
     isActive: boolean("is_active").default(false).notNull(),
     razorpayCustomerId: text("razorpay_customer_id"),
   },

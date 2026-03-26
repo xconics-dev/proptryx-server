@@ -29,6 +29,8 @@ import { organizationControlsPlugin } from "./organization";
 import { ensureDefaultOrganizationRoles } from "./rbac";
 import { generateRandomId, generateUID, PasswordUtils } from "@proptryx/utils";
 import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
+import { count, eq } from "drizzle-orm";
+import { createAuthMiddleware } from "better-auth/api";
 
 // ─────────────────────────────────────────────
 // Config — resolved once at module load
@@ -152,6 +154,7 @@ async function createAuthInstance() {
       customSession(async ({ session, user }) => {
         const userWithTags = user as typeof user & { zoneId?: string | null };
         const location = await resolveUserZone(userWithTags.zoneId);
+
         return {
           session,
           user: {
@@ -237,6 +240,58 @@ async function createAuthInstance() {
       ipAddress: {
         ipAddressHeaders: ["x-forwarded-for", "x-real-ip"],
       },
+    },
+    hooks: {
+      // Enhance the returned user object
+      after: createAuthMiddleware(async (ctx) => {
+        const path = ctx.path;
+        const returned = ctx.context.returned;
+        const isAuthPath =
+          path === "/sign-in/email" ||
+          path === "/sign-up/email" ||
+          path === "/sign-in/email-otp" ||
+          path === "/two-factor/verify-otp" ||
+          path === "/two-factor/verify-totp";
+
+        if (
+          isAuthPath &&
+          returned &&
+          typeof returned === "object" &&
+          "user" in returned &&
+          returned.user &&
+          typeof returned.user === "object" &&
+          "id" in returned.user
+        ) {
+          const userId = returned.user.id as string;
+
+          const [user] = await db
+            .select({
+              id: schema.user.id,
+              name: schema.user.name,
+              email: schema.user.email,
+              role: schema.user.role,
+              emailVerified: schema.user.emailVerified,
+              memberId: schema.member.id,
+              banned: schema.user.banned,
+              banReason: schema.user.banReason,
+              zoneId: schema.user.zoneId,
+              panel: schema.user.panel,
+            })
+            .from(schema.user)
+            .leftJoin(schema.member, eq(schema.user.id, schema.member.userId))
+            .where(eq(schema.user.id, userId))
+            .limit(1);
+
+          if (user) {
+            returned.user = {
+              ...user,
+              hasOrganization: !!user.memberId,
+            };
+          }
+        }
+
+        return returned;
+      }),
     },
   });
 }
