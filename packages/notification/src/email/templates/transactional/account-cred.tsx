@@ -304,7 +304,7 @@ export const AccountCredEmail = ({
                       You are receiving this email because your account has sign-in activity. This
                       also indicates that you agree to our{" "}
                       <Link href={metadata.termsAndConditionsUrl} style={footerLink}>
-                        Terms of Use
+                        Terms of Service
                       </Link>{" "}
                       adn our policies, including{" "}
                       <Link href={metadata.privacyPolicyOccupier} style={footerLink}>

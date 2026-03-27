@@ -275,7 +275,7 @@ export const PasswordResetOtpEmail = ({ otpCode, previewText, codeExpiryTime }: 
                       You are receiving this mail because you registered on Proptryx. This also
                       shows that you agree to our{" "}
                       <Link href={metadata.termsAndConditionsUrl} style={footerLink}>
-                        Terms of Use
+                        Terms of Service
                       </Link>{" "}
                       adn our policies, including{" "}
                       <Link href={metadata.privacyPolicyOccupier} style={footerLink}>
