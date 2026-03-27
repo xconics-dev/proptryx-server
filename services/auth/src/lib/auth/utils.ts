@@ -5,6 +5,19 @@ import { env } from "@/config/env";
 import { eq } from "drizzle-orm";
 import { type OrgFields, orgFields } from "./fields/org";
 
+const AUTH_USER_STATUS_REDIS_PREFIX = "proptryx-auth-user-status:";
+const AUTH_USER_STATUS_REDIS_TTL_SECONDS = 30;
+
+export type CachedAuthUserStatus = {
+  id: string;
+  banned: boolean;
+  banReason: string | null;
+  role: string | null;
+  panel: string | null;
+  zoneId: string | null;
+  updatedAt: string;
+};
+
 function getTrustedOriginHosts(origins: string[]) {
   return Array.from(
     new Set(
@@ -133,5 +146,36 @@ export function resolveEmailExistsCache() {
   return {
     get: (email: string) => redis.get(`${PREFIX}${email}`),
     set: (email: string, value: "1" | "0") => redis.set(`${PREFIX}${email}`, value, "EX", 60),
+  };
+}
+
+export function resolveAuthUserStatusCache() {
+  const redis = getRedisClient();
+
+  return {
+    async get(userId: string): Promise<CachedAuthUserStatus | null> {
+      const raw = await redis.get(`${AUTH_USER_STATUS_REDIS_PREFIX}${userId}`);
+      if (!raw) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(raw) as CachedAuthUserStatus;
+      } catch {
+        await redis.del(`${AUTH_USER_STATUS_REDIS_PREFIX}${userId}`);
+        return null;
+      }
+    },
+    set(userId: string, value: CachedAuthUserStatus) {
+      return redis.set(
+        `${AUTH_USER_STATUS_REDIS_PREFIX}${userId}`,
+        JSON.stringify(value),
+        "EX",
+        AUTH_USER_STATUS_REDIS_TTL_SECONDS
+      );
+    },
+    del(userId: string) {
+      return redis.del(`${AUTH_USER_STATUS_REDIS_PREFIX}${userId}`);
+    },
   };
 }

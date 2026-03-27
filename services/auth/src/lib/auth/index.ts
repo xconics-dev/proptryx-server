@@ -20,6 +20,7 @@ import {
   getBetterAuthConfigState,
   normalizeBasePath,
   organizationAdditionalFields,
+  resolveAuthUserStatusCache,
   resolveAuthDatabase,
   resolveAuthSecondaryStorage,
   resolveUserZone,
@@ -52,6 +53,7 @@ const {
 async function createAuthInstance() {
   // Resolve DB once — reuse across all hooks in this closure
   const db = resolveAuthDatabase();
+  const userStatusCache = resolveAuthUserStatusCache();
 
   return betterAuth({
     appName: "Proptryx Auth Service",
@@ -152,7 +154,72 @@ async function createAuthInstance() {
       }),
       allowCustomInputFieldsPlugin,
       customSession(async ({ session, user }) => {
-        const userWithTags = user as typeof user & { zoneId?: string | null };
+        const sessionUser = user as typeof user & {
+          banned?: boolean | null;
+          banReason?: string | null;
+          role?: string | null;
+          panel?: string | null;
+          zoneId?: string | null;
+        };
+
+        const cachedUser = await userStatusCache.get(sessionUser.id);
+
+        const liveUser =
+          cachedUser ??
+          (await (async () => {
+            const [dbUser] = await db
+              .select({
+                id: schema.user.id,
+                banned: schema.user.banned,
+                banReason: schema.user.banReason,
+                role: schema.user.role,
+                panel: schema.user.panel,
+                zoneId: schema.user.zoneId,
+                updatedAt: schema.user.updatedAt,
+              })
+              .from(schema.user)
+              .where(eq(schema.user.id, sessionUser.id))
+              .limit(1);
+
+            if (!dbUser) {
+              return null;
+            }
+
+            const nextCachedUser = {
+              id: dbUser.id,
+              banned: Boolean(dbUser.banned),
+              banReason: dbUser.banReason,
+              role: dbUser.role,
+              panel: dbUser.panel,
+              zoneId: dbUser.zoneId,
+              updatedAt: dbUser.updatedAt.toISOString(),
+            };
+
+            await userStatusCache.set(sessionUser.id, nextCachedUser);
+            return nextCachedUser;
+          })());
+
+        if (!liveUser) {
+          throw new APIError("UNAUTHORIZED", {
+            message: "Session user not found.",
+          });
+        }
+
+        if (liveUser?.banned) {
+          throw new APIError("FORBIDDEN", {
+            message: liveUser.banReason ?? "Your account has been banned.",
+          });
+        }
+
+        const userWithTags = {
+          ...sessionUser,
+          banned: liveUser?.banned ?? sessionUser.banned,
+          banReason: liveUser?.banReason ?? sessionUser.banReason,
+          role: liveUser?.role ?? sessionUser.role,
+          panel: liveUser?.panel ?? sessionUser.panel,
+          zoneId: liveUser?.zoneId ?? sessionUser.zoneId,
+        };
+
         const location = await resolveUserZone(userWithTags.zoneId);
 
         return {
@@ -161,6 +228,7 @@ async function createAuthInstance() {
             ...userWithTags,
             zone: location.zone?.name,
             region: location.region?.name,
+            updatedAt: new Date(liveUser.updatedAt),
           },
         };
       }),
@@ -225,6 +293,11 @@ async function createAuthInstance() {
               role: user.role ?? "user",
             },
           }),
+        },
+        update: {
+          after: async (user) => {
+            await userStatusCache.del(user.id);
+          },
         },
       },
     },
