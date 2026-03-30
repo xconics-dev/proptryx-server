@@ -29,7 +29,6 @@ function applySchemaOptions<TTable extends Table, TOmit extends TableColumnKey<T
     case "strict":
       schema = schema.strict();
       break;
-    case "strip":
     default:
       break;
   }
