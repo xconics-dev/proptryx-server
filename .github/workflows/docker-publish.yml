@@ -23,6 +23,9 @@ jobs:
           - service: auth
             image_name: proptryx-auth
             dockerfile: docker/auth.Dockerfile
+          - service: kernel
+            image_name: proptryx-kernel
+            dockerfile: docker/kernel.Dockerfile
 
     steps:
       - name: Checkout
