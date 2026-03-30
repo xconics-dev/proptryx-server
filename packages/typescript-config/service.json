@@ -4,7 +4,6 @@
   "extends": "./base.json",
   "compilerOptions": {
     "lib": ["es2022"],
-    "ignoreDeprecations": "6.0",
     "outDir": "dist",
     "rootDir": "src",
     "baseUrl": ".",
