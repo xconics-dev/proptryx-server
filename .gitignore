@@ -27,5 +27,9 @@ yarn-error.log*
 .idea/
 .vscode/
 
+# macOS
+.DS_Store
+._*
+
 # Husky generated internals
 .husky/_/
