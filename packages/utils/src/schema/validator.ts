@@ -1,8 +1,9 @@
 import { z } from "@hono/zod-openapi";
 
-export const IdStringParamSchema = z.object({
-  id: z.string().min(1),
-});
+export const IdStringParamSchema = <T extends string = "id">(entity?: T) =>
+  z.object({
+    [entity ?? "id"]: z.string().min(1),
+  } as Record<T extends string ? T : "id", z.ZodString>);
 
 const ApiErrorSchema = z.object({
   success: z.literal(false),

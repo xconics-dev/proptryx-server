@@ -6,17 +6,19 @@ import {
 } from "drizzle-orm";
 import { z } from "@hono/zod-openapi";
 
-export type DbSchemaOptions<TTable extends Table> = {
-  omit?: Array<Extract<keyof TTable["_"]["columns"], string>>;
+type TableColumnKey<TTable extends Table> = Extract<keyof TTable["_"]["columns"], string>;
+
+export type DbSchemaOptions<TTable extends Table, TOmit extends TableColumnKey<TTable> = never> = {
+  omit?: readonly TOmit[];
   zodObjectOptions?: Parameters<typeof z.object>[1];
   unknownKeys?: "strip" | "passthrough" | "strict";
   catchall?: z.ZodTypeAny;
   customizeSchema?: (schema: z.ZodObject<Record<string, z.ZodTypeAny>>) => z.ZodTypeAny;
 };
 
-function applySchemaOptions<TTable extends Table>(
+function applySchemaOptions<TTable extends Table, TOmit extends TableColumnKey<TTable> = never>(
   shape: Record<string, z.ZodTypeAny>,
-  options: DbSchemaOptions<TTable>
+  options: DbSchemaOptions<TTable, TOmit>
 ) {
   let schema = z.object(shape, options.zodObjectOptions);
 
@@ -69,14 +71,22 @@ function createColumnSchema(column: {
 
 export function createDbInsertSchema<TTable extends Table>(
   table: TTable,
-  options: DbSchemaOptions<TTable> = {}
-) {
-  const omit = new Set(options.omit ?? []);
+  options?: DbSchemaOptions<TTable>
+): z.ZodType<InferInsertModel<TTable>>;
+export function createDbInsertSchema<TTable extends Table, TOmit extends TableColumnKey<TTable>>(
+  table: TTable,
+  options: DbSchemaOptions<TTable, TOmit>
+): z.ZodType<Omit<InferInsertModel<TTable>, TOmit>>;
+export function createDbInsertSchema<
+  TTable extends Table,
+  TOmit extends TableColumnKey<TTable> = never,
+>(table: TTable, options: DbSchemaOptions<TTable, TOmit> = {}) {
+  const omit = new Set<TableColumnKey<TTable>>(options.omit ?? []);
   const columns = getTableColumns(table);
   const shape: Record<string, z.ZodTypeAny> = {};
 
   for (const [columnName, column] of Object.entries(columns)) {
-    if (omit.has(columnName as Extract<keyof TTable["_"]["columns"], string>)) {
+    if (omit.has(columnName as TableColumnKey<TTable>)) {
       continue;
     }
 
@@ -84,19 +94,29 @@ export function createDbInsertSchema<TTable extends Table>(
     shape[columnName] = !column.notNull || column.hasDefault ? baseSchema.optional() : baseSchema;
   }
 
-  return applySchemaOptions(shape, options) as unknown as z.ZodType<InferInsertModel<TTable>>;
+  return applySchemaOptions(shape, options) as unknown as z.ZodType<
+    Omit<InferInsertModel<TTable>, TOmit>
+  >;
 }
 
 export function createDbUpdateSchema<TTable extends Table>(
   table: TTable,
-  options: DbSchemaOptions<TTable> = {}
-) {
-  const omit = new Set(options.omit ?? []);
+  options?: DbSchemaOptions<TTable>
+): z.ZodType<Partial<InferInsertModel<TTable>>>;
+export function createDbUpdateSchema<TTable extends Table, TOmit extends TableColumnKey<TTable>>(
+  table: TTable,
+  options: DbSchemaOptions<TTable, TOmit>
+): z.ZodType<Partial<Omit<InferInsertModel<TTable>, TOmit>>>;
+export function createDbUpdateSchema<
+  TTable extends Table,
+  TOmit extends TableColumnKey<TTable> = never,
+>(table: TTable, options: DbSchemaOptions<TTable, TOmit> = {}) {
+  const omit = new Set<TableColumnKey<TTable>>(options.omit ?? []);
   const columns = getTableColumns(table);
   const shape: Record<string, z.ZodTypeAny> = {};
 
   for (const [columnName, column] of Object.entries(columns)) {
-    if (omit.has(columnName as Extract<keyof TTable["_"]["columns"], string>)) {
+    if (omit.has(columnName as TableColumnKey<TTable>)) {
       continue;
     }
 
@@ -104,20 +124,28 @@ export function createDbUpdateSchema<TTable extends Table>(
   }
 
   return applySchemaOptions(shape, options) as unknown as z.ZodType<
-    Partial<InferInsertModel<TTable>>
+    Partial<Omit<InferInsertModel<TTable>, TOmit>>
   >;
 }
 
 export function createDbSelectSchema<TTable extends Table>(
   table: TTable,
-  options: DbSchemaOptions<TTable> = {}
-) {
-  const omit = new Set(options.omit ?? []);
+  options?: DbSchemaOptions<TTable>
+): z.ZodType<InferSelectModel<TTable>>;
+export function createDbSelectSchema<TTable extends Table, TOmit extends TableColumnKey<TTable>>(
+  table: TTable,
+  options: DbSchemaOptions<TTable, TOmit>
+): z.ZodType<Omit<InferSelectModel<TTable>, TOmit>>;
+export function createDbSelectSchema<
+  TTable extends Table,
+  TOmit extends TableColumnKey<TTable> = never,
+>(table: TTable, options: DbSchemaOptions<TTable, TOmit> = {}) {
+  const omit = new Set<TableColumnKey<TTable>>(options.omit ?? []);
   const columns = getTableColumns(table);
   const shape: Record<string, z.ZodTypeAny> = {};
 
   for (const [columnName, column] of Object.entries(columns)) {
-    if (omit.has(columnName as Extract<keyof TTable["_"]["columns"], string>)) {
+    if (omit.has(columnName as TableColumnKey<TTable>)) {
       continue;
     }
 
@@ -125,5 +153,7 @@ export function createDbSelectSchema<TTable extends Table>(
     shape[columnName] = column.notNull ? baseSchema : baseSchema.nullable();
   }
 
-  return applySchemaOptions(shape, options) as unknown as z.ZodType<InferSelectModel<TTable>>;
+  return applySchemaOptions(shape, options) as unknown as z.ZodType<
+    Omit<InferSelectModel<TTable>, TOmit>
+  >;
 }

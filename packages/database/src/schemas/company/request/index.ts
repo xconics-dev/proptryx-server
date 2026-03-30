@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { user } from "../../auth";
 
 export const company_request = pgTable(
   "company_request",
@@ -14,6 +15,11 @@ export const company_request = pgTable(
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
+    // logicals
+    isDeleted: text("is_deleted").default("false").notNull(),
+    deletedByUser: text("deleted_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [uniqueIndex("company_request_gst_number_uidx").on(table.companyGstNumber)]
 );

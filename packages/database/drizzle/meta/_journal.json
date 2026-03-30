@@ -8,6 +8,13 @@
       "when": 1774850665308,
       "tag": "0000_lonely_william_stryker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774852282232,
+      "tag": "0001_peaceful_demogoblin",
+      "breakpoints": true
     }
   ]
 }

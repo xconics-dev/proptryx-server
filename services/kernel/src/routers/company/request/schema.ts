@@ -10,5 +10,5 @@ export const companyRequestSchema = createDbSelectSchema(company_request, {
 });
 
 export const companyRequestCreateSchema = createDbInsertSchema(company_request, {
-  omit: ["id"],
+  omit: ["id", "createdAt", "updatedAt"],
 });

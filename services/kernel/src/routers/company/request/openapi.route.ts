@@ -1,4 +1,4 @@
-import { DATABASE_RESOURCES } from "@proptryx/database";
+import { DATABASE_RESOURCES, gstInfoResponseSchema } from "@proptryx/database";
 import {
   createApiJsonBody,
   ApiNotFoundOpenApi,
@@ -29,7 +29,7 @@ export const get = createKernelRoute({
   middleware: [companyMethodsRateLimit, companyRequestRbac.get],
   summary: "Get a company request by ID",
   request: {
-    params: IdStringParamSchema,
+    params: IdStringParamSchema(),
   },
   responses: {
     404: ApiNotFoundOpenApi,
@@ -41,12 +41,27 @@ export const create = createKernelRoute({
   method: "post",
   path: "/",
   tags,
-  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("create")],
+  middleware: [companyMethodsRateLimit],
   summary: "Create a new company request",
   request: {
     body: createApiJsonBody(companyRequestCreateSchema),
   },
   responses: {
     201: createApiSuccessResponse(companyRequestSchema, "Company request created successfully"),
+  },
+});
+
+export const check_gst = createKernelRoute({
+  method: "get",
+  path: "/check-gst/{gstNumber}",
+  tags,
+  middleware: [companyMethodsRateLimit],
+  summary: "Check GST number validity",
+  request: {
+    params: IdStringParamSchema("gstNumber"),
+  },
+  responses: {
+    200: createApiSuccessResponse(gstInfoResponseSchema, "GST number checked successfully"),
+    404: ApiNotFoundOpenApi,
   },
 });

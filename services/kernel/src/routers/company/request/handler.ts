@@ -1,8 +1,8 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { db, company_request, gstInfoResponseSchema } from "@proptryx/database";
-import { createErrorResponse, createSuccessResponse } from "@proptryx/utils";
+import { createErrorResponse, createSuccessResponse, generateRandomId } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
-import { get } from "./openapi.route";
+import { check_gst, create, get } from "./openapi.route";
 import type { AppBindings } from "@/types/app";
 import { env } from "@/config/env";
 
@@ -62,4 +62,52 @@ companyRequestGroup.openapi(get, async (c) => {
   };
 
   return c.json(createSuccessResponse(companyRequestWithGST), 200);
+});
+
+companyRequestGroup.openapi(create, async (c) => {
+  const body = c.req.valid("json");
+
+  const [request] = await db
+    .insert(company_request)
+    .values({
+      id: generateRandomId(),
+      ...body,
+    })
+    .returning();
+
+  return c.json(createSuccessResponse(request), 201);
+});
+
+// @ts-ignore -- OpenAPI + Drizzle generic inference can exceed TS depth on this expression.
+companyRequestGroup.openapi(check_gst, async (c) => {
+  const { gstNumber } = c.req.valid("param");
+
+  const gst_response = await fetch(
+    `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`
+  );
+
+  const gst_payload = await gst_response.json();
+  const gstParsedPayload = gstInfoResponseSchema.safeParse(gst_payload);
+
+  if (!gstParsedPayload.success) {
+    return c.json(
+      createErrorResponse({
+        error: "Invalid GST",
+        message: "GST number is invalid or inactive.",
+      }),
+      400
+    );
+  }
+
+  if (gstParsedPayload.data.data?.sts !== "Active") {
+    return c.json(
+      createErrorResponse({
+        error: "Inactive GST",
+        message: "GST number is inactive.",
+      }),
+      400
+    );
+  }
+
+  return c.json(createSuccessResponse(gstParsedPayload.data), 200);
 });
