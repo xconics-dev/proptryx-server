@@ -1,10 +1,8 @@
 {
   "extends": "../../packages/typescript-config/service.json",
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "outDir": "dist",
     "rootDir": "src",
-    "baseUrl": ".",
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src"],

@@ -6,7 +6,6 @@
     "lib": ["es2022"],
     "outDir": "dist",
     "rootDir": "src",
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
