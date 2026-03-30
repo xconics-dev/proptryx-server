@@ -8,6 +8,13 @@ export {
 export { createOpenApiDocsHandler, type OpenApiDocsHandlerOptions } from "./handlers/openapi-docs";
 export { createNotFoundHandler } from "./handlers/not-found";
 export { createErrorHandler, type ErrorHandlerOptions } from "./handlers/error";
+export {
+  createOpenApiRoute,
+  DEFAULT_ROUTE_RESPONSES,
+  type OpenApiRouteHandler,
+  registerOpenApiRoute,
+  type SharedRouteConfig,
+} from "./openapi/route";
 
 // Middleware
 export { applyAppSecurity, type AppSecurityOptions } from "./middleware/security";

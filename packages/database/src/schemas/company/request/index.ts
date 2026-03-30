@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "../../auth";
 
 export const company_request = pgTable(
@@ -16,7 +16,7 @@ export const company_request = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
     // logicals
-    isDeleted: text("is_deleted").default("false").notNull(),
+    isDeleted: boolean("is_deleted").default(false).notNull(),
     deletedByUser: text("deleted_by_user").references(() => user.id, {
       onDelete: "set null",
     }),

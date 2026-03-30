@@ -99,7 +99,9 @@ export function createInternalServerErrorResponse<TDetails = unknown>(
   });
 }
 
-export const ApiBadRequestOpenApi = createApiJsonResponse(
+export const ApiBadRequestOpenApi = createApiJsonResponse(ApiErrorSchema, "Bad request");
+
+export const ApiValidationErrorOpenApi = createApiJsonResponse(
   ApiValidationErrorSchema,
   "Validation error"
 );
