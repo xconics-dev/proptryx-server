@@ -1,21 +1,26 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { db, company_request, gstInfoResponseSchema } from "@proptryx/database";
-import { createErrorResponse, createSuccessResponse, generateRandomId } from "@proptryx/utils";
-import { eq } from "drizzle-orm";
-import { check_gst, create, get } from "./openapi.route";
+import {
+  createErrorResponse,
+  createSuccessResponse,
+  generateRandomId,
+  getBetterAuthContext,
+  registerOpenApiRoute,
+} from "@proptryx/utils";
+import { and, eq } from "drizzle-orm";
+import { check_gst, create, get, remove } from "./openapi.route";
 import type { AppBindings } from "@/types/app";
 import { env } from "@/config/env";
 
 export const companyRequestGroup: OpenAPIHono<AppBindings> = new OpenAPIHono<AppBindings>();
 
-// @ts-ignore -- OpenAPI + Drizzle generic inference can exceed TS depth on this expression.
-companyRequestGroup.openapi(get, async (c) => {
+registerOpenApiRoute(companyRequestGroup, get, async (c) => {
   const { id } = c.req.valid("param");
 
   const [companyRequest] = await db
     .select()
     .from(company_request)
-    .where(eq(company_request.id, id))
+    .where(and(eq(company_request.id, id), eq(company_request.isDeleted, false)))
     .limit(1);
 
   if (!companyRequest) {
@@ -24,7 +29,7 @@ companyRequestGroup.openapi(get, async (c) => {
         error: "Not Found",
         message: `No company request found with id ${id}`,
       }),
-      400
+      404
     );
   }
 
@@ -64,7 +69,7 @@ companyRequestGroup.openapi(get, async (c) => {
   return c.json(createSuccessResponse(companyRequestWithGST), 200);
 });
 
-companyRequestGroup.openapi(create, async (c) => {
+registerOpenApiRoute(companyRequestGroup, create, async (c) => {
   const body = c.req.valid("json");
 
   const [request] = await db
@@ -78,8 +83,7 @@ companyRequestGroup.openapi(create, async (c) => {
   return c.json(createSuccessResponse(request), 201);
 });
 
-// @ts-ignore -- OpenAPI + Drizzle generic inference can exceed TS depth on this expression.
-companyRequestGroup.openapi(check_gst, async (c) => {
+registerOpenApiRoute(companyRequestGroup, check_gst, async (c) => {
   const { gstNumber } = c.req.valid("param");
 
   const gst_response = await fetch(
@@ -110,4 +114,45 @@ companyRequestGroup.openapi(check_gst, async (c) => {
   }
 
   return c.json(createSuccessResponse(gstParsedPayload.data), 200);
+});
+
+registerOpenApiRoute(companyRequestGroup, remove, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user } = getBetterAuthContext(c);
+
+  const [existingRequest] = await db
+    .select()
+    .from(company_request)
+    .where(eq(company_request.id, id))
+    .limit(1);
+
+  if (!existingRequest) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company request found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (existingRequest.isDeleted) {
+    return c.json(
+      createErrorResponse({
+        error: "Already Deleted",
+        message: `Company request with id ${id} is already deleted.`,
+      }),
+      400
+    );
+  }
+
+  await db
+    .update(company_request)
+    .set({
+      isDeleted: true,
+      deletedByUser: user?.id || null,
+    })
+    .where(eq(company_request.id, id));
+
+  return c.json(null, 200);
 });

@@ -3,12 +3,12 @@ import {
   createApiJsonBody,
   ApiNotFoundOpenApi,
   createApiSuccessResponse,
+  createOpenApiRoute,
   createOperationalRateLimit,
   createResourceRbacGuards,
   DEFAULT_FAST_RBAC_AUTH_OPTIONS,
   IdStringParamSchema,
 } from "@proptryx/utils";
-import { createKernelRoute } from "@/config/route";
 import { companyRequestCreateSchema, companyRequestSchema } from "./schema";
 
 const tags = ["Company Request Operations"];
@@ -22,7 +22,7 @@ const companyMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "company-methods",
 });
 
-export const get = createKernelRoute({
+export const get = createOpenApiRoute({
   method: "get",
   path: "/{id}",
   tags,
@@ -37,7 +37,7 @@ export const get = createKernelRoute({
   },
 });
 
-export const create = createKernelRoute({
+export const create = createOpenApiRoute({
   method: "post",
   path: "/",
   tags,
@@ -51,7 +51,7 @@ export const create = createKernelRoute({
   },
 });
 
-export const check_gst = createKernelRoute({
+export const check_gst = createOpenApiRoute({
   method: "get",
   path: "/check-gst/{gstNumber}",
   tags,
@@ -62,6 +62,23 @@ export const check_gst = createKernelRoute({
   },
   responses: {
     200: createApiSuccessResponse(gstInfoResponseSchema, "GST number checked successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const remove = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.delete],
+  summary: "Delete a company request by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    204: {
+      description: "Company request deleted successfully",
+    },
     404: ApiNotFoundOpenApi,
   },
 });

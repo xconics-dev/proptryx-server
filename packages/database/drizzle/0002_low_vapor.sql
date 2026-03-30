@@ -1,0 +1,1 @@
+ALTER TABLE "company_request" ALTER COLUMN "is_deleted" SET DATA TYPE boolean;
