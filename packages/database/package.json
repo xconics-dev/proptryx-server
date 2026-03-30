@@ -21,10 +21,11 @@
     "lint:fix": "biome lint --write ./src drizzle.config.ts",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist .turbo drizzle",
-    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:clean:artifacts": "sh -c 'if [ -d drizzle ]; then find drizzle -type f \\( -name \"._*\" -o -name \".__*\" \\) -delete; fi'",
+    "db:generate": "pnpm run db:clean:artifacts && drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/migration.ts",
-    "db:push": "drizzle-kit push --config=drizzle.config.ts",
-    "db:studio": "drizzle-kit studio --config=drizzle.config.ts"
+    "db:push": "pnpm run db:clean:artifacts && drizzle-kit push --config=drizzle.config.ts",
+    "db:studio": "pnpm run db:clean:artifacts && drizzle-kit studio --config=drizzle.config.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.1",
