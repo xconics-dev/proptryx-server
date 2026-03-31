@@ -150,6 +150,7 @@ registerOpenApiRoute(companyRequestGroup, remove, async (c) => {
     .update(company_request)
     .set({
       isDeleted: true,
+      deletedAt: new Date(),
       deletedByUser: user?.id || null,
     })
     .where(eq(company_request.id, id));

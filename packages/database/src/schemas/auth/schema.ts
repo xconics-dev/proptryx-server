@@ -113,6 +113,11 @@ export const organization = pgTable(
     companyType: text("company_type"), // Pvt Ltd, LLP, etc.
     isActive: boolean("is_active").default(false).notNull(),
     razorpayCustomerId: text("razorpay_customer_id"),
+
+    // For soft deletion
+    isDeleted: boolean("is_deleted").default(false).notNull(),
+    deletedAt: timestamp("deleted_at"),
+    deletedByUser: text("deleted_by_user").references(() => user.id, { onDelete: "set null" }),
   },
   (table) => [
     uniqueIndex("organization_slug_uidx").on(table.slug),
