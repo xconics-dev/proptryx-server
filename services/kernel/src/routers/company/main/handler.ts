@@ -3,7 +3,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: forced */
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { create, get, remove, update } from "./openapi.route";
+import { create, get, remove, update, get_gst_info } from "./openapi.route";
 import {
   ensureDefaultOrganizationRoles,
   generateNextCompanyId,
@@ -17,8 +17,13 @@ import {
 } from "@proptryx/utils";
 import { account, db, member, organization, user } from "@proptryx/database";
 import { desc, eq } from "drizzle-orm";
-import { COMPANY_CREATION_TOTAL_STEPS, type CompanyCreationStep } from "./schema";
+import {
+  COMPANY_CREATION_TOTAL_STEPS,
+  companyGstInfoSchema,
+  type CompanyCreationStep,
+} from "./schema";
 import { logger } from "@/lib/logger";
+import { env } from "@/config/env";
 
 export const companyMainGroup = new OpenAPIHono<AppBindings>();
 
@@ -35,6 +40,35 @@ registerOpenApiRoute(companyMainGroup, get, async (c) => {
   }
 
   return c.json(company, 200);
+});
+
+registerOpenApiRoute(companyMainGroup, get_gst_info, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const [company] = await db.select().from(organization).where(eq(organization.id, id)).limit(1);
+
+  if (!company) {
+    return c.json({ message: `No company found with id ${id}` }, 404);
+  }
+
+  const gstNumber = company.gstNumber;
+
+  if (!gstNumber) {
+    return c.json({ message: "GST number not found for this company" }, 404);
+  }
+  const gst_response = await fetch(
+    `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`
+  );
+
+  const gst_payload = await gst_response.json();
+
+  const gstParsedPayload = companyGstInfoSchema.safeParse(gst_payload);
+
+  if (!gstParsedPayload.success) {
+    return c.json({ message: "GST number is invalid or inactive." }, 400);
+  }
+
+  return c.json(gstParsedPayload.data, 200);
 });
 
 // Mutation routes
