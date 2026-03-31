@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import { pgTable, text, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "../../auth";
 
@@ -15,11 +16,17 @@ export const company_request = pgTable(
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
-    // logicals
+    // For soft deletion
     isDeleted: boolean("is_deleted").default(false).notNull(),
-    deletedByUser: text("deleted_by_user").references(() => user.id, {
-      onDelete: "set null",
-    }),
+    deletedAt: timestamp("deleted_at"),
+    deletedByUser: text("deleted_by_user").references(() => user.id, { onDelete: "set null" }),
   },
   (table) => [uniqueIndex("company_request_gst_number_uidx").on(table.companyGstNumber)]
 );
+
+export const companyRequestRelations = relations(company_request, ({ one }) => ({
+  deletedByUser: one(user, {
+    fields: [company_request.deletedByUser],
+    references: [user.id],
+  }),
+}));

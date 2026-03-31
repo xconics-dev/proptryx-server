@@ -1,6 +1,6 @@
 {
-  "id": "3e0ffc16-74f7-4282-9b54-d3c11ad63d46",
-  "prevId": "64f537fd-ec70-43eb-b9c1-2e16d3196ff4",
+  "id": "cb0e13f9-3cad-4e12-90b0-cf07562727db",
+  "prevId": "f3942cef-7c7a-4592-836e-889cdff170d6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -275,7 +275,8 @@
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
@@ -478,6 +479,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "created_by_user": {
+          "name": "created_by_user",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_deleted": {
           "name": "is_deleted",
           "type": "boolean",
@@ -531,6 +538,15 @@
         }
       },
       "foreignKeys": {
+        "organization_created_by_user_user_id_fk": {
+          "name": "organization_created_by_user_user_id_fk",
+          "tableFrom": "organization",
+          "tableTo": "user",
+          "columnsFrom": ["created_by_user"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "organization_deleted_by_user_user_id_fk": {
           "name": "organization_deleted_by_user_user_id_fk",
           "tableFrom": "organization",

@@ -9,7 +9,11 @@ import {
   DEFAULT_FAST_RBAC_AUTH_OPTIONS,
   IdStringParamSchema,
 } from "@proptryx/utils";
-import { companyRequestCreateSchema, companyRequestSchema } from "./schema";
+import {
+  companyRequestBaseSchema,
+  companyRequestCreateSchema,
+  companyRequestSchema,
+} from "./schema";
 
 const tags = ["Company Request Operations"];
 
@@ -19,7 +23,7 @@ const companyRequestRbac = createResourceRbacGuards({
 });
 
 const companyMethodsRateLimit = createOperationalRateLimit({
-  keyPrefix: "company-methods",
+  keyPrefix: "company-request-methods",
 });
 
 export const get = createOpenApiRoute({
@@ -47,7 +51,7 @@ export const create = createOpenApiRoute({
     body: createApiJsonBody(companyRequestCreateSchema),
   },
   responses: {
-    201: createApiSuccessResponse(companyRequestSchema, "Company request created successfully"),
+    201: createApiSuccessResponse(companyRequestBaseSchema, "Company request created successfully"),
   },
 });
 

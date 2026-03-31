@@ -32,6 +32,7 @@
     "hono": "^4.12.8",
     "hono-rate-limiter": "^0.5.3",
     "ioredis": "^5.10.1",
+    "razorpay": "^2.9.6",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "unstorage": "^1.17.4",

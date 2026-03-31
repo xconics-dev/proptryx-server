@@ -2,14 +2,15 @@
 import * as crypto from "node:crypto";
 import * as schema from "@proptryx/database";
 import { emailSubject, renderCompleteSubscriptionEmail, sendEmail } from "@proptryx/notification";
-import { generateRandomId } from "@proptryx/utils";
+import { generateRandomId, getRazorpayClient } from "@proptryx/utils";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint, createAuthMiddleware, sessionMiddleware } from "better-auth/api";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
-import { rzClient } from "./client";
 import { resolveAuthDatabase } from "../auth/utils";
+
+const rzClient = getRazorpayClient();
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set([
   "created",

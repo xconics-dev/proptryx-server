@@ -1,6 +1,6 @@
 {
-  "id": "5382740d-935d-4d38-82b6-1223bb9c46ab",
-  "prevId": "d106c081-79c1-4f88-80f4-26b5319de610",
+  "id": "f3942cef-7c7a-4592-836e-889cdff170d6",
+  "prevId": "3e0ffc16-74f7-4282-9b54-d3c11ad63d46",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -275,7 +275,8 @@
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
@@ -419,7 +420,15 @@
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         },
         "metadata": {
           "name": "metadata",
@@ -469,6 +478,25 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by_user": {
+          "name": "deleted_by_user",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -503,7 +531,17 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "organization_deleted_by_user_user_id_fk": {
+          "name": "organization_deleted_by_user_user_id_fk",
+          "tableFrom": "organization",
+          "tableTo": "user",
+          "columnsFrom": ["deleted_by_user"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "organization_slug_unique": {
@@ -1663,6 +1701,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         },
         "deleted_by_user": {
           "name": "deleted_by_user",
