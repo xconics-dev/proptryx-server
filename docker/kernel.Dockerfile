@@ -12,6 +12,7 @@ FROM base AS build-deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/database/package.json ./packages/database/package.json
 COPY packages/logger/package.json ./packages/logger/package.json
+COPY packages/notification/package.json ./packages/notification/package.json
 COPY packages/static/package.json ./packages/static/package.json
 COPY packages/typescript-config/package.json ./packages/typescript-config/package.json
 COPY packages/utils/package.json ./packages/utils/package.json
@@ -25,6 +26,7 @@ COPY --from=build-deps /app/services/kernel/node_modules /app/services/kernel/no
 COPY tsup.config.ts /app/tsup.config.ts
 COPY packages/database /app/packages/database
 COPY packages/logger /app/packages/logger
+COPY packages/notification /app/packages/notification
 COPY packages/static /app/packages/static
 COPY packages/typescript-config /app/packages/typescript-config
 COPY packages/utils /app/packages/utils
@@ -34,6 +36,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   cd /app/packages/logger \
   && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
   && cd /app/packages/database \
+  && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
+  && cd /app/packages/notification \
   && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
   && cd /app/packages/static \
   && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
