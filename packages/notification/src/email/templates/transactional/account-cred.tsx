@@ -33,7 +33,6 @@ type AccountCredEmailProps = {
   credEmail?: string;
   credPassword?: string;
   organizationName?: string;
-  planName?: string;
 };
 
 export const AccountCredEmail = ({
@@ -41,7 +40,6 @@ export const AccountCredEmail = ({
   credEmail,
   credPassword,
   organizationName,
-  planName,
 }: AccountCredEmailProps) => {
   const getStartedLink = `${metadata.consoleUrl}/auth?cred_email=${encodeURIComponent(
     credEmail || ""
@@ -159,12 +157,6 @@ export const AccountCredEmail = ({
                         {organizationName}
                       </span>{" "}
                       has been successfully activated to Proptryx.
-                    </Text>
-
-                    <Text style={paragraph}>
-                      You’re subscribed to the{" "}
-                      <span style={{ fontWeight: "600", color: "#465FFF" }}>{planName}</span>.
-                      Manage your subscription anytime from your dashboard.
                     </Text>
 
                     <Text style={paragraph}>Here’s your Login Details:</Text>
@@ -334,7 +326,6 @@ export const renderAccountCredEmail = async ({
   credEmail,
   credPassword,
   organizationName,
-  planName,
 }: AccountCredEmailProps) =>
   await pretty(
     await render(
@@ -343,7 +334,6 @@ export const renderAccountCredEmail = async ({
         credPassword={credPassword}
         previewText={previewText}
         organizationName={organizationName}
-        planName={planName}
       />
     )
   );

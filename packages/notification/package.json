@@ -16,8 +16,8 @@
   ],
   "scripts": {
     "build": "tsup --config ../../tsup.config.ts",
-    "email:dev": "set -a && . ../../env/.env && set +a && email dev --dir src/email/templates --port \"${EMAIL_PREVIEW_PORT:-3005}\"",
-    "email:export": "set -a && . ../../env/.env && set +a && email export --dir src/email/templates --outDir dist/email-preview",
+    "email:dev": "node ./scripts/clean-email-appledouble.mjs && set -a && . ../../env/.env && set +a && email dev --dir src/email/templates --port \"${EMAIL_PREVIEW_PORT:-3005}\"",
+    "email:export": "node ./scripts/clean-email-appledouble.mjs && set -a && . ../../env/.env && set +a && email export --dir src/email/templates --outDir dist/email-preview",
     "lint": "biome lint ./src",
     "lint:fix": "biome lint --write ./src",
     "type-check": "tsc --noEmit",

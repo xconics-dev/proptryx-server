@@ -1,4 +1,4 @@
-import { organization } from "@proptryx/database";
+import { gstInfoResponseSchema, organization } from "@proptryx/database";
 import { createDbInsertSchema, createDbSelectSchema } from "@proptryx/utils";
 import z from "zod";
 
@@ -67,3 +67,5 @@ export const companyUpdateSchema = createDbInsertSchema(organization, {
     return schema.partial();
   },
 });
+
+export const companyGstInfoSchema = z.object(gstInfoResponseSchema.shape);

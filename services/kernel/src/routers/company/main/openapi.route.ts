@@ -8,7 +8,12 @@ import {
   DEFAULT_FAST_RBAC_AUTH_OPTIONS,
   IdStringParamSchema,
 } from "@proptryx/utils";
-import { companyCreateResponseSchema, companyCreateSchema, companySchema } from "./schema";
+import {
+  companyCreateResponseSchema,
+  companyCreateSchema,
+  companyGstInfoSchema,
+  companySchema,
+} from "./schema";
 
 const tags = ["Company Operations"];
 
@@ -19,6 +24,42 @@ const companyRequestRbac = createResourceRbacGuards({
 
 const companyMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "company-methods",
+});
+
+// Query routes
+
+export const get = createOpenApiRoute({
+  method: "get",
+  path: "/{id}",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.get],
+  summary: "Get a company by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    404: {
+      description: "Company not found",
+    },
+    200: createApiSuccessResponse(companySchema, "Company fetched successfully"),
+  },
+});
+
+export const get_gst_info = createOpenApiRoute({
+  method: "get",
+  path: "/{id}/gst-info",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.get],
+  summary: "Get GST info for a company by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    404: {
+      description: "Company not found",
+    },
+    200: createApiSuccessResponse(companyGstInfoSchema, "Company GST info fetched successfully"),
+  },
 });
 
 // Mutation routes
