@@ -21,6 +21,25 @@ const companyMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "company-methods",
 });
 
+// Query routes
+
+export const get = createOpenApiRoute({
+  method: "get",
+  path: "/{id}",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.get],
+  summary: "Get a company by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    404: {
+      description: "Company not found",
+    },
+    200: createApiSuccessResponse(companySchema, "Company fetched successfully"),
+  },
+});
+
 // Mutation routes
 export const create = createOpenApiRoute({
   method: "post",

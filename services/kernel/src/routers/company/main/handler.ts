@@ -3,7 +3,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: forced */
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { create, remove, update } from "./openapi.route";
+import { create, get, remove, update } from "./openapi.route";
 import {
   ensureDefaultOrganizationRoles,
   generateNextCompanyId,
@@ -24,6 +24,20 @@ export const companyMainGroup = new OpenAPIHono<AppBindings>();
 
 const rzClient = getRazorpayClient();
 
+// Query routes
+registerOpenApiRoute(companyMainGroup, get, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const [company] = await db.select().from(organization).where(eq(organization.id, id)).limit(1);
+
+  if (!company) {
+    return c.json({ message: `No company found with id ${id}` }, 404);
+  }
+
+  return c.json(company, 200);
+});
+
+// Mutation routes
 registerOpenApiRoute(companyMainGroup, create, async (c) => {
   const body = c.req.valid("json");
   const { user: currentAuthUser } = getBetterAuthContext(c);
