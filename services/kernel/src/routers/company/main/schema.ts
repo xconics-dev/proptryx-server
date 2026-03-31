@@ -12,9 +12,8 @@ export const companyCreateSchema = createDbInsertSchema(organization, {
     "razorpayCustomerId",
     "deletedAt",
     "isDeleted",
+    "updatedByUser",
     "deletedByUser",
-    "logo",
-    "metadata",
     "createdByUser",
   ],
   customizeSchema(schema) {
@@ -49,4 +48,22 @@ export const companyCreateResponseSchema = z.object({
   totalSteps: z.number(),
   stepsCompleted: z.array(z.enum(COMPANY_CREATION_STEPS)),
   stepsFailed: z.array(z.enum(COMPANY_CREATION_STEPS)),
+});
+
+export const companyUpdateSchema = createDbInsertSchema(organization, {
+  omit: [
+    "id",
+    "slug",
+    "createdAt",
+    "updatedAt",
+    "razorpayCustomerId",
+    "deletedAt",
+    "isDeleted",
+    "deletedByUser",
+    "createdByUser",
+    "updatedByUser",
+  ],
+  customizeSchema(schema) {
+    return schema.partial();
+  },
 });

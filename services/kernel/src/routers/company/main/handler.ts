@@ -3,7 +3,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: forced */
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { create } from "./openapi.route";
+import { create, remove, update } from "./openapi.route";
 import {
   ensureDefaultOrganizationRoles,
   generateNextCompanyId,
@@ -200,4 +200,57 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
     },
     201
   );
+});
+
+registerOpenApiRoute(companyMainGroup, update, async (c) => {
+  const { id } = c.req.valid("param");
+  const body = c.req.valid("json");
+  const { user: currentAuthUser } = getBetterAuthContext(c);
+
+  const [existingCompany] = await db
+    .select()
+    .from(organization)
+    .where(eq(organization.id, id))
+    .limit(1);
+
+  if (!existingCompany) {
+    return c.json({ message: `No company found with id ${id}` }, 404);
+  }
+
+  const [updatedCompany] = await db
+    .update(organization)
+    .set({
+      ...body,
+      updatedByUser: currentAuthUser?.id ?? null,
+    })
+    .where(eq(organization.id, id))
+    .returning();
+
+  return c.json(updatedCompany, 200);
+});
+
+registerOpenApiRoute(companyMainGroup, remove, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user: currentAuthUser } = getBetterAuthContext(c);
+
+  const [existingCompany] = await db
+    .select()
+    .from(organization)
+    .where(eq(organization.id, id))
+    .limit(1);
+
+  if (!existingCompany) {
+    return c.json({ message: `No company found with id ${id}` }, 404);
+  }
+
+  await db
+    .update(organization)
+    .set({
+      isDeleted: true,
+      deletedAt: new Date(),
+      deletedByUser: currentAuthUser?.id ?? null,
+    })
+    .where(eq(organization.id, id));
+
+  return c.json({ message: "Company deleted successfully" }, 200);
 });

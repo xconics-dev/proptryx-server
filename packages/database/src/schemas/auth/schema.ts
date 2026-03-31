@@ -104,11 +104,6 @@ export const organization = pgTable(
     logo: text("logo"),
     type: OrganizationType("type").notNull(),
     businessType: BusinessType("business_type").default("GENERAL"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
     metadata: text("metadata"),
     email: text("email"),
     gstNumber: text("gst_number"),
@@ -122,6 +117,14 @@ export const organization = pgTable(
     createdByUser: text("created_by_user").references(() => user.id, {
       onDelete: "set null",
     }),
+    updatedByUser: text("updated_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
 
     // For soft deletion
     isDeleted: boolean("is_deleted").default(false).notNull(),
@@ -319,6 +322,10 @@ export const organizationRelations = relations(organization, ({ many, one }) => 
   }),
   createdByUser: one(user, {
     fields: [organization.createdByUser],
+    references: [user.id],
+  }),
+  updatedByUser: one(user, {
+    fields: [organization.updatedByUser],
     references: [user.id],
   }),
   subscription: one(organizationSubscription, {
