@@ -6,6 +6,7 @@ import {
   createOperationalRateLimit,
   createResourceRbacGuards,
   DEFAULT_FAST_RBAC_AUTH_OPTIONS,
+  IdStringParamSchema,
 } from "@proptryx/utils";
 import { companyCreateResponseSchema, companyCreateSchema, companySchema } from "./schema";
 
@@ -20,6 +21,7 @@ const companyMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "company-methods",
 });
 
+// Mutation routes
 export const create = createOpenApiRoute({
   method: "post",
   path: "/",
@@ -31,5 +33,36 @@ export const create = createOpenApiRoute({
   },
   responses: {
     201: createApiSuccessResponse(companyCreateResponseSchema, "Company created successfully"),
+  },
+});
+
+export const update = createOpenApiRoute({
+  method: "patch",
+  path: "/{id}",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Update a company by ID",
+  request: {
+    params: IdStringParamSchema(),
+    body: createApiJsonBody(companyCreateSchema.partial()),
+  },
+  responses: {
+    200: createApiSuccessResponse(companySchema, "Company updated successfully"),
+  },
+});
+
+export const remove = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
+  summary: "Delete a company by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    204: {
+      description: "Company request deleted successfully",
+    },
   },
 });
