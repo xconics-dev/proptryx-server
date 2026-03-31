@@ -24,6 +24,7 @@ import {
 } from "./schema";
 import { logger } from "@/lib/logger";
 import { env } from "@/config/env";
+import { sendEmail, renderAccountCredEmail, emailSubject } from "@proptryx/notification";
 
 export const companyMainGroup = new OpenAPIHono<AppBindings>();
 
@@ -164,6 +165,19 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
       })
       .returning();
     await ensureDefaultOrganizationRoles(tx, orgData.id);
+
+    if (orgData && userData) {
+      await sendEmail({
+        to: userData.email,
+        subject: emailSubject["account-credentials"].subject,
+        html: await renderAccountCredEmail({
+          credEmail: userData.email,
+          credPassword: password,
+          organizationName: orgData.name,
+          previewText: emailSubject["account-credentials"].previewText,
+        }),
+      });
+    }
     stepsCompleted.push("insert_organization");
 
     // Step 5: Insert member

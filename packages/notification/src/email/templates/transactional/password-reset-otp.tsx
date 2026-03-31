@@ -31,7 +31,11 @@ type OtpEmailProps = {
   codeExpiryTime?: string;
 };
 
-export const PasswordResetOtpEmail = ({ otpCode, previewText, codeExpiryTime }: OtpEmailProps) => {
+export const PasswordResetOtpEmail = ({
+  otpCode = defaultData.otpCode,
+  previewText = defaultData.previewText,
+  codeExpiryTime = defaultData.codeExpiryTime,
+}: OtpEmailProps) => {
   const digits = otpCode.padEnd(6, "0").slice(0, 6).split("");
 
   return (

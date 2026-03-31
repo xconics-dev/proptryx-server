@@ -27,10 +27,9 @@ import {
 } from "./utils";
 import { organizationSubscriptionPlugin } from "../razorpay/subscription";
 import { organizationControlsPlugin } from "./organization";
-import { ensureDefaultOrganizationRoles } from "./rbac";
 import { generateRandomId, generateUID, PasswordUtils } from "@proptryx/utils";
 import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
-import { count, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createAuthMiddleware } from "better-auth/api";
 
 // ─────────────────────────────────────────────
@@ -140,11 +139,6 @@ async function createAuthInstance() {
         organizationLimit: 10,
         schema: {
           organization: { additionalFields: organizationAdditionalFields },
-        },
-        organizationHooks: {
-          afterCreateOrganization: async ({ organization }) => {
-            await ensureDefaultOrganizationRoles(db, organization.id);
-          },
         },
       }),
       organizationControlsPlugin,

@@ -372,6 +372,9 @@ importers:
       '@proptryx/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@proptryx/notification':
+        specifier: workspace:*
+        version: link:../../packages/notification
       '@proptryx/utils':
         specifier: workspace:*
         version: link:../../packages/utils

@@ -34,7 +34,7 @@ type SignInCodeEmailComponent = React.FC<SignInCodeEmailProps> & {
 };
 
 const SignInCodeEmail: SignInCodeEmailComponent = ({
-  otpCode,
+  otpCode = defaultData.otpCode,
   previewText = defaultData.previewText,
   codeExpiryTime = defaultData.codeExpiryTime,
 }) => {
