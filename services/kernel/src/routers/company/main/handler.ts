@@ -10,6 +10,7 @@ import {
   generateRandomId,
   generateRandomPassword,
   generateUID,
+  getBetterAuthContext,
   getRazorpayClient,
   PasswordUtils,
   registerOpenApiRoute,
@@ -25,6 +26,7 @@ const rzClient = getRazorpayClient();
 
 registerOpenApiRoute(companyMainGroup, create, async (c) => {
   const body = c.req.valid("json");
+  const { user: currentAuthUser } = getBetterAuthContext(c);
   const stepsCompleted: CompanyCreationStep[] = [];
   const stepsFailed: CompanyCreationStep[] = [];
 
@@ -110,6 +112,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
         email: body.ownerEmail,
         phoneNumber: body.phoneNumber,
         isActive: body.isActive ?? true,
+        createdByUser: currentAuthUser?.id ?? null,
       })
       .returning();
     await ensureDefaultOrganizationRoles(tx, orgData.id);

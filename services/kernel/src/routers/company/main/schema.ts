@@ -15,6 +15,7 @@ export const companyCreateSchema = createDbInsertSchema(organization, {
     "deletedByUser",
     "logo",
     "metadata",
+    "createdByUser",
   ],
   customizeSchema(schema) {
     return schema.extend({

@@ -118,10 +118,17 @@ export const organization = pgTable(
     isActive: boolean("is_active").default(false).notNull(),
     razorpayCustomerId: text("razorpay_customer_id"),
 
+    // For Kepp Reference
+    createdByUser: text("created_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
+
     // For soft deletion
     isDeleted: boolean("is_deleted").default(false).notNull(),
     deletedAt: timestamp("deleted_at"),
-    deletedByUser: text("deleted_by_user").references(() => user.id, { onDelete: "set null" }),
+    deletedByUser: text("deleted_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     uniqueIndex("organization_slug_uidx").on(table.slug),
@@ -308,6 +315,10 @@ export const organizationRelations = relations(organization, ({ many, one }) => 
   roles: many(rbacRole),
   deletedByUser: one(user, {
     fields: [organization.deletedByUser],
+    references: [user.id],
+  }),
+  createdByUser: one(user, {
+    fields: [organization.createdByUser],
     references: [user.id],
   }),
   subscription: one(organizationSubscription, {
