@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import { pgTable, text, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "../../auth";
 
@@ -22,3 +23,10 @@ export const company_request = pgTable(
   },
   (table) => [uniqueIndex("company_request_gst_number_uidx").on(table.companyGstNumber)]
 );
+
+export const companyRequestRelations = relations(company_request, ({ one }) => ({
+  deletedByUser: one(user, {
+    fields: [company_request.deletedByUser],
+    references: [user.id],
+  }),
+}));

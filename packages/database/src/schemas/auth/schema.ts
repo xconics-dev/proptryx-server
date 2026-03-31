@@ -104,7 +104,11 @@ export const organization = pgTable(
     logo: text("logo"),
     type: OrganizationType("type").notNull(),
     businessType: BusinessType("business_type").default("GENERAL"),
-    createdAt: timestamp("created_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
     metadata: text("metadata"),
     email: text("email"),
     gstNumber: text("gst_number"),
@@ -137,7 +141,7 @@ export const member = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     role: text("role").notNull(),
     panel: AccessPanel("panel").default("company").notNull(),
-    createdAt: timestamp("created_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     index("member_organizationId_idx").on(table.organizationId),
@@ -302,6 +306,10 @@ export const organizationRelations = relations(organization, ({ many, one }) => 
   members: many(member),
   invitations: many(invitation),
   roles: many(rbacRole),
+  deletedByUser: one(user, {
+    fields: [organization.deletedByUser],
+    references: [user.id],
+  }),
   subscription: one(organizationSubscription, {
     fields: [organization.id],
     references: [organizationSubscription.organizationId],

@@ -71,7 +71,6 @@ registerOpenApiRoute(companyRequestGroup, get, async (c) => {
 
 registerOpenApiRoute(companyRequestGroup, create, async (c) => {
   const body = c.req.valid("json");
-
   const [request] = await db
     .insert(company_request)
     .values({

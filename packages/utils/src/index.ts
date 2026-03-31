@@ -82,10 +82,13 @@ export {
   AUTH_SESSION_REDIS_PREFIX,
   RATE_LIMIT_REDIS_NAMESPACE,
 } from "./redis";
+export { getRazorpayClient, initializeRazorpayClient, resetRazorpayClient } from "./razorpay";
 
 // Functions
 export { generateUID, generateRandomId, generateNextCompanyId } from "./functions/gen-id";
-export { PasswordUtils } from "./functions/password";
+export { PasswordUtils, generateRandomPassword } from "./functions/password";
+export { encryptPassword, decryptPassword } from "./functions/encrypt";
+export { ensureDefaultOrganizationRoles } from "./functions/organization-rbac";
 export {
   AUTH_SESSION_FORWARD_HEADERS,
   CLIENT_IP_HEADER_CANDIDATES,
