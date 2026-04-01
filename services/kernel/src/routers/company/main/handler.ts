@@ -34,7 +34,18 @@ const rzClient = getRazorpayClient();
 registerOpenApiRoute(companyMainGroup, get, async (c) => {
   const { id } = c.req.valid("param");
 
-  const [company] = await db.select().from(organization).where(eq(organization.id, id)).limit(1);
+  const company = await db.query.organization.findFirst({
+    where: eq(organization.id, id),
+    with: {
+      roles: {
+        columns: {
+          createdAt: false,
+          updatedAt: false,
+          organizationId: false,
+        },
+      },
+    },
+  });
 
   if (!company) {
     return c.json({ message: `No company found with id ${id}` }, 404);
@@ -46,7 +57,9 @@ registerOpenApiRoute(companyMainGroup, get, async (c) => {
 registerOpenApiRoute(companyMainGroup, get_gst_info, async (c) => {
   const { id } = c.req.valid("param");
 
-  const [company] = await db.select().from(organization).where(eq(organization.id, id)).limit(1);
+  const company = await db.query.organization.findFirst({
+    where: eq(organization.id, id),
+  });
 
   if (!company) {
     return c.json({ message: `No company found with id ${id}` }, 404);

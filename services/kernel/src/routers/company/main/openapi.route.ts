@@ -50,7 +50,7 @@ export const get_gst_info = createOpenApiRoute({
   path: "/{id}/gst-info",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.get],
-  summary: "Get GST info for a company by ID",
+  summary: "Get GST info for a company by company ID",
   request: {
     params: IdStringParamSchema(),
   },

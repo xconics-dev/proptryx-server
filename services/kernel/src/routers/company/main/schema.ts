@@ -1,8 +1,14 @@
-import { gstInfoResponseSchema, organization } from "@proptryx/database";
+import { gstInfoResponseSchema, organization, rbacRole } from "@proptryx/database";
 import { createDbInsertSchema, createDbSelectSchema } from "@proptryx/utils";
 import z from "zod";
 
-export const companySchema = createDbSelectSchema(organization);
+export const companySchema = createDbSelectSchema(organization).extend({
+  roles: z.array(
+    createDbSelectSchema(rbacRole, {
+      omit: ["createdAt", "updatedAt", "organizationId"],
+    })
+  ),
+});
 
 export const companyCreateSchema = createDbInsertSchema(organization, {
   omit: [
