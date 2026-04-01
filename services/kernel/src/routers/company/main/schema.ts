@@ -1,8 +1,25 @@
-import { gstInfoResponseSchema, organization } from "@proptryx/database";
-import { createDbInsertSchema, createDbSelectSchema } from "@proptryx/utils";
-import z from "zod";
+import {
+  gstInfoResponseSchema,
+  organization,
+  OrganizationType,
+  rbacRole,
+} from "@proptryx/database";
+import {
+  createDbInsertSchema,
+  createDbSelectSchema,
+  createDbUpdateSchema,
+  createListQuerySchema,
+  createListResponseSchema,
+} from "@proptryx/utils";
+import { z } from "@hono/zod-openapi";
 
-export const companySchema = createDbSelectSchema(organization);
+export const companySchema = createDbSelectSchema(organization).extend({
+  roles: z.array(
+    createDbSelectSchema(rbacRole, {
+      omit: ["createdAt", "updatedAt", "organizationId"],
+    })
+  ),
+});
 
 export const companyCreateSchema = createDbInsertSchema(organization, {
   omit: [
@@ -50,7 +67,7 @@ export const companyCreateResponseSchema = z.object({
   stepsFailed: z.array(z.enum(COMPANY_CREATION_STEPS)),
 });
 
-export const companyUpdateSchema = createDbInsertSchema(organization, {
+export const companyUpdateSchema = createDbUpdateSchema(organization, {
   omit: [
     "id",
     "slug",
@@ -63,9 +80,56 @@ export const companyUpdateSchema = createDbInsertSchema(organization, {
     "createdByUser",
     "updatedByUser",
   ],
-  customizeSchema(schema) {
-    return schema.partial();
-  },
 });
 
 export const companyGstInfoSchema = z.object(gstInfoResponseSchema.shape);
+
+const companyOwnerSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.email(),
+  phoneNumber: z.string().nullable(),
+});
+
+export const companyListItemSchema = createDbSelectSchema(organization).extend({
+  owner: companyOwnerSummarySchema.nullable(),
+});
+
+export const companyListSortFields = [
+  "id",
+  "name",
+  "email",
+  "phoneNumber",
+  "isActive",
+  "createdAt",
+  "updatedAt",
+] as const;
+
+const optionalBooleanQuerySchema = z.preprocess((value) => {
+  if (value === "" || value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (value === true || value === "true") {
+    return true;
+  }
+
+  if (value === false || value === "false") {
+    return false;
+  }
+
+  return value;
+}, z.boolean().optional());
+
+export const companyListQuerySchema = createListQuerySchema({
+  sortFields: companyListSortFields,
+  extraShape: {
+    isActive: optionalBooleanQuerySchema,
+    type: z.enum(OrganizationType.enumValues).optional(),
+    companyType: z.string().optional(),
+    industry: z.string().optional(),
+  },
+});
+export type CompanyListQuery = z.infer<typeof companyListQuerySchema>;
+
+export const companyListResponseSchema = createListResponseSchema(companyListItemSchema);

@@ -3,7 +3,9 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type PoolConfig } from "pg";
 import * as schema from "./schemas";
 
-export type DB = ReturnType<typeof drizzle>;
+const createDatabase = (client: Pool) => drizzle(client, { schema });
+
+export type DB = ReturnType<typeof createDatabase>;
 export let db: DB;
 
 type DBLogMeta = Record<string, unknown>;
@@ -190,7 +192,7 @@ export async function initDB(options: InitDBOptions = {}): Promise<DB> {
 
     pool = new Pool(buildPoolConfig(url, options.serviceName));
 
-    db = drizzle(pool, { schema });
+    db = createDatabase(pool);
     await verifyPoolConnection(pool, options.logger, options.serviceName);
 
     options.logger?.info("database connected", {
