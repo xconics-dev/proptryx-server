@@ -28,18 +28,18 @@
     "db:studio": "pnpm run db:clean:artifacts && drizzle-kit studio --config=drizzle.config.ts"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "^0.45.2",
     "pg": "^8.20.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.8",
+    "@biomejs/biome": "^2.4.10",
     "@proptryx/typescript-config": "workspace:*",
     "@types/node": "^25.5.0",
-    "@types/pg": "^8.18.0",
+    "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }
