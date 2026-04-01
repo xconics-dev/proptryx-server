@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -9,7 +10,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { zone } from "../zone-region";
+import { region, zone } from "../zone-region";
 import { AccessPanel, BusinessType, OrganizationType, PermissionAccessLevel } from "./enums";
 import { rbacRole } from "./rbac/schema";
 
@@ -23,7 +24,7 @@ export const user = pgTable(
     image: text("image"),
     role: text("role"),
     panel: AccessPanel("panel"),
-    zoneId: text("zone_id").references(() => zone.id, { onDelete: "set null" }),
+    zoneId: text("zone_id").references((): AnyPgColumn => zone.id, { onDelete: "set null" }),
     banned: boolean("banned").default(false),
     banReason: text("ban_reason"),
     banExpires: timestamp("ban_expires"),
@@ -296,6 +297,9 @@ export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   members: many(member),
   invitations: many(invitation),
+  deletedRegions: many(region, {
+    relationName: "regionDeletedByUser",
+  }),
   zone: one(zone, {
     fields: [user.zoneId],
     references: [zone.id],
