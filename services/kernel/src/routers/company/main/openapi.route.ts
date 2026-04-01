@@ -30,10 +30,9 @@ const companyMethodsRateLimit = createOperationalRateLimit({
 });
 
 // Query routes
-
 export const list = createOpenApiRoute({
   method: "get",
-  path: "/",
+  path: "/list",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("getAll")],
   summary: "List companies",

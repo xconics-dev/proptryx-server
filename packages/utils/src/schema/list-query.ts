@@ -71,10 +71,6 @@ export function createListResponseSchema<TItemSchema extends z.ZodTypeAny>(
     limit: z.number().int().min(1),
     offset: z.number().int().min(0),
     totalItems: z.number().int().min(0),
-    filteredItems: z.number().int().min(0),
-    sortBy: z.string().nullable(),
-    sortOrder: ListSortOrderSchema,
-    search: z.string().nullable(),
   });
 }
 
@@ -92,8 +88,4 @@ export type ListResponseData<TItem> = {
   limit: number;
   offset: number;
   totalItems: number;
-  filteredItems: number;
-  sortBy: string | null;
-  sortOrder: z.infer<typeof ListSortOrderSchema>;
-  search: string | null;
 };

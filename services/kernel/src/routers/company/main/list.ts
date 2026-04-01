@@ -70,10 +70,5 @@ export const fetchCompanyList = createTableListFetcher<
     createdAt: organization.createdAt,
     updatedAt: organization.updatedAt,
   },
-  counts: {
-    totalJoins: false,
-    filteredJoins: (queryBuilder, { hasSearch }) =>
-      hasSearch ? companyListJoins(queryBuilder) : queryBuilder,
-  },
   mapItem: mapCompanyListItem,
 });

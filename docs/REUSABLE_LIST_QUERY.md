@@ -97,10 +97,6 @@ Base response fields:
 - `limit`
 - `offset`
 - `totalItems`
-- `filteredItems`
-- `sortBy`
-- `sortOrder`
-- `search`
 
 Example:
 
@@ -126,8 +122,6 @@ It handles:
 - sorting
 - data query
 - total count
-- filtered count
-- response metadata
 
 Use this directly only when you need full manual control.
 
@@ -255,11 +249,9 @@ If `sortColumns` is enough, the utility auto-builds the sorting definitions.
 `counts` supports:
 
 - `includeTotal`
-- `includeFiltered`
 - `totalJoins`
-- `filteredJoins`
 
-`totalJoins` and `filteredJoins` can be:
+`totalJoins` can be:
 
 - `false`
   - do not apply joins to that count query
@@ -268,13 +260,12 @@ If `sortColumns` is enough, the utility auto-builds the sorting definitions.
   - reuse the same joins as the data query
 
 - custom function
-  - apply joins conditionally
+  - apply custom joins for the total count query
 
 This is useful for performance, especially when:
 
 - data query needs joins
 - total count does not need joins
-- filtered count only needs joins when search is using joined tables
 
 ## Company Route Pattern
 
@@ -332,11 +323,6 @@ export const fetchCompanyList = createTableListFetcher({
     isActive: organization.isActive,
     createdAt: organization.createdAt,
     updatedAt: organization.updatedAt,
-  },
-  counts: {
-    totalJoins: false,
-    filteredJoins: (queryBuilder, { hasSearch }) =>
-      hasSearch ? companyListJoins(queryBuilder) : queryBuilder,
   },
   mapItem: mapCompanyListItem,
 });
@@ -396,9 +382,8 @@ Every list request may run:
 
 1. data query
 2. total count query
-3. filtered count query
 
-If count queries reuse all joins unnecessarily, they can become slow. That is why `counts.totalJoins` and `counts.filteredJoins` exist.
+If count queries reuse joins unnecessarily, they can become slow. That is why `counts.totalJoins` exists.
 
 ### Indexing
 

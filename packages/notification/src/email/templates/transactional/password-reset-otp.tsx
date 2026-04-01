@@ -384,7 +384,7 @@ const extraEmphasizedText = {
 };
 
 const logo = {
-  padding: "30px",
+  padding: "20px",
   textAlign: "center" as const,
   backgroundColor: "#ffffff",
 };

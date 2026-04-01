@@ -8,11 +8,19 @@ import {
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { and, eq } from "drizzle-orm";
-import { check_gst, create, get, remove } from "./openapi.route";
+import { check_gst, create, get, list, remove } from "./openapi.route";
 import type { AppBindings } from "@/types/app";
 import { env } from "@/config/env";
+import { fetchCompanyRequestList } from "./list";
 
 export const companyRequestGroup: OpenAPIHono<AppBindings> = new OpenAPIHono<AppBindings>();
+
+registerOpenApiRoute(companyRequestGroup, list, async (c) => {
+  const query = c.req.valid("query");
+  const response = await fetchCompanyRequestList(query);
+
+  return c.json(createSuccessResponse(response), 200);
+});
 
 registerOpenApiRoute(companyRequestGroup, get, async (c) => {
   const { id } = c.req.valid("param");

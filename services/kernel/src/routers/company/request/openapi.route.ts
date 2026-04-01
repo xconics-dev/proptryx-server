@@ -10,6 +10,8 @@ import {
   IdStringParamSchema,
 } from "@proptryx/utils";
 import {
+  companyRequestListQuerySchema,
+  companyRequestListResponseSchema,
   companyRequestBaseSchema,
   companyRequestCreateSchema,
   companyRequestSchema,
@@ -24,6 +26,23 @@ const companyRequestRbac = createResourceRbacGuards({
 
 const companyMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "company-request-methods",
+});
+
+export const list = createOpenApiRoute({
+  method: "get",
+  path: "/list",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("getAll")],
+  summary: "List company requests",
+  request: {
+    query: companyRequestListQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      companyRequestListResponseSchema,
+      "Company requests fetched successfully"
+    ),
+  },
 });
 
 export const get = createOpenApiRoute({

@@ -378,7 +378,7 @@ const extraEmphasizedText: React.CSSProperties = {
 };
 
 const logo: React.CSSProperties = {
-  padding: "30px",
+  padding: "20px",
   textAlign: "center",
   backgroundColor: "#ffffff",
 };

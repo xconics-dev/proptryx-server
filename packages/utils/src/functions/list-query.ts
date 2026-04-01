@@ -35,7 +35,7 @@ export type ListFilterDefinition<TParams, TValue> = {
 type CountJoinOption<TParams extends BaseListQueryParams> =
   | false
   | "data"
-  | ((builder: any, args: { params: TParams; hasSearch: boolean }) => any);
+  | ((builder: any, args: { params: TParams }) => any);
 
 export type ListQueryOptions<TItem, TParams extends BaseListQueryParams> = {
   db: DB;
@@ -65,9 +65,7 @@ export type ListQueryOptions<TItem, TParams extends BaseListQueryParams> = {
   };
   counts?: {
     includeTotal?: boolean;
-    includeFiltered?: boolean;
     totalJoins?: CountJoinOption<TParams>;
-    filteredJoins?: CountJoinOption<TParams>;
   };
   mapItem?: (row: any) => TItem;
 };
@@ -162,7 +160,7 @@ function applyCountJoinTransform<TParams extends BaseListQueryParams>(
   builder: any,
   joinOption: CountJoinOption<TParams> | undefined,
   dataJoins: ListQueryOptions<unknown, TParams>["joins"],
-  args: { params: TParams; hasSearch: boolean }
+  args: { params: TParams }
 ) {
   if (joinOption === false) {
     return builder;
@@ -335,7 +333,6 @@ export async function executeListQuery<TItem, TParams extends BaseListQueryParam
     [baseWhere, searchWhere, filterWhere].filter(Boolean),
     "and"
   );
-  const hasSearch = !!searchWhere;
 
   let dataQuery: any = options.db.select(options.select).from(options.from);
   dataQuery = applyJoinTransform(dataQuery, options.joins);
@@ -349,7 +346,6 @@ export async function executeListQuery<TItem, TParams extends BaseListQueryParam
   const rows = await dataQuery.limit(limit).offset(offset);
 
   const includeTotal = options.counts?.includeTotal ?? true;
-  const includeFiltered = options.counts?.includeFiltered ?? true;
 
   const totalCountPromise = includeTotal
     ? (() => {
@@ -360,33 +356,14 @@ export async function executeListQuery<TItem, TParams extends BaseListQueryParam
           totalCountQuery,
           options.counts?.totalJoins ?? false,
           options.joins,
-          { params: options.params, hasSearch }
+          { params: options.params }
         );
         totalCountQuery = applyWhereClause(totalCountQuery, baseWhere);
         return totalCountQuery;
       })()
     : Promise.resolve([{ count: 0 }]);
 
-  const filteredCountPromise = includeFiltered
-    ? (() => {
-        let filteredCountQuery: any = options.db
-          .select({ count: countDistinct(options.countDistinctOn) })
-          .from(options.from);
-        filteredCountQuery = applyCountJoinTransform(
-          filteredCountQuery,
-          options.counts?.filteredJoins ?? "data",
-          options.joins,
-          { params: options.params, hasSearch }
-        );
-        filteredCountQuery = applyWhereClause(filteredCountQuery, filteredWhere);
-        return filteredCountQuery;
-      })()
-    : Promise.resolve([{ count: rows.length }]);
-
-  const [totalCountRows, filteredCountRows] = await Promise.all([
-    totalCountPromise,
-    filteredCountPromise,
-  ]);
+  const [totalCountRows] = await Promise.all([totalCountPromise]);
 
   return {
     items: options.mapItem ? rows.map(options.mapItem) : (rows as TItem[]),
@@ -394,18 +371,6 @@ export async function executeListQuery<TItem, TParams extends BaseListQueryParam
     limit,
     offset,
     totalItems: includeTotal ? (totalCountRows[0]?.count ?? 0) : 0,
-    filteredItems: includeFiltered ? (filteredCountRows[0]?.count ?? 0) : rows.length,
-    sortBy:
-      normalizeString(options.sorting?.sortBy ?? options.params.sortBy) ??
-      options.sorting?.defaultBy ??
-      Object.keys(options.sortColumns ?? {})[0] ??
-      null,
-    sortOrder:
-      options.sorting?.sortOrder ??
-      options.params.sortOrder ??
-      options.sorting?.defaultOrder ??
-      "desc",
-    search: normalizeString(options.search?.value ?? options.params.search) ?? null,
   };
 }
 

@@ -21,26 +21,28 @@ import {
 import { imgesdata, metadata } from "../../static/const";
 
 const defaultData = {
-  previewText: "Your Proptryx Account is Ready!",
+  previewText: "You're invited to join Proptryx!",
   credEmail: "mondalsuman97322@gmail.com",
   credPassword: "password123",
   organizationName: "Acme Pvt Ltd",
-  planName: "Pro Plan",
+  role: "Admin",
 };
 
-type AccountCredEmailProps = {
+type MemberAccountCredEmailProps = {
   previewText: string;
   credEmail?: string;
   credPassword?: string;
   organizationName?: string;
+  role?: string;
 };
 
-export const AccountCredEmail = ({
+export const MemberAccountCredEmail = ({
   previewText,
   credEmail,
   credPassword,
   organizationName,
-}: AccountCredEmailProps) => {
+  role,
+}: MemberAccountCredEmailProps) => {
   const getStartedLink = `${metadata.consoleUrl}/auth?cred_email=${encodeURIComponent(
     credEmail || ""
   )}&cred_password=${encodeURIComponent(credPassword || "")}`;
@@ -64,7 +66,6 @@ export const AccountCredEmail = ({
       <Body style={main}>
         <Preview>{previewText}</Preview>
 
-        {/* Outer wrapper table for full email client compatibility */}
         <table
           border={0}
           cellPadding="0"
@@ -77,19 +78,11 @@ export const AccountCredEmail = ({
             <tr>
               <td align="center" style={{ padding: "30px 15px" }}>
                 <Container style={container}>
-                  {/* Banner Section */}
+                  {/* Logo */}
                   <Section style={logo}>
-                    <table
-                      role="presentation"
-                      border={0}
-                      cellPadding="0"
-                      cellSpacing="0"
-                      align="center"
-                      style={{ margin: "0 auto" }}
-                    >
+                    <table align="center" style={{ margin: "0 auto" }}>
                       <tbody>
                         <tr>
-                          {/* Logo */}
                           <td style={{ verticalAlign: "middle" }}>
                             <Img
                               alt="Proptryx"
@@ -98,32 +91,16 @@ export const AccountCredEmail = ({
                               style={logoImg}
                             />
                           </td>
-
-                          {/* Spacing */}
                           <td width="10" />
-
-                          {/* Brand Name */}
                           <td style={{ verticalAlign: "middle" }}>
-                            <Text
-                              style={{
-                                margin: "0",
-                                fontFamily:
-                                  "'satoshi', 'Verdana', 'Arial', 'Helvetica', sans-serif",
-                                fontSize: "24px",
-                                fontWeight: "700",
-                                color: "#161950",
-                                lineHeight: "1",
-                              }}
-                            >
-                              PropTryx
-                            </Text>
+                            <Text style={brandText}>PropTryx</Text>
                           </td>
                         </tr>
                       </tbody>
                     </table>
                   </Section>
 
-                  {/* Decorative Border */}
+                  {/* Divider */}
                   <Section style={sectionsBorders}>
                     <Row>
                       <Column style={sectionBorder} />
@@ -131,41 +108,30 @@ export const AccountCredEmail = ({
                       <Column style={sectionBorder} />
                     </Row>
                   </Section>
-                  <Text
-                    style={{
-                      fontSize: "22px",
-                      fontWeight: "700",
-                      color: "#161950",
-                      marginTop: "14px",
-                      textAlign: "center",
-                    }}
-                  >
-                    Proptryx Account Activated
-                  </Text>
-                  {/* Main Content */}
+
+                  {/* Heading */}
+                  <Text style={heading}>You’ve Been Invited 🎉</Text>
+
+                  {/* Content */}
                   <Section style={content}>
-                    <Text
-                      style={{
-                        ...emphasizedText,
-                      }}
-                    >
-                      Hello,
-                    </Text>
+                    <Text style={emphasizedText}>Hello,</Text>
+
                     <Text style={paragraph}>
-                      Your organization{" "}
+                      You have been invited to join{" "}
                       <span style={{ fontWeight: "600", color: "#161950" }}>
                         {organizationName}
                       </span>{" "}
-                      has been successfully activated to Proptryx.
+                      on Proptryx as a{" "}
+                      <span style={{ fontWeight: "600", color: "#161950" }}>{role}</span>.
                     </Text>
 
                     <Text style={paragraph}>Here’s your Login Details:</Text>
 
-                    {/* Credentials Box */}
+                    {/* Credentials */}
                     <Section style={credentialsBox}>
                       <Text style={credentialLabel}>
                         Email ID: &nbsp;
-                        <span style={credentialValue}>{`${credEmail}`}</span>
+                        <span style={credentialValue}>{credEmail}</span>
                       </Text>
                       <Text style={credentialLabel}>
                         Password: &nbsp;
@@ -173,40 +139,14 @@ export const AccountCredEmail = ({
                       </Text>
                     </Section>
 
-                    <Button
-                      href={getStartedLink}
-                      style={{
-                        background:
-                          "linear-gradient(to bottom, #4962FF 0%, #4962FF 50%, #3E55EF 50%, #3E55EF 100%)",
-                        width: "100%",
-                        height: "40px",
-                        color: "#fff",
-                        textDecoration: "none",
-                        fontWeight: 400,
-                        fontSize: "16px",
-                        border: "none",
-                        boxShadow: "none",
-                        padding: "0",
-                        cursor: "pointer",
-                        letterSpacing: "0.02em",
-                        marginTop: "10px",
-                        textAlign: "center",
-                        lineHeight: "40px",
-                      }}
-                    >
-                      Get started <span style={{ marginLeft: "8px" }}>→</span>
+                    <Button href={getStartedLink} style={buttonStyle}>
+                      Accept Invitation <span style={{ marginLeft: "8px" }}>→</span>
                     </Button>
 
-                    <Text
-                      style={{
-                        ...paragraph,
-                        marginTop: "24px",
-                      }}
-                    >
-                      We’re excited to help you streamline your operations and grow .
+                    <Text style={{ ...paragraph, marginTop: "24px" }}>
+                      We’re excited to have you onboard. Start collaborating with your team.
                     </Text>
 
-                    {/* Regards Section */}
                     <Section style={regardsSection}>
                       <Text style={paragraph}>
                         Best Regards,
@@ -217,6 +157,8 @@ export const AccountCredEmail = ({
                       </Text>
                     </Section>
                   </Section>
+
+                  {/* Divider */}
                   <Section style={sectionsBorders}>
                     <Row>
                       <Column style={sectionBorder} />
@@ -225,63 +167,32 @@ export const AccountCredEmail = ({
                     </Row>
                   </Section>
 
-                  {/* Social Media Icons Section - WITH SPACER CELLS */}
+                  {/* Social */}
                   <Section style={socialSection}>
-                    <table
-                      align="center"
-                      border={0}
-                      cellPadding="0"
-                      cellSpacing="0"
-                      role="presentation"
-                      style={socialTable}
-                    >
+                    <table align="center" style={socialTable}>
                       <tbody>
                         <tr>
                           <td style={socialIconCell}>
                             <Link href={metadata.instagramUrl || "#"} style={socialLink}>
-                              <Img
-                                alt="Instagram"
-                                height="32"
-                                src={imgesdata.instagramIcon}
-                                style={socialIcon}
-                                width="32"
-                              />
+                              <Img src={imgesdata.instagramIcon} style={socialIcon} />
                             </Link>
                           </td>
-                          <td width="15" /> {/* Spacer cell */}
+                          <td width="15" />
                           <td style={socialIconCell}>
                             <Link href={metadata.facebookUrl || "#"} style={socialLink}>
-                              <Img
-                                alt="Facebook"
-                                height="32"
-                                src={imgesdata.facebookIcon}
-                                style={socialIcon}
-                                width="32"
-                              />
+                              <Img src={imgesdata.facebookIcon} style={socialIcon} />
                             </Link>
                           </td>
-                          <td width="15" /> {/* Spacer cell */}
+                          <td width="15" />
                           <td style={socialIconCell}>
                             <Link href={metadata.linkedinUrl || "#"} style={socialLink}>
-                              <Img
-                                alt="LinkedIn"
-                                height="32"
-                                src={imgesdata.linkedinIcon}
-                                style={socialIcon}
-                                width="32"
-                              />
+                              <Img src={imgesdata.linkedinIcon} style={socialIcon} />
                             </Link>
                           </td>
-                          <td width="15" /> {/* Spacer cell */}
+                          <td width="15" />
                           <td style={socialIconCell}>
                             <Link href={metadata.twitterUrl || "#"} style={socialLink}>
-                              <Img
-                                alt="X (Twitter)"
-                                height="32"
-                                src={imgesdata.twitterIcon}
-                                style={socialIcon}
-                                width="32"
-                              />
+                              <Img src={imgesdata.twitterIcon} style={socialIcon} />
                             </Link>
                           </td>
                         </tr>
@@ -289,6 +200,7 @@ export const AccountCredEmail = ({
                     </table>
                   </Section>
 
+                  {/* Footer */}
                   {/* Footer */}
                   <Section style={footerSection}>
                     <Text style={footerText}>© 2026 Proptryx. All rights reserved.</Text>
@@ -319,28 +231,14 @@ export const AccountCredEmail = ({
   );
 };
 
-export default AccountCredEmail;
+export default MemberAccountCredEmail;
 
-export const renderAccountCredEmail = async ({
-  previewText,
-  credEmail,
-  credPassword,
-  organizationName,
-}: AccountCredEmailProps) =>
-  await pretty(
-    await render(
-      <AccountCredEmail
-        credEmail={credEmail}
-        credPassword={credPassword}
-        previewText={previewText}
-        organizationName={organizationName}
-      />
-    )
-  );
+export const renderMemberAccountCredEmail = async (props: MemberAccountCredEmailProps) =>
+  await pretty(await render(<MemberAccountCredEmail {...props} />));
 
-AccountCredEmail.PreviewProps = defaultData;
+MemberAccountCredEmail.PreviewProps = defaultData;
 
-// ========== STYLES ==========
+// ================= STYLES =================
 
 const main = {
   fontFamily: "'satoshi', 'Verdana', 'Arial', 'Helvetica', sans-serif",
@@ -348,15 +246,11 @@ const main = {
   width: "100%",
   padding: "0",
   margin: "0",
-  WebkitTextSizeAdjust: "100%",
-  msTextSizeAdjust: "100%",
 };
 
 const outerTable = {
   backgroundColor: "#F0F2FF",
   width: "100%",
-  margin: "0",
-  padding: "0",
 };
 
 const container = {
@@ -369,7 +263,7 @@ const container = {
 };
 
 const content = {
-  padding: "10px 20px",
+  padding: "2px 20px",
 };
 
 const paragraph = {
@@ -388,102 +282,34 @@ const emphasizedText = {
   margin: "14px 0",
 };
 
-const link = {
-  fontSize: "14px",
+const heading = {
+  fontSize: "22px",
   fontWeight: "700",
-  textDecoration: "underline",
-  color: "#465FFF",
-};
-
-const imageSection = {
-  padding: "20px 30px",
-  textAlign: "center" as const,
-  backgroundColor: "#ffffff",
-};
-
-const sectionsBorders = {
-  width: "100%",
-  padding: "0 20px",
-};
-
-const sectionBorder = {
-  borderBottom: "1px solid #D9D9D9",
-  width: "230px",
-};
-
-const sectionCenter = {
-  borderBottom: "1px solid #465FFF",
-  width: "140px",
-};
-
-const regardsSection = {
-  marginTop: "30px",
-};
-
-// Social Media Icons Styles
-const socialSection = {
-  padding: "10px",
-  marginTop: "10px",
-  backgroundColor: "#ffffff",
-  textAlign: "center" as const,
-};
-
-const socialTable = {
-  margin: "0 auto",
-  padding: "0",
-  borderCollapse: "collapse" as const,
-  borderSpacing: "0",
-};
-
-const socialIconCell = {
-  padding: "0",
-  verticalAlign: "middle" as const,
-};
-
-const socialIcon = {
-  width: "32px",
-  height: "32px",
-  borderRadius: "50%",
-  display: "block",
-  border: "0",
-};
-
-const socialLink = {
-  display: "inline-block",
-  textDecoration: "none",
-};
-
-// Footer Styles
-const footerSection = {
-  width: "100%",
-  padding: "20px 30px",
-  backgroundColor: "#FAFBFF",
-  borderTop: "1px solid #E5E7EB",
-};
-
-const footerText = {
-  textAlign: "center" as const,
-  fontSize: "12px",
-  fontWeight: "500",
-  lineHeight: "1.5",
   color: "#161950",
-  margin: "0 0 12px 0",
-};
-
-const footerTextSmall = {
+  marginTop: "14px",
   textAlign: "center" as const,
-  fontSize: "11px",
-  fontWeight: "400",
-  lineHeight: "1.6",
-  color: "#6B7280",
-  margin: "0",
 };
 
-const footerLink = {
-  fontSize: "11px",
-  fontWeight: "500",
-  textDecoration: "underline",
-  color: "#465FFF",
+const brandText = {
+  margin: "0",
+  fontSize: "24px",
+  fontWeight: "700",
+  color: "#161950",
+};
+
+const buttonStyle = {
+  background: "linear-gradient(to bottom, #4962FF 0%, #4962FF 50%, #3E55EF 50%, #3E55EF 100%)",
+  width: "100%",
+  height: "40px",
+  color: "#fff",
+  textDecoration: "none",
+  fontWeight: 400,
+  fontSize: "16px",
+  border: "none",
+  padding: "0",
+  marginTop: "10px",
+  textAlign: "center" as const,
+  lineHeight: "40px",
 };
 
 const credentialsBox = {
@@ -495,26 +321,86 @@ const credentialsBox = {
 
 const credentialLabel = {
   fontSize: "14px",
-  fontWeight: "400",
-  color: "#161950",
-  lineHeight: "1.8",
   margin: "4px 0",
 };
 
 const credentialValue = {
   fontWeight: "600",
-  color: "#161950",
+};
+
+const link = {
+  color: "#465FFF",
+  textDecoration: "underline",
+};
+
+const sectionsBorders = {
+  padding: "0 20px",
+};
+
+const sectionBorder = {
+  borderBottom: "1px solid #D9D9D9",
+};
+
+const sectionCenter = {
+  borderBottom: "1px solid #465FFF",
+};
+
+const regardsSection = {
+  marginTop: "30px",
+};
+
+const socialSection = {
+  padding: "10px",
+  marginTop: "10px",
+  textAlign: "center" as const,
+};
+
+const socialTable = {
+  margin: "0 auto",
+};
+
+const socialIconCell = {
+  padding: "0",
+};
+
+const socialIcon = {
+  width: "32px",
+  height: "32px",
+};
+
+const socialLink = {
   textDecoration: "none",
 };
 
-const logo: React.CSSProperties = {
-  padding: "20px",
-  textAlign: "center",
-  backgroundColor: "#ffffff",
+const footerSection = {
+  padding: "15px",
+  backgroundColor: "#FAFBFF",
+  borderTop: "1px solid #E5E7EB",
 };
 
-const logoImg: React.CSSProperties = {
-  margin: "0 auto",
+const footerText = {
+  textAlign: "center" as const,
+  fontSize: "12px",
+  marginBottom: "12px",
+};
+
+const footerTextSmall = {
+  textAlign: "center" as const,
+  fontSize: "11px",
+};
+
+const logo = {
+  padding: "20px",
+  textAlign: "center" as const,
+};
+
+const logoImg = {
   display: "block",
-  maxWidth: "100%",
+};
+
+const footerLink = {
+  fontSize: "11px",
+  fontWeight: "500",
+  textDecoration: "underline",
+  color: "#465FFF",
 };
