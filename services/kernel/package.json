@@ -17,22 +17,22 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.11",
-    "@hono/zod-openapi": "^1.2.2",
+    "@hono/node-server": "^1.19.12",
+    "@hono/zod-openapi": "^1.2.4",
     "@proptryx/database": "workspace:*",
     "@proptryx/logger": "workspace:*",
     "@proptryx/utils": "workspace:*",
     "@proptryx/notification": "workspace:*",
-    "@t3-oss/env-core": "^0.13.10",
-    "hono": "^4.12.8",
+    "@t3-oss/env-core": "^0.13.11",
+    "hono": "^4.12.9",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.8",
+    "@biomejs/biome": "^2.4.10",
     "@proptryx/typescript-config": "workspace:*",
     "@types/node": "^25.5.0",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }

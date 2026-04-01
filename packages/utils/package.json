@@ -22,28 +22,28 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@hono/zod-openapi": "^1.2.2",
-    "@hono/node-server": "^1.19.11",
+    "@hono/zod-openapi": "^1.2.4",
+    "@hono/node-server": "^1.19.12",
     "@proptryx/database": "workspace:*",
     "@proptryx/static": "workspace:*",
-    "@scalar/hono-api-reference": "^0.10.4",
-    "@t3-oss/env-core": "^0.13.10",
-    "drizzle-orm": "^0.45.1",
-    "hono": "^4.12.8",
+    "@scalar/hono-api-reference": "^0.10.5",
+    "@t3-oss/env-core": "^0.13.11",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.9",
     "hono-rate-limiter": "^0.5.3",
     "ioredis": "^5.10.1",
     "razorpay": "^2.9.6",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
-    "unstorage": "^1.17.4",
+    "unstorage": "^1.17.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.8",
+    "@biomejs/biome": "^2.4.10",
     "@proptryx/typescript-config": "workspace:*",
     "@types/node": "^25.5.0",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }
