@@ -12,7 +12,10 @@ import {
   companyCreateResponseSchema,
   companyCreateSchema,
   companyGstInfoSchema,
+  companyListQuerySchema,
+  companyListResponseSchema,
   companySchema,
+  companyUpdateSchema,
 } from "./schema";
 
 const tags = ["Company Operations"];
@@ -27,6 +30,20 @@ const companyMethodsRateLimit = createOperationalRateLimit({
 });
 
 // Query routes
+
+export const list = createOpenApiRoute({
+  method: "get",
+  path: "/",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("getAll")],
+  summary: "List companies",
+  request: {
+    query: companyListQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(companyListResponseSchema, "Companies fetched successfully"),
+  },
+});
 
 export const get = createOpenApiRoute({
   method: "get",
@@ -85,7 +102,7 @@ export const update = createOpenApiRoute({
   summary: "Update a company by ID",
   request: {
     params: IdStringParamSchema(),
-    body: createApiJsonBody(companyCreateSchema.partial()),
+    body: createApiJsonBody(companyUpdateSchema),
   },
   responses: {
     200: createApiSuccessResponse(companySchema, "Company updated successfully"),
@@ -102,8 +119,6 @@ export const remove = createOpenApiRoute({
     params: IdStringParamSchema(),
   },
   responses: {
-    204: {
-      description: "Company request deleted successfully",
-    },
+    200: createApiSuccessResponse(companySchema, "Company deleted successfully"),
   },
 });

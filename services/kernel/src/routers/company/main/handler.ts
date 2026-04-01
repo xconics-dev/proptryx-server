@@ -3,8 +3,10 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: forced */
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { create, get, remove, update, get_gst_info } from "./openapi.route";
+import { create, get, get_gst_info, list, remove, update } from "./openapi.route";
 import {
+  createErrorResponse,
+  createSuccessResponse,
   ensureDefaultOrganizationRoles,
   generateNextCompanyId,
   generateRandomId,
@@ -16,7 +18,7 @@ import {
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { account, db, member, organization, user } from "@proptryx/database";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   COMPANY_CREATION_TOTAL_STEPS,
   companyGstInfoSchema,
@@ -25,17 +27,17 @@ import {
 import { logger } from "@/lib/logger";
 import { env } from "@/config/env";
 import { sendEmail, renderAccountCredEmail, emailSubject } from "@proptryx/notification";
+import { fetchCompanyList } from "./list";
 
 export const companyMainGroup = new OpenAPIHono<AppBindings>();
 
 const rzClient = getRazorpayClient();
 
-// Query routes
-registerOpenApiRoute(companyMainGroup, get, async (c) => {
-  const { id } = c.req.valid("param");
-
-  const company = await db.query.organization.findFirst({
-    where: eq(organization.id, id),
+async function findCompanyById(id: string, options?: { includeDeleted?: boolean }) {
+  return db.query.organization.findFirst({
+    where: options?.includeDeleted
+      ? eq(organization.id, id)
+      : and(eq(organization.id, id), eq(organization.isDeleted, false)),
     with: {
       roles: {
         columns: {
@@ -46,29 +48,59 @@ registerOpenApiRoute(companyMainGroup, get, async (c) => {
       },
     },
   });
+}
+
+// Query routes
+registerOpenApiRoute(companyMainGroup, list, async (c) => {
+  const query = c.req.valid("query");
+  const response = await fetchCompanyList(query);
+
+  return c.json(createSuccessResponse(response), 200);
+});
+
+registerOpenApiRoute(companyMainGroup, get, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const company = await findCompanyById(id);
 
   if (!company) {
-    return c.json({ message: `No company found with id ${id}` }, 404);
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
   }
 
-  return c.json(company, 200);
+  return c.json(createSuccessResponse(company), 200);
 });
 
 registerOpenApiRoute(companyMainGroup, get_gst_info, async (c) => {
   const { id } = c.req.valid("param");
 
-  const company = await db.query.organization.findFirst({
-    where: eq(organization.id, id),
-  });
+  const company = await findCompanyById(id);
 
   if (!company) {
-    return c.json({ message: `No company found with id ${id}` }, 404);
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
   }
 
   const gstNumber = company.gstNumber;
 
   if (!gstNumber) {
-    return c.json({ message: "GST number not found for this company" }, 404);
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "GST number not found for this company",
+      }),
+      404
+    );
   }
   const gst_response = await fetch(
     `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`
@@ -79,10 +111,16 @@ registerOpenApiRoute(companyMainGroup, get_gst_info, async (c) => {
   const gstParsedPayload = companyGstInfoSchema.safeParse(gst_payload);
 
   if (!gstParsedPayload.success) {
-    return c.json({ message: "GST number is invalid or inactive." }, 400);
+    return c.json(
+      createErrorResponse({
+        error: "Invalid GST",
+        message: "GST number is invalid or inactive.",
+      }),
+      400
+    );
   }
 
-  return c.json(gstParsedPayload.data, 200);
+  return c.json(createSuccessResponse(gstParsedPayload.data), 200);
 });
 
 // Mutation routes
@@ -125,7 +163,13 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
   ]);
 
   if (emailExists) {
-    return c.json({ message: "Client with this email already exists" }, 409);
+    return c.json(
+      createErrorResponse({
+        error: "Conflict",
+        message: "Client with this email already exists",
+      }),
+      409
+    );
   }
   //   if (phoneExists) {
   //     return c.json({ message: "Client with this phone number already exists" }, 409);
@@ -259,10 +303,15 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
     logger.error(`[company.create] Razorpay upsert failed for org ${orgData.id}:`, rzError as any);
   }
 
+  const createdCompany = await findCompanyById(orgData.id);
+
   // ─── Return ──────────────────────────────────────────────────────────────
   return c.json(
-    {
-      company: orgData,
+    createSuccessResponse({
+      company: createdCompany ?? {
+        ...orgData,
+        roles: [],
+      },
       owner: {
         id: userData.id,
         name: userData.name,
@@ -272,7 +321,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
       totalSteps: COMPANY_CREATION_TOTAL_STEPS,
       stepsCompleted,
       stepsFailed,
-    },
+    }),
     201
   );
 });
@@ -285,14 +334,20 @@ registerOpenApiRoute(companyMainGroup, update, async (c) => {
   const [existingCompany] = await db
     .select()
     .from(organization)
-    .where(eq(organization.id, id))
+    .where(and(eq(organization.id, id), eq(organization.isDeleted, false)))
     .limit(1);
 
   if (!existingCompany) {
-    return c.json({ message: `No company found with id ${id}` }, 404);
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
   }
 
-  const [updatedCompany] = await db
+  await db
     .update(organization)
     .set({
       ...body,
@@ -301,7 +356,19 @@ registerOpenApiRoute(companyMainGroup, update, async (c) => {
     .where(eq(organization.id, id))
     .returning();
 
-  return c.json(updatedCompany, 200);
+  const updatedCompany = await findCompanyById(id);
+
+  if (!updatedCompany) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  return c.json(createSuccessResponse(updatedCompany), 200);
 });
 
 registerOpenApiRoute(companyMainGroup, remove, async (c) => {
@@ -311,11 +378,17 @@ registerOpenApiRoute(companyMainGroup, remove, async (c) => {
   const [existingCompany] = await db
     .select()
     .from(organization)
-    .where(eq(organization.id, id))
+    .where(and(eq(organization.id, id), eq(organization.isDeleted, false)))
     .limit(1);
 
   if (!existingCompany) {
-    return c.json({ message: `No company found with id ${id}` }, 404);
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
   }
 
   await db
@@ -327,5 +400,18 @@ registerOpenApiRoute(companyMainGroup, remove, async (c) => {
     })
     .where(eq(organization.id, id));
 
-  return c.json({ message: "Company deleted successfully" }, 200);
+  const deletedCompany = await findCompanyById(id, { includeDeleted: true });
+
+  return c.json(
+    createSuccessResponse(
+      deletedCompany ?? {
+        ...existingCompany,
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedByUser: currentAuthUser?.id ?? null,
+        roles: [],
+      }
+    ),
+    200
+  );
 });

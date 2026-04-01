@@ -36,6 +36,7 @@ export const user = pgTable(
       .notNull(),
   },
   (table) => [
+    index("user_name_idx").on(table.name),
     index("user_role_idx").on(table.role),
     index("user_panel_idx").on(table.panel),
     index("user_zoneId_idx").on(table.zoneId),
@@ -135,6 +136,14 @@ export const organization = pgTable(
   },
   (table) => [
     uniqueIndex("organization_slug_uidx").on(table.slug),
+    index("organization_isDeleted_createdAt_idx").on(table.isDeleted, table.createdAt),
+    index("organization_isDeleted_updatedAt_idx").on(table.isDeleted, table.updatedAt),
+    index("organization_isDeleted_name_idx").on(table.isDeleted, table.name),
+    index("organization_isDeleted_type_idx").on(table.isDeleted, table.type),
+    index("organization_isDeleted_isActive_idx").on(table.isDeleted, table.isActive),
+    index("organization_email_idx").on(table.email),
+    index("organization_phoneNumber_idx").on(table.phoneNumber),
+    index("organization_gstNumber_idx").on(table.gstNumber),
     index("organization_razorpayCustomerId_idx").on(table.razorpayCustomerId),
   ]
 );

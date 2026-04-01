@@ -108,6 +108,7 @@ pnpm docker:prod:up:build:d
 - [docs/SCRIPTS.md](docs/SCRIPTS.md)
 - [docs/GITHUB_AUTOMATION.md](docs/GITHUB_AUTOMATION.md)
 - [docs/JENKINS_DEPLOYMENT.md](docs/JENKINS_DEPLOYMENT.md)
+- [docs/REUSABLE_LIST_QUERY.md](docs/REUSABLE_LIST_QUERY.md)
 
 ## Docker Optimization & Compatibility
 
