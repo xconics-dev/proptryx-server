@@ -45,7 +45,7 @@ export const MemberAccountCredEmail = ({
 }: MemberAccountCredEmailProps) => {
   const getStartedLink = `${metadata.consoleUrl}/auth?cred_email=${encodeURIComponent(
     credEmail || ""
-  )}&cred_password=${encodeURIComponent(credPassword || "")}`;
+  )}&cred_password=${encodeURIComponent(credPassword || "")}&redirect=member-invitation`;
 
   return (
     <Html>
