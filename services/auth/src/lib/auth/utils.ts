@@ -1,4 +1,4 @@
-import { getDB, region, zone } from "@proptryx/database";
+import { getDB, region, type DB, zone } from "@proptryx/database";
 import { AUTH_SESSION_REDIS_PREFIX, getRedisClient, initializeRedisClient } from "@proptryx/utils";
 import { redisStorage } from "@better-auth/redis-storage";
 import { env } from "@/config/env";
@@ -64,7 +64,7 @@ export function normalizeBasePath(pathname: string) {
   return normalizedPathname.length === 0 ? "/" : normalizedPathname;
 }
 
-export function resolveAuthDatabase() {
+export function resolveAuthDatabase(): DB {
   try {
     return getDB();
   } catch {
