@@ -17,6 +17,13 @@ export const region = pgTable(
     name: text("name").notNull().unique(),
     description: text("description"),
 
+    // For keep reference
+    createdByUser: text("created_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
+    updatedByUser: text("updated_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -42,6 +49,13 @@ export const zone = pgTable(
     regionId: text("region_id")
       .notNull()
       .references(() => region.id, { onDelete: "cascade" }),
+    // For keep reference
+    createdByUser: text("created_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
+    updatedByUser: text("updated_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -68,6 +82,16 @@ export const regionRelations = relations(region, ({ many, one }) => ({
     references: [user.id],
     relationName: "regionDeletedByUser",
   }),
+  createdBy: one(user, {
+    fields: [region.createdByUser],
+    references: [user.id],
+    relationName: "regionCreatedByUser",
+  }),
+  updatedBy: one(user, {
+    fields: [region.updatedByUser],
+    references: [user.id],
+    relationName: "regionUpdatedByUser",
+  }),
 }));
 
 export const zoneRelations = relations(zone, ({ one }) => ({
@@ -79,5 +103,15 @@ export const zoneRelations = relations(zone, ({ one }) => ({
     fields: [zone.deletedByUser],
     references: [user.id],
     relationName: "zoneDeletedByUser",
+  }),
+  createdBy: one(user, {
+    fields: [zone.createdByUser],
+    references: [user.id],
+    relationName: "zoneCreatedByUser",
+  }),
+  updatedBy: one(user, {
+    fields: [zone.updatedByUser],
+    references: [user.id],
+    relationName: "zoneUpdatedByUser",
   }),
 }));

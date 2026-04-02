@@ -17,7 +17,7 @@ import {
   companyRequestSchema,
 } from "./schema";
 
-const tags = ["Company Request Operations"];
+const tags = ["Company / Requests"];
 
 const companyRequestRbac = createResourceRbacGuards({
   resource: DATABASE_RESOURCES.company_request,

@@ -9,7 +9,7 @@ import {
 } from "@proptryx/utils";
 import { memberCreateSchema, memberSchema } from "./schema";
 
-const tags = ["Company"];
+const tags = ["Company / Members"];
 
 const companyRequestRbac = createResourceRbacGuards({
   resource: DATABASE_RESOURCES.organization,
