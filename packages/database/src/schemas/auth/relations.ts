@@ -15,6 +15,8 @@ import {
 } from "./schema";
 import { rbacRole } from "./rbac/schema";
 
+const memberUserRelationName = "memberUser";
+
 const auditRelations = {
   companyRequest: createAuditRelationNames("companyRequest"),
   faq: createAuditRelationNames("faq"),
@@ -40,7 +42,9 @@ export const userRelations = relations(user, ({ many, one }) => {
   return {
     accounts: many(account),
     sessions: many(session),
-    members: many(member),
+    members: many(member, {
+      relationName: memberUserRelationName,
+    }),
     invitations: many(invitation),
     zone: one(zone, {
       fields: [user.zoneId],
@@ -199,6 +203,7 @@ export const memberRelations = relations(member, ({ one }) => {
     user: one(user, {
       fields: [member.userId],
       references: [user.id],
+      relationName: memberUserRelationName,
     }),
     createdByUser: memberAudit(member.createdByUser, auditRelations.member.created),
     updatedByUser: memberAudit(member.updatedByUser, auditRelations.member.updated),
