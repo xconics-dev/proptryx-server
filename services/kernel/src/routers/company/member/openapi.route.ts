@@ -1,5 +1,6 @@
 import { DATABASE_RESOURCES } from "@proptryx/database";
 import {
+  ApiNotFoundOpenApi,
   createApiJsonBody,
   createApiSuccessResponse,
   createOpenApiRoute,
@@ -8,7 +9,14 @@ import {
   DEFAULT_FAST_RBAC_AUTH_OPTIONS,
   IdStringParamSchema,
 } from "@proptryx/utils";
-import { memberCreateSchema, memberSchema, memberUpdateSchema } from "./schema";
+import {
+  memberCreateSchema,
+  memberListItemSchema,
+  memberListQuerySchema,
+  memberListResponseSchema,
+  memberSchema,
+  memberUpdateSchema,
+} from "./schema";
 
 const tags = ["Company / Members"];
 
@@ -21,10 +29,43 @@ const companyMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "company-member-methods",
 });
 
+// Query routes
+export const list = createOpenApiRoute({
+  method: "get",
+  path: "/list",
+  operationId: "companyMemberList",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("getAll")],
+  summary: "List company members",
+  request: {
+    query: memberListQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(memberListResponseSchema, "Members fetched successfully"),
+  },
+});
+
+export const get = createOpenApiRoute({
+  method: "get",
+  path: "/{id}",
+  operationId: "companyMemberGetById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.get],
+  summary: "Get a company member by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(memberListItemSchema, "Member fetched successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
 // Mutation routes
 export const create = createOpenApiRoute({
   method: "post",
   path: "/",
+  operationId: "companyMemberCreate",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("create")],
   summary: "Add a new member to the company",
@@ -39,6 +80,7 @@ export const create = createOpenApiRoute({
 export const update = createOpenApiRoute({
   method: "patch",
   path: "/{id}",
+  operationId: "companyMemberUpdateById",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
   summary: "Update an existing member",
@@ -54,6 +96,7 @@ export const update = createOpenApiRoute({
 export const remove = createOpenApiRoute({
   method: "delete",
   path: "/{id}",
+  operationId: "companyMemberDeleteById",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
   summary: "Remove a member from the company",
@@ -70,6 +113,7 @@ export const remove = createOpenApiRoute({
 export const remove_with_user = createOpenApiRoute({
   method: "delete",
   path: "/{id}/with-user",
+  operationId: "companyMemberDeleteWithUserById",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
   summary: "Remove a member and their user account also",

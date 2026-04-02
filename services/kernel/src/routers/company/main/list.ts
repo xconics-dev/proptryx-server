@@ -71,4 +71,7 @@ export const fetchCompanyList = createTableListFetcher<
     updatedAt: organization.updatedAt,
   },
   mapItem: mapCompanyListItem,
+  counts: {
+    totalJoins: "data",
+  },
 });

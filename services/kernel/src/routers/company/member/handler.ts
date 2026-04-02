@@ -2,6 +2,7 @@ import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
   createErrorResponse,
+  createSuccessResponse,
   encryptPassword,
   generateRandomId,
   generateRandomPassword,
@@ -10,13 +11,60 @@ import {
   PasswordUtils,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { create, remove, remove_with_user, update } from "./openapi.route";
+import { create, get, list, remove, remove_with_user, update } from "./openapi.route";
 import { env } from "@/config/env";
 import { account, db, member, organization, user } from "@proptryx/database";
 import { and, eq } from "drizzle-orm";
 import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx/notification";
+import { fetchMemberList } from "./list";
 
 export const companyMembersGroup = new OpenAPIHono<AppBindings>();
+
+// Query routes
+registerOpenApiRoute(companyMembersGroup, list, async (c) => {
+  const query = c.req.valid("query");
+  const response = await fetchMemberList(query);
+
+  return c.json(createSuccessResponse(response), 200);
+});
+
+registerOpenApiRoute(companyMembersGroup, get, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const memberData = await db
+    .select({
+      id: member.id,
+      organizationId: member.organizationId,
+      userId: member.userId,
+      role: member.role,
+      panel: member.panel,
+      createdAt: member.createdAt,
+      updatedAt: member.updatedAt,
+      createdByUser: member.createdByUser,
+      updatedByUser: member.updatedByUser,
+      deletedAt: member.deletedAt,
+      isDeleted: member.isDeleted,
+      deletedByUser: member.deletedByUser,
+      user,
+    })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(and(eq(member.id, id), eq(member.isDeleted, false), eq(user.isDeleted, false)))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  if (!memberData) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  return c.json(createSuccessResponse(memberData), 200);
+});
 
 // Mutation routes
 registerOpenApiRoute(companyMembersGroup, create, async (c) => {

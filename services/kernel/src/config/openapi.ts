@@ -33,7 +33,7 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
   ],
   "x-tagGroups": [
     {
-      name: "Company",
+      name: "Company APIs",
       tags: ["Company", "Company / Members", "Company / Requests"],
     },
     {

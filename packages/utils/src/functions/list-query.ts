@@ -358,7 +358,7 @@ export async function executeListQuery<TItem, TParams extends BaseListQueryParam
           options.joins,
           { params: options.params }
         );
-        totalCountQuery = applyWhereClause(totalCountQuery, baseWhere);
+        totalCountQuery = applyWhereClause(totalCountQuery, filteredWhere);
         return totalCountQuery;
       })()
     : Promise.resolve([{ count: 0 }]);

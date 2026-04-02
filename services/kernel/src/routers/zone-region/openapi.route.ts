@@ -46,6 +46,7 @@ const zoneRegionMethodsRateLimit = createOperationalRateLimit({
 export const listRegions = createOpenApiRoute({
   method: "get",
   path: "/regions/list",
+  operationId: "regionList",
   tags: regionTags,
   middleware: [zoneRegionMethodsRateLimit, regionRbac.custom("getAll")],
   summary: "List regions",
@@ -60,6 +61,7 @@ export const listRegions = createOpenApiRoute({
 export const getRegion = createOpenApiRoute({
   method: "get",
   path: "/regions/{id}",
+  operationId: "regionGetById",
   tags: regionTags,
   middleware: [zoneRegionMethodsRateLimit, regionRbac.get],
   summary: "Get a region by ID",
@@ -76,6 +78,7 @@ export const getRegion = createOpenApiRoute({
 export const createRegion = createOpenApiRoute({
   method: "post",
   path: "/regions",
+  operationId: "regionCreate",
   tags: regionTags,
   middleware: [zoneRegionMethodsRateLimit, regionRbac.custom("create")],
   summary: "Create a region",
@@ -90,6 +93,7 @@ export const createRegion = createOpenApiRoute({
 export const updateRegion = createOpenApiRoute({
   method: "patch",
   path: "/regions/{id}",
+  operationId: "regionUpdateById",
   tags: regionTags,
   middleware: [zoneRegionMethodsRateLimit, regionRbac.custom("update")],
   summary: "Update a region by ID",
@@ -106,6 +110,7 @@ export const updateRegion = createOpenApiRoute({
 export const removeRegion = createOpenApiRoute({
   method: "delete",
   path: "/regions/{id}",
+  operationId: "regionDeleteById",
   tags: regionTags,
   middleware: [zoneRegionMethodsRateLimit, regionRbac.custom("delete")],
   summary: "Delete a region by ID",
@@ -121,6 +126,7 @@ export const removeRegion = createOpenApiRoute({
 export const listZones = createOpenApiRoute({
   method: "get",
   path: "/zones/list",
+  operationId: "zoneList",
   tags: zoneTags,
   middleware: [zoneRegionMethodsRateLimit, zoneRbac.custom("getAll")],
   summary: "List zones",
@@ -135,6 +141,7 @@ export const listZones = createOpenApiRoute({
 export const getZone = createOpenApiRoute({
   method: "get",
   path: "/zones/{id}",
+  operationId: "zoneGetById",
   tags: zoneTags,
   middleware: [zoneRegionMethodsRateLimit, zoneRbac.get],
   summary: "Get a zone by ID",
@@ -151,6 +158,7 @@ export const getZone = createOpenApiRoute({
 export const createZone = createOpenApiRoute({
   method: "post",
   path: "/zones",
+  operationId: "zoneCreate",
   tags: zoneTags,
   middleware: [zoneRegionMethodsRateLimit, zoneRbac.custom("create")],
   summary: "Create a zone",
@@ -165,6 +173,7 @@ export const createZone = createOpenApiRoute({
 export const updateZone = createOpenApiRoute({
   method: "patch",
   path: "/zones/{id}",
+  operationId: "zoneUpdateById",
   tags: zoneTags,
   middleware: [zoneRegionMethodsRateLimit, zoneRbac.custom("update")],
   summary: "Update a zone by ID",
@@ -181,6 +190,7 @@ export const updateZone = createOpenApiRoute({
 export const removeZone = createOpenApiRoute({
   method: "delete",
   path: "/zones/{id}",
+  operationId: "zoneDeleteById",
   tags: zoneTags,
   middleware: [zoneRegionMethodsRateLimit, zoneRbac.custom("delete")],
   summary: "Delete a zone by ID",

@@ -1,13 +1,18 @@
-import { member } from "@proptryx/database";
+import { member, user } from "@proptryx/database";
 import {
   createDbInsertSchema,
   createDbSelectSchema,
   createDbUpdateSchema,
   createListQuerySchema,
+  createListResponseSchema,
 } from "@proptryx/utils";
 import z from "zod";
 
 export const memberSchema = createDbSelectSchema(member);
+
+export const memberListItemSchema = memberSchema.extend({
+  user: createDbSelectSchema(user),
+});
 
 export const memberCreateSchema = createDbInsertSchema(member, {
   omit: [
@@ -48,10 +53,12 @@ export const memberUpdateSchema = createDbUpdateSchema(member, {
 export const memberListQuerySchema = createListQuerySchema({
   sortFields: ["name", "email", "createdAt"],
   extraShape: {
+    organizationId: z.string().optional(),
     role: z.string().optional(),
+    panel: z.string().optional(),
   },
 });
 
-export type memberListQuery = z.infer<typeof memberListQuerySchema>;
+export type MemberListQuery = z.infer<typeof memberListQuerySchema>;
 
-export const memberListResponseSchema = createDbSelectSchema(member);
+export const memberListResponseSchema = createListResponseSchema(memberListItemSchema);
