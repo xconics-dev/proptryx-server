@@ -137,6 +137,7 @@ async function createAuthInstance() {
       dash({ apiKey: env.BETTER_AUTH_API_KEY }),
       organization({
         organizationLimit: 10,
+        requireEmailVerificationOnInvitation: false,
         schema: {
           organization: { additionalFields: organizationAdditionalFields },
         },

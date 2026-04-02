@@ -14,6 +14,7 @@ import {
   generateUID,
   getBetterAuthContext,
   getRazorpayClient,
+  encryptPassword,
   PasswordUtils,
   registerOpenApiRoute,
 } from "@proptryx/utils";
@@ -133,6 +134,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
   // ─── Step 1: Validate input + generate IDs ──────────────────────────────
   const userId = generateUID();
   const password = generateRandomPassword();
+  const accId = encryptPassword(password, env.BETTER_AUTH_SECRET);
   const [hashPassword, latestOrg] = await Promise.all([
     PasswordUtils.hash(password),
     db
@@ -196,7 +198,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
 
     // Step 3: Insert credential account
     await tx.insert(account).values({
-      id: generateRandomId(),
+      id: accId,
       userId,
       accountId: generateRandomId(),
       providerId: "credential",

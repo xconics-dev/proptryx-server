@@ -24,7 +24,9 @@ export const user = pgTable(
     image: text("image"),
     role: text("role"),
     panel: AccessPanel("panel"),
-    zoneId: text("zone_id").references((): AnyPgColumn => zone.id, { onDelete: "set null" }),
+    zoneId: text("zone_id").references((): AnyPgColumn => zone.id, {
+      onDelete: "set null",
+    }),
     banned: boolean("banned").default(false),
     banReason: text("ban_reason"),
     banExpires: timestamp("ban_expires"),
@@ -161,7 +163,24 @@ export const member = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     role: text("role").notNull(),
     panel: AccessPanel("panel").default("company").notNull(),
+
+    // For Kepp Reference
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    createdByUser: text("created_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    updatedByUser: text("updated_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    deletedAt: timestamp("deleted_at"),
+    isDeleted: boolean("is_deleted").default(false).notNull(),
+    deletedByUser: text("deleted_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     index("member_organizationId_idx").on(table.organizationId),
@@ -355,6 +374,21 @@ export const memberRelations = relations(member, ({ one }) => ({
   user: one(user, {
     fields: [member.userId],
     references: [user.id],
+  }),
+  createdByUser: one(user, {
+    fields: [member.createdByUser],
+    references: [user.id],
+    relationName: "memberCreatedByUser",
+  }),
+  updatedByUser: one(user, {
+    fields: [member.updatedByUser],
+    references: [user.id],
+    relationName: "memberUpdatedByUser",
+  }),
+  deletedByUser: one(user, {
+    fields: [member.deletedByUser],
+    references: [user.id],
+    relationName: "memberDeletedByUser",
   }),
 }));
 

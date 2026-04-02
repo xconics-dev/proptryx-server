@@ -9,6 +9,38 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     description:
       "API for the Kernel service, which handles internal client and organization setup, along with core business logic for the Proptryx platform. This service manages operations related to properties, tenants, leases, and other central entities, serving as the backbone of the system.",
   },
+  tags: [
+    {
+      name: "Company",
+      description: "Top-level company operations such as create, list, get, update, and delete.",
+    },
+    {
+      name: "Company / Members",
+      description: "Company member management endpoints grouped under the company domain.",
+    },
+    {
+      name: "Company / Requests",
+      description: "Company onboarding and request-management endpoints.",
+    },
+    {
+      name: "Regions",
+      description: "Region master-data endpoints.",
+    },
+    {
+      name: "Zones",
+      description: "Zone master-data endpoints.",
+    },
+  ],
+  "x-tagGroups": [
+    {
+      name: "Company",
+      tags: ["Company", "Company / Members", "Company / Requests"],
+    },
+    {
+      name: "Location Master Data",
+      tags: ["Regions", "Zones"],
+    },
+  ],
   servers: [
     {
       // Use gateway-scoped base path for docs-driven requests.

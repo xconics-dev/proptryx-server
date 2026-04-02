@@ -18,7 +18,7 @@ import {
   companyUpdateSchema,
 } from "./schema";
 
-const tags = ["Company Operations"];
+const tags = ["Company"];
 
 const companyRequestRbac = createResourceRbacGuards({
   resource: DATABASE_RESOURCES.organization,
