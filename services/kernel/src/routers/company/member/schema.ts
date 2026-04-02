@@ -1,13 +1,18 @@
-import { member } from "@proptryx/database";
+import { member, user } from "@proptryx/database";
 import {
   createDbInsertSchema,
   createDbSelectSchema,
   createDbUpdateSchema,
   createListQuerySchema,
+  createListResponseSchema,
 } from "@proptryx/utils";
 import z from "zod";
 
 export const memberSchema = createDbSelectSchema(member);
+
+export const memberListItemSchema = memberSchema.extend({
+  user: createDbSelectSchema(user),
+});
 
 export const memberCreateSchema = createDbInsertSchema(member, {
   omit: [
@@ -30,25 +35,30 @@ export const memberCreateSchema = createDbInsertSchema(member, {
 });
 
 export const memberUpdateSchema = createDbUpdateSchema(member, {
-  omit: [
-    "id",
-    "organizationId",
-    "createdAt",
-    "updatedAt",
-    "deletedAt",
-    "createdByUser",
-    "updatedByUser",
-    "deletedByUser",
-  ],
+  customizeSchema(schema) {
+    return schema
+      .pick({
+        role: true,
+      })
+      .extend({
+        name: z.string().min(1, "Name is required").optional(),
+        image: z.url("Invalid URL").optional(),
+        email: z.email("Invalid email address").optional(),
+        phoneNumber: z.string().optional(),
+        zoneId: z.string().optional(),
+      });
+  },
 });
 
 export const memberListQuerySchema = createListQuerySchema({
   sortFields: ["name", "email", "createdAt"],
   extraShape: {
+    organizationId: z.string().optional(),
     role: z.string().optional(),
+    panel: z.string().optional(),
   },
 });
 
-export type memberListQuery = z.infer<typeof memberListQuerySchema>;
+export type MemberListQuery = z.infer<typeof memberListQuerySchema>;
 
-export const memberListResponseSchema = createDbSelectSchema(member);
+export const memberListResponseSchema = createListResponseSchema(memberListItemSchema);

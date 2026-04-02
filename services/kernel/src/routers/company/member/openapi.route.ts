@@ -1,13 +1,22 @@
 import { DATABASE_RESOURCES } from "@proptryx/database";
 import {
+  ApiNotFoundOpenApi,
   createApiJsonBody,
   createApiSuccessResponse,
   createOpenApiRoute,
   createOperationalRateLimit,
   createResourceRbacGuards,
   DEFAULT_FAST_RBAC_AUTH_OPTIONS,
+  IdStringParamSchema,
 } from "@proptryx/utils";
-import { memberCreateSchema, memberSchema } from "./schema";
+import {
+  memberCreateSchema,
+  memberListItemSchema,
+  memberListQuerySchema,
+  memberListResponseSchema,
+  memberSchema,
+  memberUpdateSchema,
+} from "./schema";
 
 const tags = ["Company / Members"];
 
@@ -20,10 +29,43 @@ const companyMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "company-member-methods",
 });
 
+// Query routes
+export const list = createOpenApiRoute({
+  method: "get",
+  path: "/list",
+  operationId: "companyMemberList",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("getAll")],
+  summary: "List company members",
+  request: {
+    query: memberListQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(memberListResponseSchema, "Members fetched successfully"),
+  },
+});
+
+export const get = createOpenApiRoute({
+  method: "get",
+  path: "/{id}",
+  operationId: "companyMemberGetById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.get],
+  summary: "Get a company member by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(memberListItemSchema, "Member fetched successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
 // Mutation routes
 export const create = createOpenApiRoute({
   method: "post",
   path: "/",
+  operationId: "companyMemberCreate",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("create")],
   summary: "Add a new member to the company",
@@ -32,5 +74,55 @@ export const create = createOpenApiRoute({
   },
   responses: {
     201: createApiSuccessResponse(memberSchema, "Member created successfully"),
+  },
+});
+
+export const update = createOpenApiRoute({
+  method: "patch",
+  path: "/{id}",
+  operationId: "companyMemberUpdateById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Update an existing member",
+  request: {
+    params: IdStringParamSchema(),
+    body: createApiJsonBody(memberUpdateSchema),
+  },
+  responses: {
+    200: createApiSuccessResponse(memberSchema, "Member updated successfully"),
+  },
+});
+
+export const remove = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}",
+  operationId: "companyMemberDeleteById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
+  summary: "Remove a member from the company",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    204: {
+      description: "Member removed successfully",
+    },
+  },
+});
+
+export const remove_with_user = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/with-user",
+  operationId: "companyMemberDeleteWithUserById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
+  summary: "Remove a member and their user account also",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    204: {
+      description: "Member with user removed successfully",
+    },
   },
 });

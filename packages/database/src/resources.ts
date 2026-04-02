@@ -1,6 +1,7 @@
 export const DATABASE_RESOURCES = {
   account: "account",
   company_request: "company_request",
+  faq: "faq",
   invitation: "invitation",
   member: "member",
   organization: "organization",
@@ -10,6 +11,7 @@ export const DATABASE_RESOURCES = {
   region: "region",
   session: "session",
   subscription_plans: "subscription_plans",
+  testimonial: "testimonial",
   user: "user",
   zone: "zone",
 } as const;

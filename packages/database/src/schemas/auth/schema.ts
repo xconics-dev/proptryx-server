@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   boolean,
@@ -10,9 +10,8 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { region, zone } from "../zone-region";
-import { AccessPanel, BusinessType, OrganizationType, PermissionAccessLevel } from "./enums";
-import { rbacRole } from "./rbac/schema";
+import { zone } from "../zone-region";
+import { AccessPanel, BusinessType, OrganizationType } from "./enums";
 
 export const user = pgTable(
   "user",
@@ -32,11 +31,25 @@ export const user = pgTable(
     banExpires: timestamp("ban_expires"),
     phoneNumber: text("phone_number"),
     phoneNumberVerified: boolean("phone_number_verified").default(false),
+
+    // For Kepp Reference
+    deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
+
+    createdByUser: text("created_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
+    updatedByUser: text("updated_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
+    deletedByUser: text("deleted_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
+    isDeleted: boolean("is_deleted").default(false).notNull(),
   },
   (table) => [
     index("user_name_idx").on(table.name),
@@ -310,110 +323,3 @@ export const organizationSubscription = pgTable(
     index("organization_subscription_subscriptionPlanId_idx").on(table.subscriptionPlanId),
   ]
 );
-
-export const userRelations = relations(user, ({ many, one }) => ({
-  accounts: many(account),
-  sessions: many(session),
-  members: many(member),
-  invitations: many(invitation),
-  deletedRegions: many(region, {
-    relationName: "regionDeletedByUser",
-  }),
-  zone: one(zone, {
-    fields: [user.zoneId],
-    references: [zone.id],
-  }),
-}));
-
-export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, {
-    fields: [account.userId],
-    references: [user.id],
-  }),
-}));
-
-export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, {
-    fields: [session.userId],
-    references: [user.id],
-  }),
-  activeOrganization: one(organization, {
-    fields: [session.activeOrganizationId],
-    references: [organization.id],
-  }),
-}));
-
-export const organizationRelations = relations(organization, ({ many, one }) => ({
-  activeSessions: many(session),
-  members: many(member),
-  invitations: many(invitation),
-  roles: many(rbacRole),
-  deletedByUser: one(user, {
-    fields: [organization.deletedByUser],
-    references: [user.id],
-  }),
-  createdByUser: one(user, {
-    fields: [organization.createdByUser],
-    references: [user.id],
-  }),
-  updatedByUser: one(user, {
-    fields: [organization.updatedByUser],
-    references: [user.id],
-  }),
-  subscription: one(organizationSubscription, {
-    fields: [organization.id],
-    references: [organizationSubscription.organizationId],
-  }),
-}));
-
-export const memberRelations = relations(member, ({ one }) => ({
-  organization: one(organization, {
-    fields: [member.organizationId],
-    references: [organization.id],
-  }),
-  user: one(user, {
-    fields: [member.userId],
-    references: [user.id],
-  }),
-  createdByUser: one(user, {
-    fields: [member.createdByUser],
-    references: [user.id],
-    relationName: "memberCreatedByUser",
-  }),
-  updatedByUser: one(user, {
-    fields: [member.updatedByUser],
-    references: [user.id],
-    relationName: "memberUpdatedByUser",
-  }),
-  deletedByUser: one(user, {
-    fields: [member.deletedByUser],
-    references: [user.id],
-    relationName: "memberDeletedByUser",
-  }),
-}));
-
-export const invitationRelations = relations(invitation, ({ one }) => ({
-  organization: one(organization, {
-    fields: [invitation.organizationId],
-    references: [organization.id],
-  }),
-  user: one(user, {
-    fields: [invitation.inviterId],
-    references: [user.id],
-  }),
-}));
-
-export const subscriptionPlansRelations = relations(subscriptionPlans, ({ many }) => ({
-  organizationSubscriptions: many(organizationSubscription),
-}));
-
-export const organizationSubscriptionRelations = relations(organizationSubscription, ({ one }) => ({
-  organization: one(organization, {
-    fields: [organizationSubscription.organizationId],
-    references: [organization.id],
-  }),
-  plan: one(subscriptionPlans, {
-    fields: [organizationSubscription.subscriptionPlanId],
-    references: [subscriptionPlans.id],
-  }),
-}));

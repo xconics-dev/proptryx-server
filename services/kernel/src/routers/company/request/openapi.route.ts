@@ -31,6 +31,7 @@ const companyMethodsRateLimit = createOperationalRateLimit({
 export const list = createOpenApiRoute({
   method: "get",
   path: "/list",
+  operationId: "companyRequestList",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("getAll")],
   summary: "List company requests",
@@ -48,6 +49,7 @@ export const list = createOpenApiRoute({
 export const get = createOpenApiRoute({
   method: "get",
   path: "/{id}",
+  operationId: "companyRequestGetById",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.get],
   summary: "Get a company request by ID",
@@ -63,6 +65,7 @@ export const get = createOpenApiRoute({
 export const create = createOpenApiRoute({
   method: "post",
   path: "/",
+  operationId: "companyRequestCreate",
   tags,
   middleware: [companyMethodsRateLimit],
   summary: "Create a new company request",
@@ -77,6 +80,7 @@ export const create = createOpenApiRoute({
 export const check_gst = createOpenApiRoute({
   method: "get",
   path: "/check-gst/{gstNumber}",
+  operationId: "companyRequestCheckGst",
   tags,
   middleware: [companyMethodsRateLimit],
   summary: "Check GST number validity",
@@ -92,6 +96,7 @@ export const check_gst = createOpenApiRoute({
 export const remove = createOpenApiRoute({
   method: "delete",
   path: "/{id}",
+  operationId: "companyRequestDeleteById",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.delete],
   summary: "Delete a company request by ID",

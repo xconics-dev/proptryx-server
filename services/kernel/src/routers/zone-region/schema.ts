@@ -5,10 +5,20 @@ import {
   createDbUpdateSchema,
   createListQuerySchema,
   createListResponseSchema,
+  optionalBooleanQuerySchema,
 } from "@proptryx/utils";
 import { z } from "@hono/zod-openapi";
 
 export const regionSchema = createDbSelectSchema(region);
+export const zoneSchema = createDbSelectSchema(zone);
+
+export const regionWithZonesSchema = regionSchema.extend({
+  zones: z.array(zoneSchema).optional(),
+});
+
+export const zoneWithRegionSchema = zoneSchema.extend({
+  region: regionSchema.optional(),
+});
 
 export const regionCreateSchema = createDbInsertSchema(region, {
   omit: [
@@ -40,13 +50,18 @@ export const regionListSortFields = ["id", "name", "createdAt", "updatedAt"] as 
 
 export const regionListQuerySchema = createListQuerySchema({
   sortFields: regionListSortFields,
+  extraShape: {
+    includeZones: optionalBooleanQuerySchema,
+  },
 });
 
 export type RegionListQuery = z.infer<typeof regionListQuerySchema>;
 
-export const regionListResponseSchema = createListResponseSchema(regionSchema);
+export const regionGetQuerySchema = z.object({
+  includeZones: optionalBooleanQuerySchema,
+});
 
-export const zoneSchema = createDbSelectSchema(zone);
+export const regionListResponseSchema = createListResponseSchema(regionWithZonesSchema);
 
 export const zoneCreateSchema = createDbInsertSchema(zone, {
   omit: [
@@ -80,9 +95,14 @@ export const zoneListQuerySchema = createListQuerySchema({
   sortFields: zoneListSortFields,
   extraShape: {
     regionId: z.string().optional(),
+    includeRegion: optionalBooleanQuerySchema,
   },
 });
 
 export type ZoneListQuery = z.infer<typeof zoneListQuerySchema>;
 
-export const zoneListResponseSchema = createListResponseSchema(zoneSchema);
+export const zoneGetQuerySchema = z.object({
+  includeRegion: optionalBooleanQuerySchema,
+});
+
+export const zoneListResponseSchema = createListResponseSchema(zoneWithRegionSchema);

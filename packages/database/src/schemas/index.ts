@@ -3,3 +3,4 @@ export * from "./zone-region";
 
 // Company schemas
 export * from "./company";
+export * from "./site-data";

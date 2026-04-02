@@ -8,7 +8,7 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import {
   createRegion,
   createZone,
@@ -51,15 +51,68 @@ async function findZoneById(id: string, options?: { includeDeleted?: boolean }) 
     .then((rows) => rows[0]);
 }
 
+async function attachZonesToRegions<TRegion extends { id: string }>(
+  regionsData: TRegion[],
+  options?: { includeZones?: boolean }
+) {
+  if (!options?.includeZones || regionsData.length === 0) {
+    return regionsData;
+  }
+
+  const regionIds = regionsData.map((item) => item.id);
+  const zonesData = await db
+    .select()
+    .from(zone)
+    .where(and(inArray(zone.regionId, regionIds), eq(zone.isDeleted, false)));
+
+  const zonesByRegionId = new Map<string, typeof zonesData>();
+  for (const zoneData of zonesData) {
+    const regionZones = zonesByRegionId.get(zoneData.regionId) ?? [];
+    regionZones.push(zoneData);
+    zonesByRegionId.set(zoneData.regionId, regionZones);
+  }
+
+  return regionsData.map((regionData) => ({
+    ...regionData,
+    zones: zonesByRegionId.get(regionData.id) ?? [],
+  }));
+}
+
+async function attachRegionToZones<TZone extends { regionId: string }>(
+  zonesData: TZone[],
+  options?: { includeRegion?: boolean }
+) {
+  if (!options?.includeRegion || zonesData.length === 0) {
+    return zonesData;
+  }
+
+  const regionIds = [...new Set(zonesData.map((item) => item.regionId))];
+  const regionsData = await db
+    .select()
+    .from(region)
+    .where(and(inArray(region.id, regionIds), eq(region.isDeleted, false)));
+
+  const regionById = new Map(regionsData.map((regionData) => [regionData.id, regionData]));
+
+  return zonesData.map((zoneData) => ({
+    ...zoneData,
+    region: regionById.get(zoneData.regionId),
+  }));
+}
+
 registerOpenApiRoute(zoneRegionGroup, listRegions, async (c) => {
   const query = c.req.valid("query");
   const response = await fetchRegionList(query);
+  const items = await attachZonesToRegions(response.items, {
+    includeZones: query.includeZones,
+  });
 
-  return c.json(createSuccessResponse(response), 200);
+  return c.json(createSuccessResponse({ ...response, items }), 200);
 });
 
 registerOpenApiRoute(zoneRegionGroup, getRegion, async (c) => {
   const { id } = c.req.valid("param");
+  const query = c.req.valid("query");
   const regionData = await findRegionById(id);
 
   if (!regionData) {
@@ -72,7 +125,11 @@ registerOpenApiRoute(zoneRegionGroup, getRegion, async (c) => {
     );
   }
 
-  return c.json(createSuccessResponse(regionData), 200);
+  const [regionWithZones] = await attachZonesToRegions([regionData], {
+    includeZones: query.includeZones,
+  });
+
+  return c.json(createSuccessResponse(regionWithZones), 200);
 });
 
 registerOpenApiRoute(zoneRegionGroup, createRegion, async (c) => {
@@ -203,12 +260,16 @@ registerOpenApiRoute(zoneRegionGroup, removeRegion, async (c) => {
 registerOpenApiRoute(zoneRegionGroup, listZones, async (c) => {
   const query = c.req.valid("query");
   const response = await fetchZoneList(query);
+  const items = await attachRegionToZones(response.items, {
+    includeRegion: query.includeRegion,
+  });
 
-  return c.json(createSuccessResponse(response), 200);
+  return c.json(createSuccessResponse({ ...response, items }), 200);
 });
 
 registerOpenApiRoute(zoneRegionGroup, getZone, async (c) => {
   const { id } = c.req.valid("param");
+  const query = c.req.valid("query");
   const zoneData = await findZoneById(id);
 
   if (!zoneData) {
@@ -221,7 +282,11 @@ registerOpenApiRoute(zoneRegionGroup, getZone, async (c) => {
     );
   }
 
-  return c.json(createSuccessResponse(zoneData), 200);
+  const [zoneWithRegion] = await attachRegionToZones([zoneData], {
+    includeRegion: query.includeRegion,
+  });
+
+  return c.json(createSuccessResponse(zoneWithRegion), 200);
 });
 
 registerOpenApiRoute(zoneRegionGroup, createZone, async (c) => {
