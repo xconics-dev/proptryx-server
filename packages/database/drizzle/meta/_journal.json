@@ -64,6 +64,13 @@
       "when": 1775116739245,
       "tag": "0008_high_sir_ram",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775122801272,
+      "tag": "0009_far_wolverine",
+      "breakpoints": true
     }
   ]
 }

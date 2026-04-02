@@ -30,16 +30,19 @@ export const memberCreateSchema = createDbInsertSchema(member, {
 });
 
 export const memberUpdateSchema = createDbUpdateSchema(member, {
-  omit: [
-    "id",
-    "organizationId",
-    "createdAt",
-    "updatedAt",
-    "deletedAt",
-    "createdByUser",
-    "updatedByUser",
-    "deletedByUser",
-  ],
+  customizeSchema(schema) {
+    return schema
+      .pick({
+        role: true,
+      })
+      .extend({
+        name: z.string().min(1, "Name is required").optional(),
+        image: z.url("Invalid URL").optional(),
+        email: z.email("Invalid email address").optional(),
+        phoneNumber: z.string().optional(),
+        zoneId: z.string().optional(),
+      });
+  },
 });
 
 export const memberListQuerySchema = createListQuerySchema({

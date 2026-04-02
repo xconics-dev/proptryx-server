@@ -8,7 +8,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { user } from "../auth";
+import { user } from "../auth/schema";
 
 export const region = pgTable(
   "region",
