@@ -28,7 +28,7 @@ function resolveFromAddress(from?: string) {
 
 export async function sendEmail(options: SendEmailOptions) {
   const response = await getResendClient().emails.send({
-    from: resolveFromAddress(options.from),
+    from: `Proptryx <${resolveFromAddress(options.from)}>`,
     to: normalizeToAddresses(options.to),
     subject: options.subject,
     html: options.html,
@@ -44,7 +44,7 @@ export async function sendEmail(options: SendEmailOptions) {
 export async function sendEmailBatch(emails: SendEmailOptions[]) {
   const response = await getResendClient().batch.send(
     emails.map((email) => ({
-      from: resolveFromAddress(email.from),
+      from: `Proptryx <${resolveFromAddress(email.from)}>`,
       to: normalizeToAddresses(email.to),
       subject: email.subject,
       html: email.html,

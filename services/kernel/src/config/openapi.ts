@@ -30,6 +30,14 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
       name: "Zones",
       description: "Zone master-data endpoints.",
     },
+    {
+      name: "Testimonials",
+      description: "Site-data testimonial management endpoints.",
+    },
+    {
+      name: "FAQs",
+      description: "Site-data FAQ management endpoints.",
+    },
   ],
   "x-tagGroups": [
     {
@@ -39,6 +47,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     {
       name: "Location Master Data",
       tags: ["Regions", "Zones"],
+    },
+    {
+      name: "Site data",
+      tags: ["Testimonials", "FAQs"],
     },
   ],
   servers: [

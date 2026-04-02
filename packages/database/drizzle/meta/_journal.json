@@ -71,6 +71,20 @@
       "when": 1775122801272,
       "tag": "0009_far_wolverine",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1775131427166,
+      "tag": "0010_mysterious_shockwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1775132434721,
+      "tag": "0011_common_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

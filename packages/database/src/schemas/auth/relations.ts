@@ -1,4 +1,7 @@
 import { relations } from "drizzle-orm";
+import { company_request } from "../company/request";
+import { faq, testimonial } from "../site-data";
+import { createAuditRelationNames } from "../utils/audit";
 import { region, zone } from "../zone-region";
 import {
   account,
@@ -12,46 +15,114 @@ import {
 } from "./schema";
 import { rbacRole } from "./rbac/schema";
 
-export const userRelations = relations(user, ({ many, one }) => ({
-  accounts: many(account),
-  sessions: many(session),
-  members: many(member),
-  invitations: many(invitation),
-  deletedRegions: many(region, {
-    relationName: "regionDeletedByUser",
-  }),
-  createdRegions: many(region, {
-    relationName: "regionCreatedByUser",
-  }),
-  updatedRegions: many(region, {
-    relationName: "regionUpdatedByUser",
-  }),
-  deletedZones: many(zone, {
-    relationName: "zoneDeletedByUser",
-  }),
-  createdZones: many(zone, {
-    relationName: "zoneCreatedByUser",
-  }),
-  updatedZones: many(zone, {
-    relationName: "zoneUpdatedByUser",
-  }),
-  deletedByUser: one(user, {
-    fields: [user.deletedByUser],
-    references: [user.id],
-  }),
-  createdByUser: one(user, {
-    fields: [user.createdByUser],
-    references: [user.id],
-  }),
-  updatedByUser: one(user, {
-    fields: [user.updatedByUser],
-    references: [user.id],
-  }),
-  zone: one(zone, {
-    fields: [user.zoneId],
-    references: [zone.id],
-  }),
-}));
+const auditRelations = {
+  companyRequest: createAuditRelationNames("companyRequest"),
+  faq: createAuditRelationNames("faq"),
+  member: createAuditRelationNames("member"),
+  organization: createAuditRelationNames("organization"),
+  region: createAuditRelationNames("region"),
+  testimonial: createAuditRelationNames("testimonial"),
+  user: createAuditRelationNames("user"),
+  zone: createAuditRelationNames("zone"),
+} as const;
+
+export const userRelations = relations(user, ({ many, one }) => {
+  const userAudit = (
+    field: typeof user.createdByUser | typeof user.updatedByUser | typeof user.deletedByUser,
+    relationName: (typeof auditRelations.user)[keyof typeof auditRelations.user]
+  ) =>
+    one(user, {
+      fields: [field],
+      references: [user.id],
+      relationName,
+    });
+
+  return {
+    accounts: many(account),
+    sessions: many(session),
+    members: many(member),
+    invitations: many(invitation),
+    zone: one(zone, {
+      fields: [user.zoneId],
+      references: [zone.id],
+    }),
+    deletedRegions: many(region, {
+      relationName: auditRelations.region.deleted,
+    }),
+    createdRegions: many(region, {
+      relationName: auditRelations.region.created,
+    }),
+    updatedRegions: many(region, {
+      relationName: auditRelations.region.updated,
+    }),
+    deletedZones: many(zone, {
+      relationName: auditRelations.zone.deleted,
+    }),
+    createdZones: many(zone, {
+      relationName: auditRelations.zone.created,
+    }),
+    updatedZones: many(zone, {
+      relationName: auditRelations.zone.updated,
+    }),
+    createdUsers: many(user, {
+      relationName: auditRelations.user.created,
+    }),
+    updatedUsers: many(user, {
+      relationName: auditRelations.user.updated,
+    }),
+    deletedUsers: many(user, {
+      relationName: auditRelations.user.deleted,
+    }),
+    createdByUser: userAudit(user.createdByUser, auditRelations.user.created),
+    updatedByUser: userAudit(user.updatedByUser, auditRelations.user.updated),
+    deletedByUser: userAudit(user.deletedByUser, auditRelations.user.deleted),
+    createdTestimonials: many(testimonial, {
+      relationName: auditRelations.testimonial.created,
+    }),
+    updatedTestimonials: many(testimonial, {
+      relationName: auditRelations.testimonial.updated,
+    }),
+    deletedTestimonials: many(testimonial, {
+      relationName: auditRelations.testimonial.deleted,
+    }),
+    createdFaqs: many(faq, {
+      relationName: auditRelations.faq.created,
+    }),
+    updatedFaqs: many(faq, {
+      relationName: auditRelations.faq.updated,
+    }),
+    deletedFaqs: many(faq, {
+      relationName: auditRelations.faq.deleted,
+    }),
+    createdCompanyRequests: many(company_request, {
+      relationName: auditRelations.companyRequest.created,
+    }),
+    updatedCompanyRequests: many(company_request, {
+      relationName: auditRelations.companyRequest.updated,
+    }),
+    deletedCompanyRequests: many(company_request, {
+      relationName: auditRelations.companyRequest.deleted,
+    }),
+    createdOrganizations: many(organization, {
+      relationName: auditRelations.organization.created,
+    }),
+    updatedOrganizations: many(organization, {
+      relationName: auditRelations.organization.updated,
+    }),
+    deletedOrganizations: many(organization, {
+      relationName: auditRelations.organization.deleted,
+    }),
+    createdMembers: many(member, {
+      relationName: auditRelations.member.created,
+    }),
+    updatedMembers: many(member, {
+      relationName: auditRelations.member.updated,
+    }),
+    deletedMembers: many(member, {
+      relationName: auditRelations.member.deleted,
+    }),
+  };
+});
 
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
@@ -71,54 +142,69 @@ export const sessionRelations = relations(session, ({ one }) => ({
   }),
 }));
 
-export const organizationRelations = relations(organization, ({ many, one }) => ({
-  activeSessions: many(session),
-  members: many(member),
-  invitations: many(invitation),
-  roles: many(rbacRole),
-  deletedByUser: one(user, {
-    fields: [organization.deletedByUser],
-    references: [user.id],
-  }),
-  createdByUser: one(user, {
-    fields: [organization.createdByUser],
-    references: [user.id],
-  }),
-  updatedByUser: one(user, {
-    fields: [organization.updatedByUser],
-    references: [user.id],
-  }),
-  subscription: one(organizationSubscription, {
-    fields: [organization.id],
-    references: [organizationSubscription.organizationId],
-  }),
-}));
+export const organizationRelations = relations(organization, ({ many, one }) => {
+  const organizationAudit = (
+    field:
+      | typeof organization.createdByUser
+      | typeof organization.updatedByUser
+      | typeof organization.deletedByUser,
+    relationName: (typeof auditRelations.organization)[keyof typeof auditRelations.organization]
+  ) =>
+    one(user, {
+      fields: [field],
+      references: [user.id],
+      relationName,
+    });
 
-export const memberRelations = relations(member, ({ one }) => ({
-  organization: one(organization, {
-    fields: [member.organizationId],
-    references: [organization.id],
-  }),
-  user: one(user, {
-    fields: [member.userId],
-    references: [user.id],
-  }),
-  createdByUser: one(user, {
-    fields: [member.createdByUser],
-    references: [user.id],
-    relationName: "memberCreatedByUser",
-  }),
-  updatedByUser: one(user, {
-    fields: [member.updatedByUser],
-    references: [user.id],
-    relationName: "memberUpdatedByUser",
-  }),
-  deletedByUser: one(user, {
-    fields: [member.deletedByUser],
-    references: [user.id],
-    relationName: "memberDeletedByUser",
-  }),
-}));
+  return {
+    activeSessions: many(session),
+    members: many(member),
+    invitations: many(invitation),
+    roles: many(rbacRole),
+    createdByUser: organizationAudit(
+      organization.createdByUser,
+      auditRelations.organization.created
+    ),
+    updatedByUser: organizationAudit(
+      organization.updatedByUser,
+      auditRelations.organization.updated
+    ),
+    deletedByUser: organizationAudit(
+      organization.deletedByUser,
+      auditRelations.organization.deleted
+    ),
+    subscription: one(organizationSubscription, {
+      fields: [organization.id],
+      references: [organizationSubscription.organizationId],
+    }),
+  };
+});
+
+export const memberRelations = relations(member, ({ one }) => {
+  const memberAudit = (
+    field: typeof member.createdByUser | typeof member.updatedByUser | typeof member.deletedByUser,
+    relationName: (typeof auditRelations.member)[keyof typeof auditRelations.member]
+  ) =>
+    one(user, {
+      fields: [field],
+      references: [user.id],
+      relationName,
+    });
+
+  return {
+    organization: one(organization, {
+      fields: [member.organizationId],
+      references: [organization.id],
+    }),
+    user: one(user, {
+      fields: [member.userId],
+      references: [user.id],
+    }),
+    createdByUser: memberAudit(member.createdByUser, auditRelations.member.created),
+    updatedByUser: memberAudit(member.updatedByUser, auditRelations.member.updated),
+    deletedByUser: memberAudit(member.deletedByUser, auditRelations.member.deleted),
+  };
+});
 
 export const invitationRelations = relations(invitation, ({ one }) => ({
   organization: one(organization, {
