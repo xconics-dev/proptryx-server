@@ -11,14 +11,18 @@ import {
 } from "@proptryx/utils";
 import {
   regionCreateSchema,
+  regionGetQuerySchema,
   regionListQuerySchema,
   regionListResponseSchema,
   regionSchema,
+  regionWithZonesSchema,
   regionUpdateSchema,
   zoneCreateSchema,
+  zoneGetQuerySchema,
   zoneListQuerySchema,
   zoneListResponseSchema,
   zoneSchema,
+  zoneWithRegionSchema,
   zoneUpdateSchema,
 } from "./schema";
 
@@ -61,9 +65,10 @@ export const getRegion = createOpenApiRoute({
   summary: "Get a region by ID",
   request: {
     params: IdStringParamSchema(),
+    query: regionGetQuerySchema,
   },
   responses: {
-    200: createApiSuccessResponse(regionSchema, "Region fetched successfully"),
+    200: createApiSuccessResponse(regionWithZonesSchema, "Region fetched successfully"),
     404: ApiNotFoundOpenApi,
   },
 });
@@ -135,9 +140,10 @@ export const getZone = createOpenApiRoute({
   summary: "Get a zone by ID",
   request: {
     params: IdStringParamSchema(),
+    query: zoneGetQuerySchema,
   },
   responses: {
-    200: createApiSuccessResponse(zoneSchema, "Zone fetched successfully"),
+    200: createApiSuccessResponse(zoneWithRegionSchema, "Zone fetched successfully"),
     404: ApiNotFoundOpenApi,
   },
 });

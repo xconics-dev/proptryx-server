@@ -16,7 +16,7 @@ import { openApiInfo } from "./config/openapi";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { companyGroup } from "@/routers/company";
 import type { AppBindings } from "@/types/app";
-import { zoneRegionGroup } from "@/routers/zone-region";
+import { zoneRegionGroup } from "@/routers/zone-region/handler";
 
 const app = new OpenAPIHono<AppBindings>();
 
