@@ -5,6 +5,22 @@ export const IdStringParamSchema = <T extends string = "id">(entity?: T) =>
     [entity ?? "id"]: z.string().min(1),
   } as Record<T extends string ? T : "id", z.ZodString>);
 
+export const optionalBooleanQuerySchema = z.preprocess((value) => {
+  if (value === "" || value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (value === true || value === "true") {
+    return true;
+  }
+
+  if (value === false || value === "false") {
+    return false;
+  }
+
+  return value;
+}, z.boolean().optional());
+
 const ApiErrorSchema = z.object({
   success: z.literal(false),
   error: z.string(),

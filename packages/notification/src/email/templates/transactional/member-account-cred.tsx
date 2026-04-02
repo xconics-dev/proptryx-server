@@ -110,7 +110,9 @@ export const MemberAccountCredEmail = ({
                   </Section>
 
                   {/* Heading */}
-                  <Text style={heading}>You’ve Been Invited 🎉</Text>
+                  <Section style={content}>
+                    <Text style={heading}>Welcome to {organizationName}! 🎉</Text>
+                  </Section>
 
                   {/* Content */}
                   <Section style={content}>
@@ -346,7 +348,7 @@ const sectionCenter = {
 };
 
 const regardsSection = {
-  marginTop: "30px",
+  marginTop: "20px",
 };
 
 const socialSection = {
