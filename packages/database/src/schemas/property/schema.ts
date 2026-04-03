@@ -14,6 +14,7 @@ import {
 import { user } from "../auth/schema";
 import { createAuditRelationNames } from "../utils/audit";
 import {
+  AreaType,
   BusinessDistrictType,
   CertificateStatus,
   CertificateType,
@@ -22,9 +23,11 @@ import {
   ParkingSecurityControl,
   ParkingType,
   ParkingVentilationType,
+  PriceUnit,
   PropertyOwnershipType,
   PropertyStatus,
   PropertyType,
+  TransactionType,
   RetailBrandCategory,
   RetailPropertyType,
   RetailStoreType,
@@ -84,6 +87,17 @@ export const property = pgTable(
     certificateEtaDate: timestamp("certificate_eta_date"),
     /** Stamped when certificateStatus transitions to RECEIVED — frontend watches this to fire the toast */
     certificateReceivedAt: timestamp("certificate_received_at"),
+
+    // Area Details
+    totalAreaSqft: real("total_area_sqft"),
+    roadWidthFt: real("road_width_ft"),
+    /** SINGLE = one unit; SPLIT = divided floor/area-wise across multiple owners */
+    areaType: AreaType("area_type").default("SINGLE").notNull(),
+
+    // Pricing
+    transactionType: TransactionType("transaction_type"),
+    priceUnit: PriceUnit("price_unit"),
+    priceNegotiable: boolean("price_negotiable").default(true).notNull(),
 
     // Enums
     type: PropertyType("type").notNull(),
@@ -251,6 +265,18 @@ export const propertyOwner = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+
+    // Floor / area split — only populated when property.areaType = "SPLIT"
+    floorNumber: text("floor_number"),
+    allocatedAreaSqft: real("allocated_area_sqft"),
+    /** Free-form label for the split segment, e.g. "North wing, floors 3–5" */
+    areaDescription: text("area_description"),
+
+    // Per-owner pricing — overrides the property-level price for this floor/area segment.
+    // Null = inherit from the parent property pricing setup.
+    pricePerUnit: real("price_per_unit"),
+    priceUnit: PriceUnit("price_unit"),
+    priceNegotiable: boolean("price_negotiable"),
   },
   (table) => [
     unique("property_owner_propertyId_userId_unique").on(table.propertyId, table.userId),

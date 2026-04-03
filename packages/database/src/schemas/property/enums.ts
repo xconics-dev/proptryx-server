@@ -19,6 +19,22 @@ export const PropertyStatus = pgEnum("property_status", [
 ]);
 export type PropertyStatus = (typeof PropertyStatus.enumValues)[number];
 
+// ─── Area & Pricing ───────────────────────────────────────────────────────────
+
+/** SINGLE = one contiguous unit; SPLIT = divided floor-wise or area-wise across multiple owners */
+export const AreaType = pgEnum("area_type", ["SINGLE", "SPLIT"]);
+export type AreaType = (typeof AreaType.enumValues)[number];
+
+/** How the property is being transacted */
+export const TransactionType = pgEnum("transaction_type", ["LEASE", "SALE", "LEASE_PURCHASE"]);
+export type TransactionType = (typeof TransactionType.enumValues)[number];
+
+/** Unit in which askingPrice is expressed */
+export const PriceUnit = pgEnum("price_unit", ["PER_SQFT", "LUMP_SUM", "PER_MONTH"]);
+export type PriceUnit = (typeof PriceUnit.enumValues)[number];
+
+// ─── Certificate ──────────────────────────────────────────────────────────────
+
 /** OC = Occupancy Certificate (safe to occupy); CC = Completion Certificate (construction complete) */
 export const CertificateType = pgEnum("certificate_type", ["OC", "CC"]);
 export type CertificateType = (typeof CertificateType.enumValues)[number];
