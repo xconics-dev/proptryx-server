@@ -10,6 +10,7 @@
     { "path": "./packages/typescript-config" },
     { "path": "./packages/logger" },
     { "path": "./packages/database" },
+    { "path": "./packages/uploader" },
     { "path": "./services/gateway" },
     { "path": "./services/auth" },
     { "path": "./services/kernel" }
