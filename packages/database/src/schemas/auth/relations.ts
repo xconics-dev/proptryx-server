@@ -1,6 +1,12 @@
 import { relations } from "drizzle-orm";
 import { company_request } from "../company/request";
-import { property, propertyOwner } from "../property";
+import {
+  meeting,
+  meetingBuyerRelationName,
+  meetingRequestedByUserRelationName,
+  meetingSellerRelationName,
+} from "../meeting";
+import { property, propertyOwner, propertyZone } from "../property";
 import { faq, testimonial } from "../site-data";
 import { createAuditRelationNames } from "../utils/audit";
 import { region, zone } from "../zone-region";
@@ -22,8 +28,10 @@ const auditRelations = {
   companyRequest: createAuditRelationNames("companyRequest"),
   faq: createAuditRelationNames("faq"),
   member: createAuditRelationNames("member"),
+  meeting: createAuditRelationNames("meeting"),
   organization: createAuditRelationNames("organization"),
   property: createAuditRelationNames("property"),
+  propertyZone: createAuditRelationNames("propertyZone"),
   region: createAuditRelationNames("region"),
   testimonial: createAuditRelationNames("testimonial"),
   user: createAuditRelationNames("user"),
@@ -58,6 +66,15 @@ export const userRelations = relations(user, ({ many, one }) => {
     ownedProperties: many(property, {
       relationName: "propertySuperOwner",
     }),
+    buyerMeetings: many(meeting, {
+      relationName: meetingBuyerRelationName,
+    }),
+    sellerMeetings: many(meeting, {
+      relationName: meetingSellerRelationName,
+    }),
+    requestedMeetings: many(meeting, {
+      relationName: meetingRequestedByUserRelationName,
+    }),
     ownedReferencedProperties: many(propertyOwner),
     createdRegions: many(region, {
       relationName: auditRelations.region.created,
@@ -91,6 +108,24 @@ export const userRelations = relations(user, ({ many, one }) => {
     }),
     deletedProperties: many(property, {
       relationName: auditRelations.property.deleted,
+    }),
+    createdPropertyZones: many(propertyZone, {
+      relationName: auditRelations.propertyZone.created,
+    }),
+    updatedPropertyZones: many(propertyZone, {
+      relationName: auditRelations.propertyZone.updated,
+    }),
+    deletedPropertyZones: many(propertyZone, {
+      relationName: auditRelations.propertyZone.deleted,
+    }),
+    createdMeetings: many(meeting, {
+      relationName: auditRelations.meeting.created,
+    }),
+    updatedMeetings: many(meeting, {
+      relationName: auditRelations.meeting.updated,
+    }),
+    deletedMeetings: many(meeting, {
+      relationName: auditRelations.meeting.deleted,
     }),
     createdByUser: userAudit(user.createdByUser, auditRelations.user.created),
     updatedByUser: userAudit(user.updatedByUser, auditRelations.user.updated),

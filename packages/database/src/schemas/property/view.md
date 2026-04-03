@@ -7,7 +7,9 @@ erDiagram
   USER ||--o{ PROPERTY : "super owner"
   USER ||--o{ PROPERTY : "created by / updated by / deleted by"
   USER ||--o{ PROPERTY_OWNER : "co-owner"
+  USER ||--o{ PROPERTY_MEDIA : "media audit"
 
+  PROPERTY ||--o{ PROPERTY_MEDIA : "media"
   PROPERTY ||--o| PROPERTY_RETAIL : "retail details"
   PROPERTY ||--o| PROPERTY_OFFICE : "office details"
   PROPERTY ||--o| PROPERTY_WAREHOUSE : "warehouse details"
@@ -27,9 +29,6 @@ erDiagram
     real latitude
     real longitude
     jsonb location_metadata
-    text thumbnail
-    text[] images
-    jsonb documents
     bool is_verified
     bool is_published
     bool is_operational
@@ -109,6 +108,28 @@ erDiagram
     price_unit price_unit
     bool price_negotiable
   }
+
+  PROPERTY_MEDIA {
+    uuid id PK
+    uuid property_id FK
+    property_media_type media_type
+    text name
+    text storage_key
+    text url
+    text mime_type
+    int size_bytes
+    property_media_visibility visibility
+    int sort_order
+    text alt_text
+    bool is_thumbnail
+    text created_by_user FK
+    text updated_by_user FK
+    timestamp created_at
+    timestamp updated_at
+    bool is_deleted
+    timestamp deleted_at
+    text deleted_by_user FK
+  }
 ```
 
 ## Required Fields
@@ -140,6 +161,7 @@ Extension table required fields:
 - `property_warehouse.propertyId`
 - `property_parking.propertyId`, `property_parking.parkingType`, `property_parking.parkingConfiguration`
 - `property_owner.propertyId`, `property_owner.userId`
+- `property_media.propertyId`, `property_media.mediaType`, `property_media.name`, `property_media.storageKey`, `property_media.url`, `property_media.visibility`
 
 ## Relationship Notes
 
@@ -147,8 +169,11 @@ Extension table required fields:
 - `property.createdByUser / updatedByUser / deletedByUser -> user.id`
 - `property_owner.userId -> user.id`
 - `property_owner.propertyId -> property.id`
+- `property_media.propertyId -> property.id`
+- `property_media.createdByUser / updatedByUser / deletedByUser -> user.id`
 - Each subtype table is `1:0..1` from `property`
 - `property.owners` is `1:N` through `property_owner`
+- `property.mediaItems` is `1:N` through `property_media`
 - `ownershipType = SINGLE_OWNER` means only `superOwner` is expected
 - `ownershipType = MULTIPLE_OWNER` means `property_owner` rows are also expected
 
@@ -157,10 +182,23 @@ Extension table required fields:
 - Identity: `id`, `name`, `description`
 - Location: `country`, `state`, `city`, `addressLine1`, `addressLine2`, `pincode`, `latitude`, `longitude`
 - Search metadata: `locationMetadata`
-- Media: `thumbnail`, `images`, `documents`
 - Operational: `isVerified`, `isPublished`, `isOperational`
 - Certificate: `certificateType`, `certificateStatus`, `certificateEtaDate`, `certificateReceivedAt`
 - Area and pricing: `totalAreaSqft`, `roadWidthFt`, `areaType`, `transactionType`, `priceUnit`, `priceNegotiable`
 - Classification: `type`, `status`, `ownershipType`
 - Ownership and audit: `superOwnerId`, `createdByUser`, `updatedByUser`, `createdAt`, `updatedAt`, `isDeleted`, `deletedAt`, `deletedByUser`
+- Media: `property_media`
 
+## Operational Rule
+
+Keep `isOperational` aligned with `certificateStatus`:
+
+- `PENDING` -> `isOperational = false`
+- `RECEIVED` -> `isOperational = true`
+- `NOT_REQUIRED` -> `isOperational = true`
+
+Suggested transition behavior:
+
+- When `certificateStatus` becomes `RECEIVED`, stamp `certificateReceivedAt` if it is empty.
+- When `certificateStatus` becomes `PENDING`, clear `certificateReceivedAt`.
+- When `certificateStatus` becomes `NOT_REQUIRED`, keep `certificateReceivedAt` as-is or `null` if you prefer to avoid implying a receipt event.

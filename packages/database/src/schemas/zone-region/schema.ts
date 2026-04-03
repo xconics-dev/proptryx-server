@@ -8,6 +8,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { propertyZone } from "../property/schema";
 import { user } from "../auth/schema";
 
 export const region = pgTable(
@@ -94,10 +95,13 @@ export const regionRelations = relations(region, ({ many, one }) => ({
   }),
 }));
 
-export const zoneRelations = relations(zone, ({ one }) => ({
+export const zoneRelations = relations(zone, ({ many, one }) => ({
   region: one(region, {
     fields: [zone.regionId],
     references: [region.id],
+  }),
+  propertyZones: many(propertyZone, {
+    relationName: "zonePropertyZones",
   }),
   deletedBy: one(user, {
     fields: [zone.deletedByUser],

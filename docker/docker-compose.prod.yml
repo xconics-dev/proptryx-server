@@ -133,7 +133,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-
 networks:
   app-network:
     name: proptryx-app-network
