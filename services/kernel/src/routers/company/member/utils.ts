@@ -1,5 +1,6 @@
-import { db, member, organization, user } from "@proptryx/database";
+import { account, db, member, organization, user } from "@proptryx/database";
 import {
+  decryptPassword,
   encryptPassword,
   generateRandomPassword,
   generateUID,
@@ -90,5 +91,50 @@ export async function createMemberAuthSeed(secret: string) {
     password,
     hashedPassword,
     accountId,
+  };
+}
+
+export async function getMemberCredentialDeliveryData(id: string, secret: string) {
+  const memberData = await findMemberDetailsById(id);
+
+  if (!memberData) {
+    return {
+      success: false as const,
+      message: "Member not found",
+    };
+  }
+
+  const [orgData, memberAccount] = await Promise.all([
+    findOrganizationSummaryById(memberData.organizationId),
+    db
+      .select({ password: account.password })
+      .from(account)
+      .where(eq(account.userId, memberData.userId))
+      .limit(1)
+      .then((rows) => rows[0]),
+  ]);
+
+  if (!orgData) {
+    return {
+      success: false as const,
+      message: "Company not found",
+    };
+  }
+
+  if (!memberAccount?.password) {
+    return {
+      success: false as const,
+      message: "Member account not found",
+    };
+  }
+
+  return {
+    success: true as const,
+    data: {
+      email: memberData.user.email,
+      password: decryptPassword(memberAccount.password, secret),
+      organizationName: orgData.name,
+      role: memberData.role,
+    },
   };
 }

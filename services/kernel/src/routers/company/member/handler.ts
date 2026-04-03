@@ -12,9 +12,10 @@ import { account, db, member, user } from "@proptryx/database";
 import { eq } from "drizzle-orm";
 import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { fetchMemberList } from "./list";
-import { create, get, list, remove, remove_with_user, update } from "./openapi.route";
+import { create, get, list, remove, remove_with_user, resend_cred, update } from "./openapi.route";
 import {
   createMemberAuthSeed,
+  getMemberCredentialDeliveryData,
   findMemberById,
   findMemberConflictByEmail,
   findMemberDetailsById,
@@ -299,4 +300,38 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
   });
 
   return c.json(null);
+});
+
+registerOpenApiRoute(companyMembersGroup, resend_cred, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const credentialData = await getMemberCredentialDeliveryData(id, env.BETTER_AUTH_SECRET);
+
+  if (!credentialData.success) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: credentialData.message,
+      }),
+      404
+    );
+  }
+  await sendEmail({
+    to: credentialData.data.email,
+    subject: emailSubject["member-account-cred"].subject,
+    html: await renderMemberAccountCredEmail({
+      credEmail: credentialData.data.email,
+      credPassword: credentialData.data.password,
+      organizationName: credentialData.data.organizationName,
+      role: credentialData.data.role,
+      previewText: emailSubject["member-account-cred"].previewText,
+    }),
+  });
+
+  return c.json(
+    createSuccessResponse({
+      message: "Credentials resent successfully",
+    }),
+    200
+  );
 });

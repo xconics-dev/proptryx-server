@@ -126,3 +126,21 @@ export const remove_with_user = createOpenApiRoute({
     },
   },
 });
+
+export const resend_cred = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/resend-cred",
+  operationId: "companyMemberResendCredentialsById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Resend credentials to a member",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: {
+      description: "Credentials resent successfully",
+    },
+    404: ApiNotFoundOpenApi,
+  },
+});

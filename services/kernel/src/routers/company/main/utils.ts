@@ -1,7 +1,8 @@
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
-import { db, organization, user } from "@proptryx/database";
+import { account, db, member, organization, user } from "@proptryx/database";
 import {
+  decryptPassword,
   encryptPassword,
   generateNextCompanyId,
   generateRandomPassword,
@@ -174,4 +175,65 @@ export async function syncCompanyRazorpayCustomer({
       error: rzError,
     });
   }
+}
+
+export async function getCompanyOwnerCredentialDeliveryData(id: string, secret: string) {
+  const company = await findCompanyById(id);
+
+  if (!company) {
+    return {
+      success: false as const,
+      message: "Company not found",
+    };
+  }
+
+  const ownerMember = await db
+    .select({
+      role: member.role,
+      userId: user.id,
+      email: user.email,
+    })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(
+      and(
+        eq(member.organizationId, id),
+        eq(member.role, "owner"),
+        eq(member.isDeleted, false),
+        eq(user.isDeleted, false)
+      )
+    )
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  if (!ownerMember) {
+    return {
+      success: false as const,
+      message: "Owner member not found",
+    };
+  }
+
+  const ownerAccount = await db
+    .select({ password: account.password })
+    .from(account)
+    .where(eq(account.userId, ownerMember.userId))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  if (!ownerAccount?.password) {
+    return {
+      success: false as const,
+      message: "Owner account not found",
+    };
+  }
+
+  return {
+    success: true as const,
+    data: {
+      email: ownerMember.email,
+      password: decryptPassword(ownerAccount.password, secret),
+      organizationName: company.name,
+      role: ownerMember.role,
+    },
+  };
 }

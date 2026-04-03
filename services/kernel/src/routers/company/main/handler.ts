@@ -13,7 +13,7 @@ import { account, db, member, organization, user } from "@proptryx/database";
 import { and, eq } from "drizzle-orm";
 import { emailSubject, renderAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { fetchCompanyList } from "./list";
-import { create, get, get_gst_info, list, remove, update } from "./openapi.route";
+import { create, get, get_gst_info, list, remove, resend_cred, update } from "./openapi.route";
 import { COMPANY_CREATION_TOTAL_STEPS, type CompanyCreationStep } from "./schema";
 import {
   createCompanyAuthSeed,
@@ -21,6 +21,7 @@ import {
   findCompanyById,
   findCompanyOwnerConflicts,
   findNextCompanyId,
+  getCompanyOwnerCredentialDeliveryData,
   syncCompanyRazorpayCustomer,
 } from "./utils";
 
@@ -311,6 +312,40 @@ registerOpenApiRoute(companyMainGroup, remove, async (c) => {
         roles: [],
       }
     ),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMainGroup, resend_cred, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const credentialData = await getCompanyOwnerCredentialDeliveryData(id, env.BETTER_AUTH_SECRET);
+
+  if (!credentialData.success) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: credentialData.message,
+      }),
+      404
+    );
+  }
+
+  await sendEmail({
+    to: credentialData.data.email,
+    subject: emailSubject["account-credentials"].subject,
+    html: await renderAccountCredEmail({
+      credEmail: credentialData.data.email,
+      credPassword: credentialData.data.password,
+      organizationName: credentialData.data.organizationName,
+      previewText: emailSubject["account-credentials"].previewText,
+    }),
+  });
+
+  return c.json(
+    createSuccessResponse({
+      message: "Credentials resent successfully",
+    }),
     200
   );
 });
