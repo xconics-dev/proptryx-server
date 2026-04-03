@@ -8,24 +8,12 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { create, get, list, remove, update } from "./openapi.route";
 import { fetchTestimonialList } from "./list";
+import { findTestimonialById } from "./utils";
 
 export const testimonialsGroup = new OpenAPIHono<AppBindings>();
-
-async function findTestimonialById(id: string, options?: { includeDeleted?: boolean }) {
-  const whereClause = options?.includeDeleted
-    ? eq(testimonial.id, id)
-    : and(eq(testimonial.id, id), eq(testimonial.isDeleted, false));
-
-  return db
-    .select()
-    .from(testimonial)
-    .where(whereClause)
-    .limit(1)
-    .then((rows) => rows[0]);
-}
 
 registerOpenApiRoute(testimonialsGroup, list, async (c) => {
   const query = c.req.valid("query");

@@ -1,5 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { db, company_request, gstInfoResponseSchema } from "@proptryx/database";
+import { company_request, db } from "@proptryx/database";
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -7,11 +7,11 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { and, eq } from "drizzle-orm";
-import { check_gst, create, get, list, remove } from "./openapi.route";
 import type { AppBindings } from "@/types/app";
-import { env } from "@/config/env";
+import { eq } from "drizzle-orm";
 import { fetchCompanyRequestList } from "./list";
+import { check_gst, create, get, list, remove } from "./openapi.route";
+import { fetchActiveGstInfo, findCompanyRequestById } from "./utils";
 
 export const companyRequestGroup: OpenAPIHono<AppBindings> = new OpenAPIHono<AppBindings>();
 
@@ -25,11 +25,7 @@ registerOpenApiRoute(companyRequestGroup, list, async (c) => {
 registerOpenApiRoute(companyRequestGroup, get, async (c) => {
   const { id } = c.req.valid("param");
 
-  const [companyRequest] = await db
-    .select()
-    .from(company_request)
-    .where(and(eq(company_request.id, id), eq(company_request.isDeleted, false)))
-    .limit(1);
+  const companyRequest = await findCompanyRequestById(id);
 
   if (!companyRequest) {
     return c.json(
@@ -41,37 +37,21 @@ registerOpenApiRoute(companyRequestGroup, get, async (c) => {
     );
   }
 
-  const gst_response = await fetch(
-    `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(companyRequest.companyGstNumber)}`
-  );
+  const gstResult = await fetchActiveGstInfo(companyRequest.companyGstNumber);
 
-  const gst_payload = await gst_response.json();
-
-  const gstParsedPayload = gstInfoResponseSchema.safeParse(gst_payload);
-
-  if (!gstParsedPayload.success) {
+  if (!gstResult.success) {
     return c.json(
       createErrorResponse({
-        error: "Invalid GST",
-        message: "GST number is invalid or inactive.",
+        error: gstResult.error,
+        message: gstResult.message,
       }),
-      400
-    );
-  }
-
-  if (gstParsedPayload.data.data?.sts !== "Active") {
-    return c.json(
-      createErrorResponse({
-        error: "Inactive GST",
-        message: "GST number is inactive.",
-      }),
-      400
+      gstResult.status
     );
   }
 
   const companyRequestWithGST = {
     ...companyRequest,
-    gst_details: gstParsedPayload.data,
+    gst_details: gstResult.data,
   };
 
   return c.json(createSuccessResponse(companyRequestWithGST), 200);
@@ -93,45 +73,26 @@ registerOpenApiRoute(companyRequestGroup, create, async (c) => {
 registerOpenApiRoute(companyRequestGroup, check_gst, async (c) => {
   const { gstNumber } = c.req.valid("param");
 
-  const gst_response = await fetch(
-    `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`
-  );
+  const gstResult = await fetchActiveGstInfo(gstNumber);
 
-  const gst_payload = await gst_response.json();
-  const gstParsedPayload = gstInfoResponseSchema.safeParse(gst_payload);
-
-  if (!gstParsedPayload.success) {
+  if (!gstResult.success) {
     return c.json(
       createErrorResponse({
-        error: "Invalid GST",
-        message: "GST number is invalid or inactive.",
+        error: gstResult.error,
+        message: gstResult.message,
       }),
-      400
+      gstResult.status
     );
   }
 
-  if (gstParsedPayload.data.data?.sts !== "Active") {
-    return c.json(
-      createErrorResponse({
-        error: "Inactive GST",
-        message: "GST number is inactive.",
-      }),
-      400
-    );
-  }
-
-  return c.json(createSuccessResponse(gstParsedPayload.data), 200);
+  return c.json(createSuccessResponse(gstResult.data), 200);
 });
 
 registerOpenApiRoute(companyRequestGroup, remove, async (c) => {
   const { id } = c.req.valid("param");
   const { user } = getBetterAuthContext(c);
 
-  const [existingRequest] = await db
-    .select()
-    .from(company_request)
-    .where(eq(company_request.id, id))
-    .limit(1);
+  const existingRequest = await findCompanyRequestById(id, { includeDeleted: true });
 
   if (!existingRequest) {
     return c.json(

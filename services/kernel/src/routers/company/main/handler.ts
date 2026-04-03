@@ -1,55 +1,31 @@
-// company/company.handler.ts
-/** biome-ignore-all lint/style/useConst: forced */
-/** biome-ignore-all lint/suspicious/noExplicitAny: forced */
 import type { AppBindings } from "@/types/app";
+import { env } from "@/config/env";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { create, get, get_gst_info, list, remove, update } from "./openapi.route";
 import {
   createErrorResponse,
   createSuccessResponse,
   ensureDefaultOrganizationRoles,
-  generateNextCompanyId,
   generateRandomId,
-  generateRandomPassword,
-  generateUID,
   getBetterAuthContext,
-  getRazorpayClient,
-  encryptPassword,
-  PasswordUtils,
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { account, db, member, organization, user } from "@proptryx/database";
-import { and, desc, eq } from "drizzle-orm";
-import {
-  COMPANY_CREATION_TOTAL_STEPS,
-  companyGstInfoSchema,
-  type CompanyCreationStep,
-} from "./schema";
-import { logger } from "@/lib/logger";
-import { env } from "@/config/env";
-import { sendEmail, renderAccountCredEmail, emailSubject } from "@proptryx/notification";
+import { and, eq } from "drizzle-orm";
+import { emailSubject, renderAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { fetchCompanyList } from "./list";
+import { create, get, get_gst_info, list, remove, resend_cred, update } from "./openapi.route";
+import { COMPANY_CREATION_TOTAL_STEPS, type CompanyCreationStep } from "./schema";
+import {
+  createCompanyAuthSeed,
+  fetchCompanyGstInfo,
+  findCompanyById,
+  findCompanyOwnerConflicts,
+  findNextCompanyId,
+  getCompanyOwnerCredentialDeliveryData,
+  syncCompanyRazorpayCustomer,
+} from "./utils";
 
 export const companyMainGroup = new OpenAPIHono<AppBindings>();
-
-const rzClient = getRazorpayClient();
-
-async function findCompanyById(id: string, options?: { includeDeleted?: boolean }) {
-  return db.query.organization.findFirst({
-    where: options?.includeDeleted
-      ? eq(organization.id, id)
-      : and(eq(organization.id, id), eq(organization.isDeleted, false)),
-    with: {
-      roles: {
-        columns: {
-          createdAt: false,
-          updatedAt: false,
-          organizationId: false,
-        },
-      },
-    },
-  });
-}
 
 // Query routes
 registerOpenApiRoute(companyMainGroup, list, async (c) => {
@@ -103,25 +79,19 @@ registerOpenApiRoute(companyMainGroup, get_gst_info, async (c) => {
       404
     );
   }
-  const gst_response = await fetch(
-    `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`
-  );
+  const gstResult = await fetchCompanyGstInfo(gstNumber);
 
-  const gst_payload = await gst_response.json();
-
-  const gstParsedPayload = companyGstInfoSchema.safeParse(gst_payload);
-
-  if (!gstParsedPayload.success) {
+  if (!gstResult.success) {
     return c.json(
       createErrorResponse({
-        error: "Invalid GST",
-        message: "GST number is invalid or inactive.",
+        error: gstResult.error,
+        message: gstResult.message,
       }),
-      400
+      gstResult.status
     );
   }
 
-  return c.json(createSuccessResponse(gstParsedPayload.data), 200);
+  return c.json(createSuccessResponse(gstResult.data), 200);
 });
 
 // Mutation routes
@@ -131,40 +101,14 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
   const stepsCompleted: CompanyCreationStep[] = [];
   const stepsFailed: CompanyCreationStep[] = [];
 
-  // ─── Step 1: Validate input + generate IDs ──────────────────────────────
-  const userId = generateUID();
-  const password = generateRandomPassword();
-  const accId = encryptPassword(password, env.BETTER_AUTH_SECRET);
-  const [hashPassword, latestOrg] = await Promise.all([
-    PasswordUtils.hash(password),
-    db
-      .select({ id: organization.id })
-      .from(organization)
-      .orderBy(desc(organization.createdAt))
-      .limit(1)
-      .then((rows) => rows[0]),
-  ]);
+  const [{ userId, password, hashedPassword, accountId }, nextOrgId, ownerConflicts] =
+    await Promise.all([
+      createCompanyAuthSeed(env.BETTER_AUTH_SECRET),
+      findNextCompanyId(),
+      findCompanyOwnerConflicts(body.ownerEmail, body.ownerPhoneNumber),
+    ]);
 
-  const nextOrgId = generateNextCompanyId(latestOrg?.id);
-
-  const [emailExists, phoneExists] = await Promise.all([
-    db
-      .select({ id: user.id })
-      .from(user)
-      .where(eq(user.email, body.ownerEmail))
-      .limit(1)
-      .then((r) => r[0]),
-    body.ownerPhoneNumber
-      ? db
-          .select({ id: user.id })
-          .from(user)
-          .where(eq(user.phoneNumber, body.ownerPhoneNumber))
-          .limit(1)
-          .then((r) => r[0])
-      : Promise.resolve(null),
-  ]);
-
-  if (emailExists) {
+  if (ownerConflicts.emailExists) {
     return c.json(
       createErrorResponse({
         error: "Conflict",
@@ -173,9 +117,6 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
       409
     );
   }
-  //   if (phoneExists) {
-  //     return c.json({ message: "Client with this phone number already exists" }, 409);
-  //   }
 
   stepsCompleted.push("validate_input");
 
@@ -198,11 +139,11 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
 
     // Step 3: Insert credential account
     await tx.insert(account).values({
-      id: accId,
+      id: accountId,
       userId,
       accountId: generateRandomId(),
       providerId: "credential",
-      password: hashPassword,
+      password: hashedPassword,
     });
     stepsCompleted.push("insert_credential_account");
 
@@ -255,55 +196,12 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
     return { userData, orgData, memberData };
   });
 
-  // ─── Step 6: Upsert Razorpay customer (outside TX — external API) ────────
-  //
-  // We search by email using a targeted query instead of fetching all customers.
-  // The Razorpay customer search endpoint filters server-side and avoids the
-  // O(n) full-scan that `customers.all({})` causes.
-  let customerId: string;
-
-  try {
-    const searchResult = await rzClient.customers.all().then((result) => {
-      // Filter results to find exact email match, as Razorpay's search is a "contains" match
-      const matchingItems = result.items.filter((item) => item.email === body.ownerEmail);
-      return { items: matchingItems };
-    });
-
-    const existingCustomer = searchResult.items?.[0] ?? null;
-
-    if (existingCustomer) {
-      customerId = existingCustomer.id;
-
-      // Only patch if contact is missing and we now have it
-      if (userData.phoneNumber && !existingCustomer.contact) {
-        await rzClient.customers.edit(existingCustomer.id, {
-          contact: userData.phoneNumber,
-        });
-      }
-    } else {
-      const customer = await rzClient.customers.create({
-        name: userData.name,
-        email: userData.email,
-        contact: userData.phoneNumber ?? undefined,
-        gstin: orgData.gstNumber,
-        notes: {
-          organizationId: orgData.id,
-          memberId: memberData.id,
-          userId: userData.id,
-          createdAt: new Date().toISOString(),
-        },
-      });
-      customerId = customer.id;
-    }
-
-    // ─── Step 7: Persist Razorpay customer ID on org ──────────────────────
-    await db
-      .update(organization)
-      .set({ razorpayCustomerId: customerId })
-      .where(eq(organization.id, orgData.id));
-  } catch (rzError) {
-    logger.error(`[company.create] Razorpay upsert failed for org ${orgData.id}:`, rzError as any);
-  }
+  await syncCompanyRazorpayCustomer({
+    ownerEmail: body.ownerEmail,
+    userData,
+    orgData,
+    memberData,
+  });
 
   const createdCompany = await findCompanyById(orgData.id);
 
@@ -414,6 +312,40 @@ registerOpenApiRoute(companyMainGroup, remove, async (c) => {
         roles: [],
       }
     ),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMainGroup, resend_cred, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const credentialData = await getCompanyOwnerCredentialDeliveryData(id, env.BETTER_AUTH_SECRET);
+
+  if (!credentialData.success) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: credentialData.message,
+      }),
+      404
+    );
+  }
+
+  await sendEmail({
+    to: credentialData.data.email,
+    subject: emailSubject["account-credentials"].subject,
+    html: await renderAccountCredEmail({
+      credEmail: credentialData.data.email,
+      credPassword: credentialData.data.password,
+      organizationName: credentialData.data.organizationName,
+      previewText: emailSubject["account-credentials"].previewText,
+    }),
+  });
+
+  return c.json(
+    createSuccessResponse({
+      message: "Credentials resent successfully",
+    }),
     200
   );
 });

@@ -1,22 +1,26 @@
 import type { AppBindings } from "@/types/app";
+import { env } from "@/config/env";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
   createErrorResponse,
   createSuccessResponse,
-  encryptPassword,
   generateRandomId,
-  generateRandomPassword,
-  generateUID,
   getBetterAuthContext,
-  PasswordUtils,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { create, get, list, remove, remove_with_user, update } from "./openapi.route";
-import { env } from "@/config/env";
-import { account, db, member, organization, user } from "@proptryx/database";
-import { and, eq } from "drizzle-orm";
+import { account, db, member, user } from "@proptryx/database";
+import { eq } from "drizzle-orm";
 import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { fetchMemberList } from "./list";
+import { create, get, list, remove, remove_with_user, resend_cred, update } from "./openapi.route";
+import {
+  createMemberAuthSeed,
+  getMemberCredentialDeliveryData,
+  findMemberById,
+  findMemberConflictByEmail,
+  findMemberDetailsById,
+  findOrganizationSummaryById,
+} from "./utils";
 
 export const companyMembersGroup = new OpenAPIHono<AppBindings>();
 
@@ -31,27 +35,7 @@ registerOpenApiRoute(companyMembersGroup, list, async (c) => {
 registerOpenApiRoute(companyMembersGroup, get, async (c) => {
   const { id } = c.req.valid("param");
 
-  const memberData = await db
-    .select({
-      id: member.id,
-      organizationId: member.organizationId,
-      userId: member.userId,
-      role: member.role,
-      panel: member.panel,
-      createdAt: member.createdAt,
-      updatedAt: member.updatedAt,
-      createdByUser: member.createdByUser,
-      updatedByUser: member.updatedByUser,
-      deletedAt: member.deletedAt,
-      isDeleted: member.isDeleted,
-      deletedByUser: member.deletedByUser,
-      user,
-    })
-    .from(member)
-    .innerJoin(user, eq(user.id, member.userId))
-    .where(and(eq(member.id, id), eq(member.isDeleted, false), eq(user.isDeleted, false)))
-    .limit(1)
-    .then((rows) => rows[0]);
+  const memberData = await findMemberDetailsById(id);
 
   if (!memberData) {
     return c.json(
@@ -72,31 +56,19 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
   const { user: currentUser } = getBetterAuthContext(c);
 
   const [existingUserWithMember, orgData] = await Promise.all([
-    db
-      .select({
-        userId: user.id,
-        memberId: member.id,
-        organizationId: member.organizationId,
-      })
-      .from(user)
-      .leftJoin(
-        member,
-        and(
-          eq(member.userId, user.id),
-          eq(member.organizationId, body.organizationId),
-          eq(member.isDeleted, false)
-        )
-      )
-      .where(eq(user.email, body.email))
-      .limit(1)
-      .then((rows) => rows[0]),
-    db
-      .select({ id: organization.id, name: organization.name })
-      .from(organization)
-      .where(and(eq(organization.id, body.organizationId), eq(organization.isDeleted, false)))
-      .limit(1)
-      .then((rows) => rows[0]),
+    findMemberConflictByEmail(body.email, body.organizationId),
+    findOrganizationSummaryById(body.organizationId),
   ]);
+
+  if (!orgData) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Company not found",
+      }),
+      404
+    );
+  }
 
   const emailExists = Boolean(existingUserWithMember?.userId);
   const memberExists = Boolean(existingUserWithMember?.memberId);
@@ -121,12 +93,9 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
     );
   }
 
-  const userId = generateUID();
-  const password = generateRandomPassword();
-  const [hashedPassword, accId] = await Promise.all([
-    PasswordUtils.hash(password),
-    Promise.resolve(encryptPassword(password, env.BETTER_AUTH_SECRET)),
-  ]);
+  const { userId, password, hashedPassword, accountId } = await createMemberAuthSeed(
+    env.BETTER_AUTH_SECRET
+  );
 
   const memberData = await db.transaction(async (tx) => {
     // Step 1: Insert user
@@ -142,7 +111,7 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
 
     // Step 2: Insert account
     await tx.insert(account).values({
-      id: accId,
+      id: accountId,
       userId,
       accountId: generateRandomId(),
       providerId: "credential",
@@ -188,12 +157,7 @@ registerOpenApiRoute(companyMembersGroup, update, async (c) => {
   const body = c.req.valid("json");
   const { user: currentUser } = getBetterAuthContext(c);
 
-  const existingMember = await db
-    .select()
-    .from(member)
-    .where(and(eq(member.id, id), eq(member.isDeleted, false)))
-    .limit(1)
-    .then((rows) => rows[0]);
+  const existingMember = await findMemberById(id);
 
   if (!existingMember) {
     return c.json(
@@ -244,12 +208,7 @@ registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
   const { id } = c.req.valid("param");
   const { user: currentUser } = getBetterAuthContext(c);
 
-  const existingMember = await db
-    .select()
-    .from(member)
-    .where(and(eq(member.id, id), eq(member.isDeleted, false)))
-    .limit(1)
-    .then((rows) => rows[0]);
+  const existingMember = await findMemberById(id);
 
   if (!existingMember) {
     return c.json(
@@ -298,12 +257,7 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
   const { id } = c.req.valid("param");
   const { user: currentUser } = getBetterAuthContext(c);
 
-  const existingMember = await db
-    .select()
-    .from(member)
-    .where(and(eq(member.id, id), eq(member.isDeleted, false)))
-    .limit(1)
-    .then((rows) => rows[0]);
+  const existingMember = await findMemberById(id);
 
   if (!existingMember) {
     return c.json(
@@ -346,4 +300,38 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
   });
 
   return c.json(null);
+});
+
+registerOpenApiRoute(companyMembersGroup, resend_cred, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const credentialData = await getMemberCredentialDeliveryData(id, env.BETTER_AUTH_SECRET);
+
+  if (!credentialData.success) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: credentialData.message,
+      }),
+      404
+    );
+  }
+  await sendEmail({
+    to: credentialData.data.email,
+    subject: emailSubject["member-account-cred"].subject,
+    html: await renderMemberAccountCredEmail({
+      credEmail: credentialData.data.email,
+      credPassword: credentialData.data.password,
+      organizationName: credentialData.data.organizationName,
+      role: credentialData.data.role,
+      previewText: emailSubject["member-account-cred"].previewText,
+    }),
+  });
+
+  return c.json(
+    createSuccessResponse({
+      message: "Credentials resent successfully",
+    }),
+    200
+  );
 });
