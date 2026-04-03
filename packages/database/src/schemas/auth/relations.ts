@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import { company_request } from "../company/request";
+import { property } from "../property";
 import { faq, testimonial } from "../site-data";
 import { createAuditRelationNames } from "../utils/audit";
 import { region, zone } from "../zone-region";
@@ -22,6 +23,7 @@ const auditRelations = {
   faq: createAuditRelationNames("faq"),
   member: createAuditRelationNames("member"),
   organization: createAuditRelationNames("organization"),
+  property: createAuditRelationNames("property"),
   region: createAuditRelationNames("region"),
   testimonial: createAuditRelationNames("testimonial"),
   user: createAuditRelationNames("user"),
@@ -53,6 +55,9 @@ export const userRelations = relations(user, ({ many, one }) => {
     deletedRegions: many(region, {
       relationName: auditRelations.region.deleted,
     }),
+    ownedProperties: many(property, {
+      relationName: "propertySuperOwner",
+    }),
     createdRegions: many(region, {
       relationName: auditRelations.region.created,
     }),
@@ -76,6 +81,15 @@ export const userRelations = relations(user, ({ many, one }) => {
     }),
     deletedUsers: many(user, {
       relationName: auditRelations.user.deleted,
+    }),
+    createdProperties: many(property, {
+      relationName: auditRelations.property.created,
+    }),
+    updatedProperties: many(property, {
+      relationName: auditRelations.property.updated,
+    }),
+    deletedProperties: many(property, {
+      relationName: auditRelations.property.deleted,
     }),
     createdByUser: userAudit(user.createdByUser, auditRelations.user.created),
     updatedByUser: userAudit(user.updatedByUser, auditRelations.user.updated),

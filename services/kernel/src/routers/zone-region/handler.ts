@@ -8,7 +8,7 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   createRegion,
   createZone,
@@ -22,83 +22,17 @@ import {
   updateZone,
 } from "./openapi.route";
 import { fetchRegionList, fetchZoneList } from "./list";
+import {
+  attachRegionToZones,
+  attachZonesToRegions,
+  findActiveZoneByRegionId,
+  findRegionById,
+  findRegionByName,
+  findZoneById,
+  findZoneByRegionAndName,
+} from "./utils";
 
 export const zoneRegionGroup = new OpenAPIHono<AppBindings>();
-
-async function findRegionById(id: string, options?: { includeDeleted?: boolean }) {
-  const whereClause = options?.includeDeleted
-    ? eq(region.id, id)
-    : and(eq(region.id, id), eq(region.isDeleted, false));
-
-  return db
-    .select()
-    .from(region)
-    .where(whereClause)
-    .limit(1)
-    .then((rows) => rows[0]);
-}
-
-async function findZoneById(id: string, options?: { includeDeleted?: boolean }) {
-  const whereClause = options?.includeDeleted
-    ? eq(zone.id, id)
-    : and(eq(zone.id, id), eq(zone.isDeleted, false));
-
-  return db
-    .select()
-    .from(zone)
-    .where(whereClause)
-    .limit(1)
-    .then((rows) => rows[0]);
-}
-
-async function attachZonesToRegions<TRegion extends { id: string }>(
-  regionsData: TRegion[],
-  options?: { includeZones?: boolean }
-) {
-  if (!options?.includeZones || regionsData.length === 0) {
-    return regionsData;
-  }
-
-  const regionIds = regionsData.map((item) => item.id);
-  const zonesData = await db
-    .select()
-    .from(zone)
-    .where(and(inArray(zone.regionId, regionIds), eq(zone.isDeleted, false)));
-
-  const zonesByRegionId = new Map<string, typeof zonesData>();
-  for (const zoneData of zonesData) {
-    const regionZones = zonesByRegionId.get(zoneData.regionId) ?? [];
-    regionZones.push(zoneData);
-    zonesByRegionId.set(zoneData.regionId, regionZones);
-  }
-
-  return regionsData.map((regionData) => ({
-    ...regionData,
-    zones: zonesByRegionId.get(regionData.id) ?? [],
-  }));
-}
-
-async function attachRegionToZones<TZone extends { regionId: string }>(
-  zonesData: TZone[],
-  options?: { includeRegion?: boolean }
-) {
-  if (!options?.includeRegion || zonesData.length === 0) {
-    return zonesData;
-  }
-
-  const regionIds = [...new Set(zonesData.map((item) => item.regionId))];
-  const regionsData = await db
-    .select()
-    .from(region)
-    .where(and(inArray(region.id, regionIds), eq(region.isDeleted, false)));
-
-  const regionById = new Map(regionsData.map((regionData) => [regionData.id, regionData]));
-
-  return zonesData.map((zoneData) => ({
-    ...zoneData,
-    region: regionById.get(zoneData.regionId),
-  }));
-}
 
 registerOpenApiRoute(zoneRegionGroup, listRegions, async (c) => {
   const query = c.req.valid("query");
@@ -136,12 +70,7 @@ registerOpenApiRoute(zoneRegionGroup, createRegion, async (c) => {
   const body = c.req.valid("json");
   const { user } = getBetterAuthContext(c);
 
-  const existingRegion = await db
-    .select({ id: region.id })
-    .from(region)
-    .where(and(eq(region.name, body.name), eq(region.isDeleted, false)))
-    .limit(1)
-    .then((rows) => rows[0]);
+  const existingRegion = await findRegionByName(body.name);
 
   if (existingRegion) {
     return c.json(
@@ -183,12 +112,7 @@ registerOpenApiRoute(zoneRegionGroup, updateRegion, async (c) => {
   }
 
   if (body.name) {
-    const duplicateRegion = await db
-      .select({ id: region.id })
-      .from(region)
-      .where(and(eq(region.name, body.name), eq(region.isDeleted, false), ne(region.id, id)))
-      .limit(1)
-      .then((rows) => rows[0]);
+    const duplicateRegion = await findRegionByName(body.name, { excludeId: id });
 
     if (duplicateRegion) {
       return c.json(
@@ -226,12 +150,7 @@ registerOpenApiRoute(zoneRegionGroup, removeRegion, async (c) => {
     );
   }
 
-  const activeZone = await db
-    .select({ id: zone.id })
-    .from(zone)
-    .where(and(eq(zone.regionId, id), eq(zone.isDeleted, false)))
-    .limit(1)
-    .then((rows) => rows[0]);
+  const activeZone = await findActiveZoneByRegionId(id);
 
   if (activeZone) {
     return c.json(
@@ -295,14 +214,7 @@ registerOpenApiRoute(zoneRegionGroup, createZone, async (c) => {
 
   const [regionData, existingZone] = await Promise.all([
     findRegionById(body.regionId),
-    db
-      .select({ id: zone.id })
-      .from(zone)
-      .where(
-        and(eq(zone.regionId, body.regionId), eq(zone.name, body.name), eq(zone.isDeleted, false))
-      )
-      .limit(1)
-      .then((rows) => rows[0]),
+    findZoneByRegionAndName(body.regionId, body.name),
   ]);
 
   if (!regionData) {
@@ -359,19 +271,7 @@ registerOpenApiRoute(zoneRegionGroup, updateZone, async (c) => {
 
   const [regionData, duplicateZone] = await Promise.all([
     findRegionById(nextRegionId),
-    db
-      .select({ id: zone.id })
-      .from(zone)
-      .where(
-        and(
-          eq(zone.regionId, nextRegionId),
-          eq(zone.name, nextName),
-          eq(zone.isDeleted, false),
-          ne(zone.id, id)
-        )
-      )
-      .limit(1)
-      .then((rows) => rows[0]),
+    findZoneByRegionAndName(nextRegionId, nextName, { excludeId: id }),
   ]);
 
   if (!regionData) {

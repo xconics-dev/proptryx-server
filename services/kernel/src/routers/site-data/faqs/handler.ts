@@ -7,24 +7,12 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { create, get, list, remove, update } from "./openapi.route";
 import { fetchFaqList } from "./list";
+import { findFaqById } from "./utils";
 
 export const faqsGroup = new OpenAPIHono<AppBindings>();
-
-async function findFaqById(id: string, options?: { includeDeleted?: boolean }) {
-  const whereClause = options?.includeDeleted
-    ? eq(faq.id, id)
-    : and(eq(faq.id, id), eq(faq.isDeleted, false));
-
-  return db
-    .select()
-    .from(faq)
-    .where(whereClause)
-    .limit(1)
-    .then((rows) => rows[0]);
-}
 
 registerOpenApiRoute(faqsGroup, list, async (c) => {
   const query = c.req.valid("query");

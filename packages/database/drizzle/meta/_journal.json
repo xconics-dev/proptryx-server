@@ -85,6 +85,13 @@
       "when": 1775132434721,
       "tag": "0011_common_wolf_cub",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1775196147890,
+      "tag": "0012_nappy_gamora",
+      "breakpoints": true
     }
   ]
 }
