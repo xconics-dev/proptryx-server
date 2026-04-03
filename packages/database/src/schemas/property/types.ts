@@ -13,7 +13,6 @@ export type PropertyLocationMetadata = {
     commercialHubKm?: number;
     competitionKm?: number;
   };
-  roadWidthFt?: number;
 };
 
 export const defaultPropertyLocationMetadata: PropertyLocationMetadata = {
@@ -24,7 +23,6 @@ export const defaultPropertyLocationMetadata: PropertyLocationMetadata = {
     commercialHubKm: 0,
     competitionKm: 0,
   },
-  roadWidthFt: 0,
 };
 
 export const defaultPropertyDocuments: PropertyDocument[] = [];

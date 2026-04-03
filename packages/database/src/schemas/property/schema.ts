@@ -15,6 +15,8 @@ import { user } from "../auth/schema";
 import { createAuditRelationNames } from "../utils/audit";
 import {
   BusinessDistrictType,
+  CertificateStatus,
+  CertificateType,
   ParkingAccessType,
   ParkingConfiguration,
   ParkingSecurityControl,
@@ -74,6 +76,15 @@ export const property = pgTable(
     isVerified: boolean("is_verified").default(false).notNull(),
     isPublished: boolean("is_published").default(false).notNull(),
 
+    // Operational & Certificate (OC / CC)
+    isOperational: boolean("is_operational").default(false).notNull(),
+    certificateType: CertificateType("certificate_type").default("OC").notNull(),
+    certificateStatus: CertificateStatus("certificate_status").default("PENDING").notNull(),
+    /** Expected certificate receipt date — only relevant when isOperational = false */
+    certificateEtaDate: timestamp("certificate_eta_date"),
+    /** Stamped when certificateStatus transitions to RECEIVED — frontend watches this to fire the toast */
+    certificateReceivedAt: timestamp("certificate_received_at"),
+
     // Enums
     type: PropertyType("type").notNull(),
     status: PropertyStatus("status").notNull(),
@@ -112,6 +123,7 @@ export const property = pgTable(
     index("property_status_idx").on(table.status),
     index("property_city_idx").on(table.city),
     index("property_pincode_idx").on(table.pincode),
+    index("property_certificateStatus_idx").on(table.certificateStatus),
     index("property_isDeleted_isPublished_createdAt_idx").on(
       table.isDeleted,
       table.isPublished,

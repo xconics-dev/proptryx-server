@@ -19,6 +19,22 @@ export const PropertyStatus = pgEnum("property_status", [
 ]);
 export type PropertyStatus = (typeof PropertyStatus.enumValues)[number];
 
+/** OC = Occupancy Certificate (safe to occupy); CC = Completion Certificate (construction complete) */
+export const CertificateType = pgEnum("certificate_type", ["OC", "CC"]);
+export type CertificateType = (typeof CertificateType.enumValues)[number];
+
+/**
+ * PENDING      → Certificate not yet received; property not operational (show ETA date picker)
+ * RECEIVED     → Certificate received; certificateReceivedAt is stamped — triggers flash notification
+ * NOT_REQUIRED → Property is exempt / already certified; no tracking needed
+ */
+export const CertificateStatus = pgEnum("certificate_status", [
+  "PENDING",
+  "RECEIVED",
+  "NOT_REQUIRED",
+]);
+export type CertificateStatus = (typeof CertificateStatus.enumValues)[number];
+
 /** SINGLE_OWNER = only superOwner; MULTIPLE_OWNER = superOwner + co-owners via property_owner table */
 export const PropertyOwnershipType = pgEnum("property_ownership_type", [
   "SINGLE_OWNER",
