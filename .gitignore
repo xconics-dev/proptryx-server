@@ -33,3 +33,8 @@ yarn-error.log*
 
 # Husky generated internals
 .husky/_/
+
+# Local Codex skill scaffolding
+skills
+skills/.scaffold/
+skills/better-upload/
