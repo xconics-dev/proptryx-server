@@ -58,6 +58,14 @@ export const PropertyOwnershipType = pgEnum("property_ownership_type", [
 ]);
 export type PropertyOwnershipType = (typeof PropertyOwnershipType.enumValues)[number];
 
+// ─── Property Media ──────────────────────────────────────────────────────────
+
+export const PropertyMediaType = pgEnum("property_media_type", ["IMAGE", "DOCUMENT"]);
+export type PropertyMediaType = (typeof PropertyMediaType.enumValues)[number];
+
+export const PropertyMediaVisibility = pgEnum("property_media_visibility", ["PUBLIC", "PRIVATE"]);
+export type PropertyMediaVisibility = (typeof PropertyMediaVisibility.enumValues)[number];
+
 // ─── Retail ───────────────────────────────────────────────────────────────────
 
 export const RetailPropertyType = pgEnum("retail_mall_type", ["MALL", "HIGH_STREET"]);

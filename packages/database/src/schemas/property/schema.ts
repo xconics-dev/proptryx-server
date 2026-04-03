@@ -23,6 +23,8 @@ import {
   ParkingSecurityControl,
   ParkingType,
   ParkingVentilationType,
+  PropertyMediaType,
+  PropertyMediaVisibility,
   PriceUnit,
   PropertyOwnershipType,
   PropertyStatus,
@@ -33,12 +35,7 @@ import {
   RetailStoreType,
   WarehouseConstructionType,
 } from "./enums";
-import {
-  defaultPropertyDocuments,
-  defaultPropertyLocationMetadata,
-  type PropertyDocument,
-  type PropertyLocationMetadata,
-} from "./types";
+import { defaultPropertyLocationMetadata, type PropertyLocationMetadata } from "./types";
 
 const auditRelations = {
   property: createAuditRelationNames("property"),
@@ -67,25 +64,18 @@ export const property = pgTable(
       .default(defaultPropertyLocationMetadata)
       .notNull(),
 
-    // Files & Images
-    thumbnail: text("thumbnail"),
-    images: text("images").array().default([]).notNull(),
-    documents: jsonb("documents")
-      .$type<PropertyDocument[]>()
-      .default(defaultPropertyDocuments)
-      .notNull(),
-
     // Boolean Statuses
     isVerified: boolean("is_verified").default(false).notNull(),
     isPublished: boolean("is_published").default(false).notNull(),
 
     // Operational & Certificate (OC / CC)
+    /** Derived operational flag: PENDING => false, RECEIVED / NOT_REQUIRED => true. */
     isOperational: boolean("is_operational").default(false).notNull(),
     certificateType: CertificateType("certificate_type").default("OC").notNull(),
     certificateStatus: CertificateStatus("certificate_status").default("PENDING").notNull(),
     /** Expected certificate receipt date — only relevant when isOperational = false */
     certificateEtaDate: timestamp("certificate_eta_date"),
-    /** Stamped when certificateStatus transitions to RECEIVED — frontend watches this to fire the toast */
+    /** Stamped when certificateStatus transitions to RECEIVED — frontend watches this to fire the toast. */
     certificateReceivedAt: timestamp("certificate_received_at"),
 
     // Area Details
@@ -143,6 +133,53 @@ export const property = pgTable(
       table.isPublished,
       table.createdAt
     ),
+  ]
+);
+
+// ─── Media ────────────────────────────────────────────────────────────────────
+
+export const propertyMedia = pgTable(
+  "property_media",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    propertyId: uuid("property_id")
+      .notNull()
+      .references(() => property.id, { onDelete: "cascade" }),
+
+    mediaType: PropertyMediaType("media_type").notNull(),
+    name: text("name").notNull(),
+    storageKey: text("storage_key").notNull(),
+    url: text("url").notNull(),
+    mimeType: text("mime_type"),
+    sizeBytes: integer("size_bytes"),
+    visibility: PropertyMediaVisibility("visibility").default("PUBLIC").notNull(),
+    sortOrder: integer("sort_order").default(0),
+    altText: text("alt_text"),
+    isThumbnail: boolean("is_thumbnail").default(false).notNull(),
+
+    createdByUser: text("created_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    updatedByUser: text("updated_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+
+    isDeleted: boolean("is_deleted").default(false).notNull(),
+    deletedAt: timestamp("deleted_at"),
+    deletedByUser: text("deleted_by_user").references(() => user.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [
+    index("property_media_propertyId_idx").on(table.propertyId),
+    index("property_media_propertyId_mediaType_idx").on(table.propertyId, table.mediaType),
+    index("property_media_propertyId_isThumbnail_idx").on(table.propertyId, table.isThumbnail),
+    index("property_media_isDeleted_propertyId_idx").on(table.isDeleted, table.propertyId),
   ]
 );
 
@@ -314,6 +351,9 @@ export const propertyRelations = relations(property, ({ one, many }) => {
     // Co-owners (populated when ownershipType = "MULTIPLE_OWNER")
     owners: many(propertyOwner),
 
+    // Media assets for the property listing
+    mediaItems: many(propertyMedia),
+
     // Type-specific extension (only one will be populated per property)
     retailDetails: one(propertyRetail, {
       fields: [property.id],
@@ -333,6 +373,28 @@ export const propertyRelations = relations(property, ({ one, many }) => {
     }),
   };
 });
+
+export const propertyMediaRelations = relations(propertyMedia, ({ one }) => ({
+  property: one(property, {
+    fields: [propertyMedia.propertyId],
+    references: [property.id],
+  }),
+  createdByUser: one(user, {
+    fields: [propertyMedia.createdByUser],
+    references: [user.id],
+    relationName: "propertyMediaCreatedByUser",
+  }),
+  updatedByUser: one(user, {
+    fields: [propertyMedia.updatedByUser],
+    references: [user.id],
+    relationName: "propertyMediaUpdatedByUser",
+  }),
+  deletedByUser: one(user, {
+    fields: [propertyMedia.deletedByUser],
+    references: [user.id],
+    relationName: "propertyMediaDeletedByUser",
+  }),
+}));
 
 export const propertyRetailRelations = relations(propertyRetail, ({ one }) => ({
   property: one(property, {
