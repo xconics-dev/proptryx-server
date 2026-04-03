@@ -1,8 +1,33 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, jsonb, pgTable, real, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  real,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { user } from "../auth/schema";
 import { createAuditRelationNames } from "../utils/audit";
-import { PropertyStatus, PropertyType } from "./enums";
+import {
+  BusinessDistrictType,
+  ParkingAccessType,
+  ParkingConfiguration,
+  ParkingSecurityControl,
+  ParkingType,
+  ParkingVentilationType,
+  PropertyOwnershipType,
+  PropertyStatus,
+  PropertyType,
+  RetailBrandCategory,
+  RetailPropertyType,
+  RetailStoreType,
+  WarehouseConstructionType,
+} from "./enums";
 import {
   defaultPropertyDocuments,
   defaultPropertyLocationMetadata,
@@ -53,10 +78,12 @@ export const property = pgTable(
     type: PropertyType("type").notNull(),
     status: PropertyStatus("status").notNull(),
 
-    // Relation for Property Control
+    // Ownership
+    ownershipType: PropertyOwnershipType("ownership_type").default("SINGLE_OWNER").notNull(),
     superOwnerId: text("super_owner_id").references(() => user.id, {
       onDelete: "set null",
     }),
+    // Co-owners are stored in the property_owner junction table
 
     // For keep reference
     createdByUser: text("created_by_user").references(() => user.id, {
@@ -93,7 +120,136 @@ export const property = pgTable(
   ]
 );
 
-export const propertyRelations = relations(property, ({ one }) => {
+// ─── Retail Extension ─────────────────────────────────────────────────────────
+
+export const propertyRetail = pgTable(
+  "property_retail",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    propertyId: uuid("property_id")
+      .notNull()
+      .references(() => property.id, { onDelete: "cascade" }),
+
+    propertyType: RetailPropertyType("property_type").notNull(),
+    storeType: RetailStoreType("store_type").notNull(),
+    /** Width of the front face visible from the main road (in feet) */
+    frontageWidthFt: real("frontage_width_ft"),
+    /** Floor-to-lowest-beam clearance (in feet) — critical for fit-outs */
+    beamBottomHeightFt: real("beam_bottom_height_ft"),
+    /** Names of neighbouring / adjoining brand outlets */
+    neighbouringBrands: text("neighbouring_brands").array().default([]).notNull(),
+    /** Type(s) of tenant / business mix at this location */
+    brandCategories: RetailBrandCategory("brand_categories").array().default([]).notNull(),
+  },
+  (table) => [
+    unique("property_retail_propertyId_unique").on(table.propertyId),
+    index("property_retail_propertyType_idx").on(table.propertyType),
+    index("property_retail_storeType_idx").on(table.storeType),
+  ]
+);
+
+// ─── Office Extension ─────────────────────────────────────────────────────────
+
+export const propertyOffice = pgTable(
+  "property_office",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    propertyId: uuid("property_id")
+      .notNull()
+      .references(() => property.id, { onDelete: "cascade" }),
+
+    floor: text("floor"),
+    buildingName: text("building_name"),
+    /** CBD = Central, SBD = Secondary, TBD = Territory/Outlying */
+    businessDistrictType: BusinessDistrictType("business_district_type"),
+    carParksAvailable: integer("car_parks_available"),
+    toiletsCount: integer("toilets_count"),
+  },
+  (table) => [
+    unique("property_office_propertyId_unique").on(table.propertyId),
+    index("property_office_businessDistrictType_idx").on(table.businessDistrictType),
+  ]
+);
+
+// ─── Warehouse / Industrial Extension ─────────────────────────────────────────
+
+export const propertyWarehouse = pgTable(
+  "property_warehouse",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    propertyId: uuid("property_id")
+      .notNull()
+      .references(() => property.id, { onDelete: "cascade" }),
+
+    /** Side height from ground to start of roof slope (in feet) */
+    eavesHeightFt: real("eaves_height_ft"),
+    /** Central peak height of the roof (in feet) */
+    topHeightFt: real("top_height_ft"),
+    constructionType: WarehouseConstructionType("construction_type"),
+    /**
+     * Ratio of top height to eaves height (topHeightFt / eavesHeightFt).
+     * Stored explicitly so clients can filter/sort without recomputing.
+     */
+    heightRatio: real("height_ratio"),
+  },
+  (table) => [
+    unique("property_warehouse_propertyId_unique").on(table.propertyId),
+    index("property_warehouse_constructionType_idx").on(table.constructionType),
+  ]
+);
+
+// ─── Commercial Parking Extension ─────────────────────────────────────────────
+
+export const propertyParking = pgTable(
+  "property_parking",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    propertyId: uuid("property_id")
+      .notNull()
+      .references(() => property.id, { onDelete: "cascade" }),
+
+    parkingType: ParkingType("parking_type").notNull(),
+    parkingConfiguration: ParkingConfiguration("parking_configuration").notNull(),
+    totalCapacity: integer("total_capacity"),
+    accessType: ParkingAccessType("access_type"),
+    /** Multi-select — a single asset may have RFID + CCTV etc. */
+    securityControl: ParkingSecurityControl("security_control").array().default([]).notNull(),
+    ventilationType: ParkingVentilationType("ventilation_type"),
+    /** Minimum vehicle clearance height (in feet) */
+    heightClearanceFt: real("height_clearance_ft"),
+  },
+  (table) => [
+    unique("property_parking_propertyId_unique").on(table.propertyId),
+    index("property_parking_parkingType_idx").on(table.parkingType),
+    index("property_parking_accessType_idx").on(table.accessType),
+  ]
+);
+
+// ─── Co-owner Junction Table ──────────────────────────────────────────────────
+// Used when ownershipType = "MULTIPLE_OWNER". superOwner is still the primary
+// controlling owner; entries here are co-owners / referenced owners.
+
+export const propertyOwner = pgTable(
+  "property_owner",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    propertyId: uuid("property_id")
+      .notNull()
+      .references(() => property.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    unique("property_owner_propertyId_userId_unique").on(table.propertyId, table.userId),
+    index("property_owner_propertyId_idx").on(table.propertyId),
+    index("property_owner_userId_idx").on(table.userId),
+  ]
+);
+
+// ─── Relations ────────────────────────────────────────────────────────────────
+
+export const propertyRelations = relations(property, ({ one, many }) => {
   const auditUser = (
     field:
       | typeof property.createdByUser
@@ -116,5 +272,65 @@ export const propertyRelations = relations(property, ({ one }) => {
     createdByUser: auditUser(property.createdByUser, auditRelations.property.created),
     updatedByUser: auditUser(property.updatedByUser, auditRelations.property.updated),
     deletedByUser: auditUser(property.deletedByUser, auditRelations.property.deleted),
+
+    // Co-owners (populated when ownershipType = "MULTIPLE_OWNER")
+    owners: many(propertyOwner),
+
+    // Type-specific extension (only one will be populated per property)
+    retailDetails: one(propertyRetail, {
+      fields: [property.id],
+      references: [propertyRetail.propertyId],
+    }),
+    officeDetails: one(propertyOffice, {
+      fields: [property.id],
+      references: [propertyOffice.propertyId],
+    }),
+    warehouseDetails: one(propertyWarehouse, {
+      fields: [property.id],
+      references: [propertyWarehouse.propertyId],
+    }),
+    parkingDetails: one(propertyParking, {
+      fields: [property.id],
+      references: [propertyParking.propertyId],
+    }),
   };
 });
+
+export const propertyRetailRelations = relations(propertyRetail, ({ one }) => ({
+  property: one(property, {
+    fields: [propertyRetail.propertyId],
+    references: [property.id],
+  }),
+}));
+
+export const propertyOfficeRelations = relations(propertyOffice, ({ one }) => ({
+  property: one(property, {
+    fields: [propertyOffice.propertyId],
+    references: [property.id],
+  }),
+}));
+
+export const propertyWarehouseRelations = relations(propertyWarehouse, ({ one }) => ({
+  property: one(property, {
+    fields: [propertyWarehouse.propertyId],
+    references: [property.id],
+  }),
+}));
+
+export const propertyParkingRelations = relations(propertyParking, ({ one }) => ({
+  property: one(property, {
+    fields: [propertyParking.propertyId],
+    references: [property.id],
+  }),
+}));
+
+export const propertyOwnerRelations = relations(propertyOwner, ({ one }) => ({
+  property: one(property, {
+    fields: [propertyOwner.propertyId],
+    references: [property.id],
+  }),
+  user: one(user, {
+    fields: [propertyOwner.userId],
+    references: [user.id],
+  }),
+}));

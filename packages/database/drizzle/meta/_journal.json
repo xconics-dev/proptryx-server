@@ -92,6 +92,13 @@
       "when": 1775196147890,
       "tag": "0012_nappy_gamora",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1775197678360,
+      "tag": "0013_far_synch",
+      "breakpoints": true
     }
   ]
 }

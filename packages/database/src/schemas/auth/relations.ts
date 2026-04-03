@@ -1,6 +1,6 @@
 import { relations } from "drizzle-orm";
 import { company_request } from "../company/request";
-import { property } from "../property";
+import { property, propertyOwner } from "../property";
 import { faq, testimonial } from "../site-data";
 import { createAuditRelationNames } from "../utils/audit";
 import { region, zone } from "../zone-region";
@@ -58,6 +58,7 @@ export const userRelations = relations(user, ({ many, one }) => {
     ownedProperties: many(property, {
       relationName: "propertySuperOwner",
     }),
+    ownedReferencedProperties: many(propertyOwner),
     createdRegions: many(region, {
       relationName: auditRelations.region.created,
     }),
