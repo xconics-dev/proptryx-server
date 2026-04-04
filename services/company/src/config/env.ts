@@ -26,6 +26,8 @@ export const env = createEnv({
     REDIS_URL: z.url("REDIS_URL must be a valid Redis connection string"),
     AUTH_SERVICE_URL: z.url("AUTH_SERVICE_URL must be a valid URL — e.g. http://auth:6001"),
     BETTER_AUTH_SECRET: z.string().min(1, "BETTER_AUTH_SECRET is required"),
+    RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required for Resend transport"),
+    RESEND_FROM: z.string().email("RESEND_FROM must be a valid email address"),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -37,6 +39,8 @@ export const env = createEnv({
     REDIS_URL: process.env.REDIS_URL,
     AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM: process.env.RESEND_FROM,
   },
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
   onValidationError(issues) {
