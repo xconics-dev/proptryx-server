@@ -3,7 +3,6 @@ import {
   createDbInsertSchema,
   createDbSelectSchema,
   createDbUpdateSchema,
-  IdStringParamSchema,
   createListQuerySchema,
   createListResponseSchema,
 } from "@proptryx/utils";
@@ -19,6 +18,7 @@ export const memberCreateSchema = createDbInsertSchema(member, {
   omit: [
     "id",
     "userId",
+    "organizationId",
     "panel",
     "isDeleted",
     "createdAt",
@@ -53,8 +53,6 @@ export const memberUpdateSchema = createDbUpdateSchema(member, {
       });
   },
 });
-
-export const memberListParamsSchema = IdStringParamSchema("companyId");
 
 export const memberListQuerySchema = createListQuerySchema({
   sortFields: ["name", "email", "createdAt"],

@@ -390,8 +390,8 @@ function requiredEntityUnauthorizedResponse(c: Context, requiredEntity: BetterAu
   const requiredEntityLabels: Record<BetterAuthRequiredEntity, string> = {
     user: "Required user access",
     session: "Required session access",
-    organization: "Required organization access",
-    member: "Required organization member access",
+    organization: "Required organization data",
+    member: "Required organization member data",
   };
 
   return c.json(

@@ -7,9 +7,13 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     title: "Company Service API",
     version: "1.0.0",
     description:
-      "API for the Company service, which manages meeting scheduling, lifecycle workflows, and meeting-centric coordination for the Proptryx platform.",
+      "API for the Company service, which manages company members, meeting scheduling, lifecycle workflows, and meeting-centric coordination for the Proptryx platform.",
   },
   tags: [
+    {
+      name: "Members",
+      description: "Company member management endpoints.",
+    },
     {
       name: "Meetings",
       description:
@@ -17,6 +21,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     },
   ],
   "x-tagGroups": [
+    {
+      name: "Member APIs",
+      tags: ["Members"],
+    },
     {
       name: "Meeting APIs",
       tags: ["Meetings"],

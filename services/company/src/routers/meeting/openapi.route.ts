@@ -126,6 +126,7 @@ export const remove = createOpenApiRoute({
   },
 });
 
+// Lifecycle Management Routes
 export const schedule = createOpenApiRoute({
   method: "post",
   path: "/{id}/schedule",
