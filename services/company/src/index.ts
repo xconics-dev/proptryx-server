@@ -13,6 +13,7 @@ import {
 } from "@proptryx/utils";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
+import { membersGroup } from "@/routers/members";
 import { meetingGroup } from "@/routers/meeting";
 import type { AppBindings } from "@/types/app";
 import { openApiInfo } from "./config/openapi";
@@ -37,7 +38,7 @@ app.get(
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
 
-const routes = app.route("/meetings", meetingGroup);
+const routes = app.route("/meeting", meetingGroup).route("/member", membersGroup);
 
 app.doc("/doc", openApiInfo);
 const docsHandler = createOpenApiDocsHandler({

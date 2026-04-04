@@ -12,18 +12,28 @@ import {
 import {
   memberCreateSchema,
   memberListItemSchema,
-  memberListParamsSchema,
   memberListQuerySchema,
   memberListResponseSchema,
   memberSchema,
   memberUpdateSchema,
 } from "./schema";
 
-const tags = ["Company / Members"];
+const tags = ["Members"];
 
 const companyRequestRbac = createResourceRbacGuards({
-  resource: DATABASE_RESOURCES.organization,
-  auth: DEFAULT_FAST_RBAC_AUTH_OPTIONS,
+  resource: DATABASE_RESOURCES.member,
+  auth: {
+    enableRedisCache: true,
+    entities: {
+      data: false,
+      user: true,
+      session: true,
+      organization: true,
+      hasOrganization: true,
+    },
+    cacheTtlMs: 5_000,
+    requiredEntities: ["organization"],
+  },
 });
 
 const companyMethodsRateLimit = createOperationalRateLimit({
@@ -32,13 +42,12 @@ const companyMethodsRateLimit = createOperationalRateLimit({
 
 export const list = createOpenApiRoute({
   method: "get",
-  path: "/{companyId}/list",
+  path: "/list",
   operationId: "companyMemberList",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("getAll")],
   summary: "List company members",
   request: {
-    params: memberListParamsSchema,
     query: memberListQuerySchema,
   },
   responses: {

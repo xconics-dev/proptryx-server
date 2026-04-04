@@ -1,6 +1,7 @@
 import type { AppBindings } from "@/types/app";
 import { env } from "@/config/env";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import type { Context } from "hono";
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -9,7 +10,7 @@ import {
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { account, db, member, user } from "@proptryx/database";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { fetchMemberList } from "./list";
 import { create, get, list, remove, remove_with_user, resend_cred, update } from "./openapi.route";
@@ -22,23 +23,58 @@ import {
   findOrganizationSummaryById,
 } from "./utils";
 
-export const companyMembersGroup = new OpenAPIHono<AppBindings>();
+export const membersGroup = new OpenAPIHono<AppBindings>();
 
-registerOpenApiRoute(companyMembersGroup, list, async (c) => {
-  const { companyId } = c.req.valid("param");
+function resolveCurrentOrganizationContext(c: Context<AppBindings>) {
+  const authContext = getBetterAuthContext(c);
+  const organizationId = authContext.organization?.id ?? authContext.member?.organizationId ?? null;
+
+  if (!organizationId) {
+    return {
+      errorResponse: c.json(
+        createErrorResponse({
+          error: "Unauthorized",
+          message: "Required organization member access",
+        }),
+        401
+      ),
+      organizationId: null,
+      user: authContext.user,
+    };
+  }
+
+  return {
+    errorResponse: null,
+    organizationId,
+    user: authContext.user,
+  };
+}
+
+registerOpenApiRoute(membersGroup, list, async (c) => {
   const query = c.req.valid("query");
+  const scopedOrganization = resolveCurrentOrganizationContext(c);
+
+  if (scopedOrganization.errorResponse) {
+    return scopedOrganization.errorResponse;
+  }
+
   const response = await fetchMemberList({
     ...query,
-    organizationId: companyId,
+    organizationId: scopedOrganization.organizationId,
   });
 
   return c.json(createSuccessResponse(response), 200);
 });
 
-registerOpenApiRoute(companyMembersGroup, get, async (c) => {
+registerOpenApiRoute(membersGroup, get, async (c) => {
   const { id } = c.req.valid("param");
+  const scopedOrganization = resolveCurrentOrganizationContext(c);
 
-  const memberData = await findMemberDetailsById(id);
+  if (scopedOrganization.errorResponse) {
+    return scopedOrganization.errorResponse;
+  }
+
+  const memberData = await findMemberDetailsById(id, scopedOrganization.organizationId);
 
   if (!memberData) {
     return c.json(
@@ -53,13 +89,17 @@ registerOpenApiRoute(companyMembersGroup, get, async (c) => {
   return c.json(createSuccessResponse(memberData), 200);
 });
 
-registerOpenApiRoute(companyMembersGroup, create, async (c) => {
+registerOpenApiRoute(membersGroup, create, async (c) => {
   const body = c.req.valid("json");
-  const { user: currentUser } = getBetterAuthContext(c);
+  const scopedOrganization = resolveCurrentOrganizationContext(c);
+
+  if (scopedOrganization.errorResponse) {
+    return scopedOrganization.errorResponse;
+  }
 
   const [existingUserWithMember, orgData] = await Promise.all([
-    findMemberConflictByEmail(body.email, body.organizationId),
-    findOrganizationSummaryById(body.organizationId),
+    findMemberConflictByEmail(body.email, scopedOrganization.organizationId),
+    findOrganizationSummaryById(scopedOrganization.organizationId),
   ]);
 
   if (!orgData) {
@@ -124,9 +164,9 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
         id: generateRandomId(),
         userId,
         panel: "company",
-        organizationId: body.organizationId,
+        organizationId: scopedOrganization.organizationId,
         role: body.role,
-        createdByUser: currentUser?.id,
+        createdByUser: scopedOrganization.user?.id,
       })
       .returning();
 
@@ -150,12 +190,18 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
   return c.json(memberData, 201);
 });
 
-registerOpenApiRoute(companyMembersGroup, update, async (c) => {
+registerOpenApiRoute(membersGroup, update, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
-  const { user: currentUser } = getBetterAuthContext(c);
+  const scopedOrganization = resolveCurrentOrganizationContext(c);
 
-  const existingMember = await findMemberById(id);
+  if (scopedOrganization.errorResponse) {
+    return scopedOrganization.errorResponse;
+  }
+
+  const existingMember = await findMemberById(id, {
+    organizationId: scopedOrganization.organizationId,
+  });
 
   if (!existingMember) {
     return c.json(
@@ -183,9 +229,9 @@ registerOpenApiRoute(companyMembersGroup, update, async (c) => {
       .update(member)
       .set({
         role: body.role,
-        updatedByUser: currentUser?.id,
+        updatedByUser: scopedOrganization.user?.id,
       })
-      .where(eq(member.id, id))
+      .where(and(eq(member.id, id), eq(member.organizationId, scopedOrganization.organizationId)))
       .returning();
   });
 
@@ -202,11 +248,17 @@ registerOpenApiRoute(companyMembersGroup, update, async (c) => {
   return c.json(updatedMember);
 });
 
-registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
+registerOpenApiRoute(membersGroup, remove, async (c) => {
   const { id } = c.req.valid("param");
-  const { user: currentUser } = getBetterAuthContext(c);
+  const scopedOrganization = resolveCurrentOrganizationContext(c);
 
-  const existingMember = await findMemberById(id);
+  if (scopedOrganization.errorResponse) {
+    return scopedOrganization.errorResponse;
+  }
+
+  const existingMember = await findMemberById(id, {
+    organizationId: scopedOrganization.organizationId,
+  });
 
   if (!existingMember) {
     return c.json(
@@ -233,9 +285,9 @@ registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
     .set({
       isDeleted: true,
       deletedAt: new Date(),
-      deletedByUser: currentUser?.id,
+      deletedByUser: scopedOrganization.user?.id,
     })
-    .where(eq(member.id, id))
+    .where(and(eq(member.id, id), eq(member.organizationId, scopedOrganization.organizationId)))
     .returning();
 
   if (!deletedMember) {
@@ -251,11 +303,17 @@ registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
   return c.json(deletedMember);
 });
 
-registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
+registerOpenApiRoute(membersGroup, remove_with_user, async (c) => {
   const { id } = c.req.valid("param");
-  const { user: currentUser } = getBetterAuthContext(c);
+  const scopedOrganization = resolveCurrentOrganizationContext(c);
 
-  const existingMember = await findMemberById(id);
+  if (scopedOrganization.errorResponse) {
+    return scopedOrganization.errorResponse;
+  }
+
+  const existingMember = await findMemberById(id, {
+    organizationId: scopedOrganization.organizationId,
+  });
 
   if (!existingMember) {
     return c.json(
@@ -283,16 +341,16 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
       .set({
         isDeleted: true,
         deletedAt: new Date(),
-        deletedByUser: currentUser?.id,
+        deletedByUser: scopedOrganization.user?.id,
       })
-      .where(eq(member.id, id));
+      .where(and(eq(member.id, id), eq(member.organizationId, scopedOrganization.organizationId)));
 
     await tx
       .update(user)
       .set({
         isDeleted: true,
         deletedAt: new Date(),
-        deletedByUser: currentUser?.id,
+        deletedByUser: scopedOrganization.user?.id,
       })
       .where(eq(user.id, existingMember.userId));
   });
@@ -300,10 +358,19 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
   return c.json(null);
 });
 
-registerOpenApiRoute(companyMembersGroup, resend_cred, async (c) => {
+registerOpenApiRoute(membersGroup, resend_cred, async (c) => {
   const { id } = c.req.valid("param");
+  const scopedOrganization = resolveCurrentOrganizationContext(c);
 
-  const credentialData = await getMemberCredentialDeliveryData(id, env.BETTER_AUTH_SECRET);
+  if (scopedOrganization.errorResponse) {
+    return scopedOrganization.errorResponse;
+  }
+
+  const credentialData = await getMemberCredentialDeliveryData(
+    id,
+    env.BETTER_AUTH_SECRET,
+    scopedOrganization.organizationId
+  );
 
   if (!credentialData.success) {
     return c.json(
