@@ -142,6 +142,9 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM: ${RESEND_FROM}
     healthcheck:
       test:
         [
