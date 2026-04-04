@@ -1,8 +1,8 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
 export const OrganizationType = pgEnum("organization_type", [
-  "SELLER",
   "DEVELOPER",
+  "OCCUPIER",
   "MANAGEMENT",
   "APPLICATION",
 ]);

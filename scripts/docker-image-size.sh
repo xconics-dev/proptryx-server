@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVICES=(gateway auth kernel)
+SERVICES=(gateway auth kernel company)
 BUILD_FIRST=false
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -12,13 +12,14 @@ PROJECT_NAME="proptryx"
 print_usage() {
   cat <<'USAGE'
 Usage:
-  scripts/docker-image-size.sh [--build] [all|gateway|auth|kernel ...]
+  scripts/docker-image-size.sh [--build] [all|gateway|auth|kernel|company ...]
 
 Examples:
   pnpm docker:size
   pnpm docker:size -- all
   pnpm docker:size -- gateway auth
   pnpm docker:size:build -- kernel
+  pnpm docker:size -- company
 USAGE
 }
 

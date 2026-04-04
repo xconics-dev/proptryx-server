@@ -4,6 +4,8 @@ export const DATABASE_RESOURCES = {
   faq: "faq",
   invitation: "invitation",
   member: "member",
+  meeting: "meeting",
+  property: "property",
   organization: "organization",
   organization_subscription: "organization_subscription",
   rbac_role: "rbac_role",

@@ -132,7 +132,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
         name: body.ownerName,
         email: body.ownerEmail,
         phoneNumber: body.ownerPhoneNumber,
-        role: "seller",
+        role: "developer",
       })
       .returning();
     stepsCompleted.push("insert_user");
@@ -155,7 +155,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
         name: body.name,
         gstNumber: body.gstNumber,
         slug: body.slug,
-        type: "SELLER",
+        type: body.organizationType,
         companyType: body.companyType,
         industry: body.industry,
         email: body.ownerEmail,

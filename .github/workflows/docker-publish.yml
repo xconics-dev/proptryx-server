@@ -26,6 +26,9 @@ jobs:
           - service: kernel
             image_name: proptryx-kernel
             dockerfile: docker/kernel.Dockerfile
+          - service: company
+            image_name: proptryx-company
+            dockerfile: docker/company.Dockerfile
 
     steps:
       - name: Checkout

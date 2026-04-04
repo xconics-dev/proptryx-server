@@ -340,6 +340,52 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2
 
+  services/company:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.12
+        version: 1.19.12(hono@4.12.9)
+      '@hono/zod-openapi':
+        specifier: ^1.2.4
+        version: 1.2.4(hono@4.12.9)(zod@4.3.6)
+      '@proptryx/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@proptryx/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@proptryx/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
+      '@t3-oss/env-core':
+        specifier: ^0.13.11
+        version: 0.13.11(typescript@6.0.2)(zod@4.3.6)
+      hono:
+        specifier: ^4.12.9
+        version: 4.12.9
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.4.10
+        version: 2.4.10
+      '@proptryx/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.4.31)(tsx@4.21.0)(typescript@6.0.2)(yaml@2.8.2)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+
   services/gateway:
     dependencies:
       '@hono/node-server':

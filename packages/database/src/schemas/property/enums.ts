@@ -29,7 +29,7 @@ export type AreaType = (typeof AreaType.enumValues)[number];
 export const TransactionType = pgEnum("transaction_type", ["LEASE", "SALE", "LEASE_PURCHASE"]);
 export type TransactionType = (typeof TransactionType.enumValues)[number];
 
-/** Unit in which askingPrice is expressed */
+/** Unit in which Price is expressed */
 export const PriceUnit = pgEnum("price_unit", ["PER_SQFT", "LUMP_SUM", "PER_MONTH"]);
 export type PriceUnit = (typeof PriceUnit.enumValues)[number];
 

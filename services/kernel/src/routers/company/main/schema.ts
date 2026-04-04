@@ -40,6 +40,7 @@ export const companyCreateSchema = createDbInsertSchema(organization, {
       ownerEmail: z.email("Invalid email address"),
       ownerPhoneNumber: z.string().optional(),
       ownerZoneId: z.string(),
+      organizationType: z.enum(OrganizationType.enumValues),
     });
   },
 });

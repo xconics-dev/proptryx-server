@@ -328,8 +328,8 @@ For each module/resource, define one `rbac_role_permission` row with:
 
 So a role matrix like this:
 
-- seller admin -> `company`
-- seller executive -> `user`
+- developer admin -> `company`
+- developer executive -> `user`
 - proptryx admin -> `all`
 
 can be represented in the database exactly.

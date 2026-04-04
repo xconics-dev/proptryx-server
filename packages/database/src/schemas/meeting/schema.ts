@@ -8,7 +8,7 @@ export const meeting = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     type: MeetingType("type").default("MEETING").notNull(),
-    status: MeetingStatus("status").default("SCHEDULED").notNull(),
+    status: MeetingStatus("status").default("REQUESTED").notNull(),
     agenda: text("agenda"), // before meeting note
     requestNote: text("request_note"),
     // location details
@@ -26,13 +26,13 @@ export const meeting = pgTable(
     momPublishedAt: timestamp("mom_published_at"),
 
     // relations
-    buyerId: text("buyer_id").references(() => user.id, {
+    developerId: text("developer_id").references(() => user.id, {
       onDelete: "set null",
     }),
     propertyId: uuid("property_id")
       .notNull()
       .references(() => property.id, { onDelete: "cascade" }),
-    sellerId: text("seller_id").references(() => user.id, {
+    occupierId: text("occupier_id").references(() => user.id, {
       onDelete: "set null",
     }),
     requestedByUser: text("requested_by_user").references(() => user.id, {
@@ -59,8 +59,8 @@ export const meeting = pgTable(
   },
   (table) => [
     index("meeting_propertyId_idx").on(table.propertyId),
-    index("meeting_buyerId_idx").on(table.buyerId),
-    index("meeting_sellerId_idx").on(table.sellerId),
+    index("meeting_developerId_idx").on(table.developerId),
+    index("meeting_occupierId_idx").on(table.occupierId),
     index("meeting_requestedByUser_idx").on(table.requestedByUser),
     index("meeting_type_idx").on(table.type),
     index("meeting_status_idx").on(table.status),

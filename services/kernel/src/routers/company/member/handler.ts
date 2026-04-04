@@ -103,7 +103,7 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
       id: userId,
       name: body.name,
       panel: "company",
-      role: "seller",
+      role: "developer",
       email: body.email,
       phoneNumber: body.phoneNumber,
       zoneId: body.zoneId,

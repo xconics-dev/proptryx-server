@@ -40,6 +40,10 @@ app.get(
         url: "/api/auth/open-api/generate-schema",
       },
       {
+        title: "Company Service",
+        url: "/api/company/doc",
+      },
+      {
         title: "Kernel Service",
         url: "/api/kernel/doc",
       },
