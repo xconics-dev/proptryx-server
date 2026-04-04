@@ -4,8 +4,8 @@ import { property } from "../property/schema";
 import { createAuditRelationNames } from "../utils/audit";
 import { meeting } from "./schema";
 
-export const meetingBuyerRelationName = "meetingBuyer";
-export const meetingSellerRelationName = "meetingSeller";
+export const meetingDeveloperRelationName = "meetingDeveloper";
+export const meetingOccupierRelationName = "meetingOccupier";
 export const meetingRequestedByUserRelationName = "meetingRequestedByUser";
 
 const auditRelations = createAuditRelationNames("meeting");
@@ -25,15 +25,15 @@ export const meetingRelations = relations(meeting, ({ one }) => {
     });
 
   return {
-    buyer: one(user, {
-      fields: [meeting.buyerId],
+    developer: one(user, {
+      fields: [meeting.developerId],
       references: [user.id],
-      relationName: meetingBuyerRelationName,
+      relationName: meetingDeveloperRelationName,
     }),
-    seller: one(user, {
-      fields: [meeting.sellerId],
+    occupier: one(user, {
+      fields: [meeting.occupierId],
       references: [user.id],
-      relationName: meetingSellerRelationName,
+      relationName: meetingOccupierRelationName,
     }),
     requestedByUser: one(user, {
       fields: [meeting.requestedByUser],

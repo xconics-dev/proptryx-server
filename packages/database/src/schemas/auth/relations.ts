@@ -2,9 +2,9 @@ import { relations } from "drizzle-orm";
 import { company_request } from "../company/request";
 import {
   meeting,
-  meetingBuyerRelationName,
+  meetingDeveloperRelationName,
   meetingRequestedByUserRelationName,
-  meetingSellerRelationName,
+  meetingOccupierRelationName,
 } from "../meeting";
 import { property, propertyOwner, propertyZone } from "../property";
 import { faq, testimonial } from "../site-data";
@@ -66,11 +66,11 @@ export const userRelations = relations(user, ({ many, one }) => {
     ownedProperties: many(property, {
       relationName: "propertySuperOwner",
     }),
-    buyerMeetings: many(meeting, {
-      relationName: meetingBuyerRelationName,
+    developerMeetings: many(meeting, {
+      relationName: meetingDeveloperRelationName,
     }),
-    sellerMeetings: many(meeting, {
-      relationName: meetingSellerRelationName,
+    occupierMeetings: many(meeting, {
+      relationName: meetingOccupierRelationName,
     }),
     requestedMeetings: many(meeting, {
       relationName: meetingRequestedByUserRelationName,
