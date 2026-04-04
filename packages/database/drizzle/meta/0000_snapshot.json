@@ -1,5 +1,5 @@
 {
-  "id": "2659ed9e-7ec7-48cc-8fbf-d17248e4cc0e",
+  "id": "b0e77ade-0d4c-4c0d-9ad9-189982f2caa9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -3840,7 +3840,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'SCHEDULED'"
+          "default": "'REQUESTED'"
         },
         "agenda": {
           "name": "agenda",
@@ -4685,7 +4685,7 @@
     "public.meeting_status": {
       "name": "meeting_status",
       "schema": "public",
-      "values": ["SCHEDULED", "COMPLETED", "CANCELLED", "REJECTED", "IN_PROGRESS"]
+      "values": ["REQUESTED", "SCHEDULED", "COMPLETED", "CANCELLED", "REJECTED", "IN_PROGRESS"]
     },
     "public.meeting_type": {
       "name": "meeting_type",

@@ -22,7 +22,7 @@ CREATE TYPE "public"."retail_mall_type" AS ENUM('MALL', 'HIGH_STREET');--> state
 CREATE TYPE "public"."retail_store_type" AS ENUM('ANCHOR', 'VANILLA');--> statement-breakpoint
 CREATE TYPE "public"."transaction_type" AS ENUM('LEASE', 'SALE', 'LEASE_PURCHASE');--> statement-breakpoint
 CREATE TYPE "public"."warehouse_construction_type" AS ENUM('RCC_COMPLIANT', 'NON_RCC');--> statement-breakpoint
-CREATE TYPE "public"."meeting_status" AS ENUM('SCHEDULED', 'COMPLETED', 'CANCELLED', 'REJECTED', 'IN_PROGRESS');--> statement-breakpoint
+CREATE TYPE "public"."meeting_status" AS ENUM('REQUESTED', 'SCHEDULED', 'COMPLETED', 'CANCELLED', 'REJECTED', 'IN_PROGRESS');--> statement-breakpoint
 CREATE TYPE "public"."meeting_type" AS ENUM('MEETING', 'SITE_VISIT');--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
@@ -389,7 +389,7 @@ CREATE TABLE "property_zone" (
 CREATE TABLE "meeting" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"type" "meeting_type" DEFAULT 'MEETING' NOT NULL,
-	"status" "meeting_status" DEFAULT 'SCHEDULED' NOT NULL,
+	"status" "meeting_status" DEFAULT 'REQUESTED' NOT NULL,
 	"agenda" text,
 	"request_note" text,
 	"location" text,

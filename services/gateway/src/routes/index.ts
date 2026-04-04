@@ -11,6 +11,7 @@ import { createUpstreamUrl, proxyRoutes, type ProxyRoute } from "@/proxy";
 
 const GATEWAY_TAG = "Gateway";
 const AUTH_PROXY_TAG = "Auth Service (Proxied)";
+const COMPANY_PROXY_TAG = "Company Service (Proxied)";
 const KERNEL_PROXY_TAG = "Kernel Service (Proxied)";
 
 const gatewayHealthRoute = createRoute({
@@ -52,6 +53,19 @@ const kernelRootRedirectRoute = createRoute({
   },
 });
 
+const companyRootRedirectRoute = createRoute({
+  method: "get",
+  path: "/api/company",
+  tags: [COMPANY_PROXY_TAG],
+  summary: "Company docs entrypoint",
+  description: "Redirects to the Company service root docs via gateway proxy scope.",
+  responses: {
+    302: {
+      description: "Redirect to /api/company/",
+    },
+  },
+});
+
 const authHealthProxyRoute = createRoute({
   method: "get",
   path: "/api/auth/health",
@@ -80,6 +94,22 @@ const kernelHealthProxyRoute = createRoute({
     },
     502: {
       description: "Kernel service upstream unavailable",
+    },
+  },
+});
+
+const companyHealthProxyRoute = createRoute({
+  method: "get",
+  path: "/api/company/health",
+  tags: [COMPANY_PROXY_TAG],
+  summary: "Company health (proxied)",
+  description: "Proxies company service health status through the gateway.",
+  responses: {
+    200: {
+      description: "Company service health response",
+    },
+    502: {
+      description: "Company service upstream unavailable",
     },
   },
 });
@@ -145,6 +175,7 @@ function getProxyRoute(prefix: string) {
 export function registerGatewayRoutes(app: OpenAPIHono) {
   const faviconHandler = createFaviconHandler();
   const authProxyRoute = getProxyRoute("/api/auth");
+  const companyProxyRoute = getProxyRoute("/api/company");
   const kernelProxyRoute = getProxyRoute("/api/kernel");
 
   app.openapi(
@@ -160,9 +191,12 @@ export function registerGatewayRoutes(app: OpenAPIHono) {
 
   app.openapi(authRootRedirectRoute, (c: Context) => c.redirect("/api/auth/docs", 302));
   app.get("/api/auth/", (c: Context) => c.redirect("/api/auth/docs", 302));
+  app.openapi(companyRootRedirectRoute, (c: Context) => c.redirect("/api/company/", 302));
+  app.get("/api/company/", (c: Context) => c.redirect("/api/company/docs", 302));
   app.openapi(kernelRootRedirectRoute, (c: Context) => c.redirect("/api/kernel/", 302));
 
   app.openapi(authHealthProxyRoute, createProxyHandler(authProxyRoute));
+  app.openapi(companyHealthProxyRoute, createProxyHandler(companyProxyRoute));
   app.openapi(kernelHealthProxyRoute, createProxyHandler(kernelProxyRoute));
 
   for (const route of proxyRoutes) {

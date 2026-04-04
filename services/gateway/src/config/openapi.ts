@@ -20,6 +20,11 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
         "Auth service scope exposed through gateway under /api/auth. Includes auth docs redirect and proxied health endpoint.",
     },
     {
+      name: "Company Service (Proxied)",
+      description:
+        "Company service scope exposed through gateway under /api/company. Includes company root redirect and proxied health endpoint.",
+    },
+    {
       name: "Kernel Service (Proxied)",
       description:
         "Kernel service scope exposed through gateway under /api/kernel. Includes kernel root redirect and proxied health endpoint.",
