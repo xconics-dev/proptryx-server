@@ -12,7 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { zone } from "../zone-region";
 import { AccessPanel, BusinessType, OrganizationType } from "./enums";
-import { SubscriptionPlanFeatures } from "./types";
+import { DEFAULT_PLAN_FEATURES, type SubscriptionPlanFeatures } from "./types";
 
 export const user = pgTable(
   "user",
@@ -240,13 +240,12 @@ export const subscriptionPlans = pgTable(
     totalCount: integer("total_count"),
     quantity: integer("quantity").default(1).notNull(),
     trialDays: integer("trial_days").default(0).notNull(),
-    includedProperties: integer("included_properties").default(0).notNull(),
     addonPropertyOneTimeCostInPaise: integer("addon_property_one_time_cost_in_paise")
       .default(0)
       .notNull(),
     features: jsonb("features")
       .$type<SubscriptionPlanFeatures>()
-      .default(SubscriptionPlanFeatures)
+      .default(DEFAULT_PLAN_FEATURES)
       .notNull(),
     metadata: jsonb("metadata")
       .$type<Record<string, unknown>>()
@@ -288,7 +287,6 @@ export const organizationSubscription = pgTable(
     baseAmountInPaise: integer("base_amount_in_paise").default(0).notNull(),
     billingPeriod: text("billing_period").default("monthly").notNull(),
     trialDaysApplied: integer("trial_days_applied").default(0).notNull(),
-    includedProperties: integer("included_properties").default(0).notNull(),
     additionalProperties: integer("additional_properties").default(0).notNull(),
     addonPropertyOneTimeCostInPaise: integer("addon_property_one_time_cost_in_paise")
       .default(0)

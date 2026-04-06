@@ -15,6 +15,20 @@
       "when": 1775456972158,
       "tag": "0001_material_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775459978569,
+      "tag": "0002_concerned_famine",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775461756419,
+      "tag": "0003_optimal_jack_murdock",
+      "breakpoints": true
     }
   ]
 }

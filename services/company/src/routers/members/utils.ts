@@ -107,6 +107,7 @@ export async function createMemberAuthSeed(secret: string) {
   };
 }
 
+// This function is used to retrieve the member's email, decrypted password, organization name, and role for credential delivery purposes (e.g., when inviting a member or resetting credentials). It ensures that the member and organization exist, and that the member has an associated account with a password before returning the data.
 export async function getMemberCredentialDeliveryData(
   id: string,
   secret: string,

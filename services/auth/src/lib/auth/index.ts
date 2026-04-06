@@ -25,7 +25,7 @@ import {
   resolveAuthSecondaryStorage,
   resolveUserZone,
 } from "./utils";
-import { organizationSubscriptionPlugin } from "../razorpay/subscription";
+import { organizationSubscriptionPlugin, subscriptionPlansPlugin } from "../razorpay/subscriptions";
 import { organizationControlsPlugin } from "./organization";
 import { generateRandomId, generateUID, PasswordUtils } from "@proptryx/utils";
 import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
@@ -143,6 +143,7 @@ async function createAuthInstance() {
         },
       }),
       organizationControlsPlugin,
+      subscriptionPlansPlugin,
       organizationSubscriptionPlugin,
       admin({
         defaultRole: "user",

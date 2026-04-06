@@ -1,7 +1,7 @@
 import type { DB } from "@proptryx/database";
 import * as schema from "@proptryx/database";
 import { and, eq, inArray } from "drizzle-orm";
-import { generateRandomId } from "./gen-id";
+import { generateRandomId } from "../gen-id";
 
 const DEFAULT_ORGANIZATION_ROLES = [
   {

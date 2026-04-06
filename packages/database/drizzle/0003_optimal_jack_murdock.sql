@@ -1,0 +1,1 @@
+ALTER TABLE "organization_subscription" DROP COLUMN "included_properties";
