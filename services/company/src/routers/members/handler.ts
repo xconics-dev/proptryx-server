@@ -3,10 +3,11 @@ import { env } from "@/config/env";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import {
+  checkCurrentOrganizationLimit,
   createErrorResponse,
   createSuccessResponse,
   generateRandomId,
-  getBetterAuthContext,
+  resolveCurrentOrganizationAccess,
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { account, db, member, user } from "@proptryx/database";
@@ -26,8 +27,8 @@ import {
 export const membersGroup = new OpenAPIHono<AppBindings>();
 
 function resolveCurrentOrganizationContext(c: Context<AppBindings>) {
-  const authContext = getBetterAuthContext(c);
-  const organizationId = authContext.organization?.id ?? authContext.member?.organizationId ?? null;
+  const authCheck = resolveCurrentOrganizationAccess(c);
+  const organizationId = authCheck.organizationId;
 
   if (!organizationId) {
     return {
@@ -39,14 +40,14 @@ function resolveCurrentOrganizationContext(c: Context<AppBindings>) {
         401
       ),
       organizationId: null,
-      user: authContext.user,
+      user: authCheck.user,
     };
   }
 
   return {
     errorResponse: null,
     organizationId,
-    user: authContext.user,
+    user: authCheck.user,
   };
 }
 
@@ -132,6 +133,18 @@ registerOpenApiRoute(membersGroup, create, async (c) => {
         message: "This user is already a member of the company",
       }),
       409
+    );
+  }
+
+  // Check plan member limit before creating
+  const memberLimitCheck = await checkCurrentOrganizationLimit(c, "users");
+  if (!memberLimitCheck.ok) {
+    return c.json(
+      createErrorResponse({
+        error: memberLimitCheck.error,
+        message: memberLimitCheck.message,
+      }),
+      memberLimitCheck.statusCode
     );
   }
 

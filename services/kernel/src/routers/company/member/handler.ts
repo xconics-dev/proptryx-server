@@ -2,13 +2,14 @@ import type { AppBindings } from "@/types/app";
 import { env } from "@/config/env";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
+  buildOrganizationLimitDeniedMessage,
   createErrorResponse,
   createSuccessResponse,
   generateRandomId,
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { account, db, member, user } from "@proptryx/database";
+import { account, checkOrganizationLimit, db, member, user } from "@proptryx/database";
 import { eq } from "drizzle-orm";
 import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { fetchMemberList } from "./list";
@@ -92,6 +93,25 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
         message: "This user is already a member of the company",
       }),
       409
+    );
+  }
+
+  const memberLimitCheck = await checkOrganizationLimit({
+    organizationId: body.organizationId,
+    featureName: "users",
+  });
+
+  if (!memberLimitCheck.allowed) {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: buildOrganizationLimitDeniedMessage({
+          featureName: memberLimitCheck.normalizedFeatureName,
+          entry: memberLimitCheck.entry,
+          reason: memberLimitCheck.reason,
+        }),
+      }),
+      403
     );
   }
 

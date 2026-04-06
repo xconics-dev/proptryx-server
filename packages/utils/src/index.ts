@@ -101,7 +101,15 @@ export {
 } from "./functions/list-query";
 export { PasswordUtils, generateRandomPassword } from "./functions/password";
 export { encryptPassword, decryptPassword } from "./functions/encrypt";
-export { ensureDefaultOrganizationRoles } from "./functions/organization-rbac";
+export {
+  buildOrganizationLimitDeniedMessage,
+  checkCurrentOrganizationLimit,
+  ensureDefaultOrganizationRoles,
+  getCurrentOrganizationLimits,
+  resolveCurrentOrganizationAccess,
+  type ActiveOrganizationAccess,
+  type CurrentOrganizationLimitCheckResult,
+} from "./functions/organization";
 export {
   AUTH_SESSION_FORWARD_HEADERS,
   CLIENT_IP_HEADER_CANDIDATES,
