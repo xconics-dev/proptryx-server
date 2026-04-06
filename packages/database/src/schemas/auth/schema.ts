@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { zone } from "../zone-region";
 import { AccessPanel, BusinessType, OrganizationType } from "./enums";
+import { SubscriptionPlanFeatures } from "./types";
 
 export const user = pgTable(
   "user",
@@ -244,8 +245,8 @@ export const subscriptionPlans = pgTable(
       .default(0)
       .notNull(),
     features: jsonb("features")
-      .$type<Record<string, unknown>>()
-      .default(sql`'{}'::jsonb`)
+      .$type<SubscriptionPlanFeatures>()
+      .default(SubscriptionPlanFeatures)
       .notNull(),
     metadata: jsonb("metadata")
       .$type<Record<string, unknown>>()
