@@ -32,16 +32,33 @@ function getTrustedOriginHosts(origins: string[]) {
   );
 }
 
+function matchesCookieDomain(host: string, domain: string) {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
 export function getBetterAuthConfigState() {
   const betterAuthUrl = new URL(env.BETTER_AUTH_URL);
   const trustedOrigins = Array.from(new Set([...env.CORS_ALLOWED_ORIGINS, betterAuthUrl.origin]));
   const isProduction = env.NODE_ENV === "production";
   const crossSubDomainCookiesEnabled = isProduction && env.BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES;
+  const cookieDomain = env.BETTER_AUTH_COOKIE_DOMAIN;
 
-  if (crossSubDomainCookiesEnabled && !env.BETTER_AUTH_COOKIE_DOMAIN) {
+  if (crossSubDomainCookiesEnabled && !cookieDomain) {
     throw new Error(
       "BETTER_AUTH_COOKIE_DOMAIN is required when BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES=true"
     );
+  }
+
+  if (crossSubDomainCookiesEnabled && cookieDomain) {
+    const incompatibleHosts = getTrustedOriginHosts(trustedOrigins).filter(
+      (host) => !matchesCookieDomain(host, cookieDomain)
+    );
+
+    if (incompatibleHosts.length > 0) {
+      throw new Error(
+        `BETTER_AUTH_COOKIE_DOMAIN=${cookieDomain} must be a shared parent domain for all trusted origins. Incompatible hosts: ${incompatibleHosts.join(", ")}`
+      );
+    }
   }
 
   return {
@@ -51,7 +68,7 @@ export function getBetterAuthConfigState() {
     crossSubDomainCookies: crossSubDomainCookiesEnabled
       ? {
           enabled: true,
-          domain: env.BETTER_AUTH_COOKIE_DOMAIN,
+          domain: cookieDomain,
         }
       : undefined,
     isProduction,
