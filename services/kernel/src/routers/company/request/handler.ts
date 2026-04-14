@@ -9,7 +9,11 @@ import {
 } from "@proptryx/utils";
 import type { AppBindings } from "@/types/app";
 import { eq } from "drizzle-orm";
-import { fetchCompanyRequestList } from "./list";
+import {
+  fetchCompanyRequestList,
+  fetchCompanyRequestListWithoutFuzzySearch,
+  isPgTrgmUnavailableError,
+} from "./list";
 import { check_gst, create, get, list, remove } from "./openapi.route";
 import { fetchActiveGstInfo, findCompanyRequestById } from "./utils";
 
@@ -17,7 +21,13 @@ export const companyRequestGroup: OpenAPIHono<AppBindings> = new OpenAPIHono<App
 
 registerOpenApiRoute(companyRequestGroup, list, async (c) => {
   const query = c.req.valid("query");
-  const response = await fetchCompanyRequestList(query);
+  const response = await fetchCompanyRequestList(query).catch((error) => {
+    if (isPgTrgmUnavailableError(error)) {
+      return fetchCompanyRequestListWithoutFuzzySearch(query);
+    }
+
+    throw error;
+  });
   const items = await Promise.all(
     response.items.map(async (request) => {
       const gstResult = await fetchActiveGstInfo(request.companyGstNumber);

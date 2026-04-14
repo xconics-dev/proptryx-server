@@ -37,76 +37,106 @@ function buildCompanyRequestSearchRank(searchTerm: string) {
   )`;
 }
 
-export const fetchCompanyRequestList = createTableListFetcher<
-  typeof company_request,
-  typeof company_request.$inferSelect,
-  CompanyRequestListQuery
->({
-  db: getDB,
-  table: company_request,
-  where: eq(company_request.isDeleted, false),
-  search: {
-    exact: [company_request.id],
-    prefix: [
-      company_request.ownerEmail,
-      company_request.ownerPhoneNumber,
-      company_request.companyGstNumber,
-      company_request.companyEmail,
-    ],
-    contains: [company_request.ownerName],
-    build: ({ searchTerm }) => {
-      const normalizedSearchTerm = normalizeCompanyRequestSearchValue(searchTerm);
+function createCompanyRequestListFetcher(enableFuzzySearch: boolean) {
+  return createTableListFetcher<
+    typeof company_request,
+    typeof company_request.$inferSelect,
+    CompanyRequestListQuery
+  >({
+    db: getDB,
+    table: company_request,
+    where: eq(company_request.isDeleted, false),
+    search: {
+      exact: [company_request.id],
+      prefix: [
+        company_request.ownerEmail,
+        company_request.ownerPhoneNumber,
+        company_request.companyGstNumber,
+        company_request.companyEmail,
+      ],
+      contains: [company_request.ownerName],
+      build: enableFuzzySearch
+        ? ({ searchTerm }) => {
+            const normalizedSearchTerm = normalizeCompanyRequestSearchValue(searchTerm);
 
-      if (!normalizedSearchTerm) {
-        return undefined;
-      }
+            if (!normalizedSearchTerm || normalizedSearchTerm.length < MIN_FUZZY_SEARCH_LENGTH) {
+              return undefined;
+            }
 
-      const fuzzyConditions =
-        normalizedSearchTerm.length >= MIN_FUZZY_SEARCH_LENGTH
-          ? [
+            return [
               sql`lower(${company_request.ownerEmail}) % ${normalizedSearchTerm}`,
               sql`lower(${company_request.ownerPhoneNumber}) % ${normalizedSearchTerm}`,
               sql`lower(${company_request.companyGstNumber}) % ${normalizedSearchTerm}`,
               sql`coalesce(lower(${company_request.companyEmail}), '') % ${normalizedSearchTerm}`,
               sql`lower(${company_request.ownerName}) % ${normalizedSearchTerm}`,
-            ]
-          : [];
-
-      return fuzzyConditions;
+            ];
+          }
+        : undefined,
     },
-  },
-  sorting: {
-    defaultBy: "createdAt",
-    defaultOrder: "desc",
-    definitions: {
-      id: buildColumnSort(company_request.id),
-      ownerName: buildColumnSort(company_request.ownerName),
-      ownerEmail: buildColumnSort(company_request.ownerEmail),
-      ownerPhoneNumber: buildColumnSort(company_request.ownerPhoneNumber),
-      companyGstNumber: buildColumnSort(company_request.companyGstNumber),
-      companyEmail: buildColumnSort(company_request.companyEmail),
-      createdAt: ({ direction, params }) => {
-        const normalizedSearchTerm = normalizeCompanyRequestSearchValue(params.search);
-        const createdAtOrder =
-          direction === "asc" ? asc(company_request.createdAt) : desc(company_request.createdAt);
+    sorting: {
+      defaultBy: "createdAt",
+      defaultOrder: "desc",
+      definitions: {
+        id: buildColumnSort(company_request.id),
+        ownerName: buildColumnSort(company_request.ownerName),
+        ownerEmail: buildColumnSort(company_request.ownerEmail),
+        ownerPhoneNumber: buildColumnSort(company_request.ownerPhoneNumber),
+        companyGstNumber: buildColumnSort(company_request.companyGstNumber),
+        companyEmail: buildColumnSort(company_request.companyEmail),
+        createdAt: ({ direction, params }) => {
+          const normalizedSearchTerm = normalizeCompanyRequestSearchValue(params.search);
+          const createdAtOrder =
+            direction === "asc" ? asc(company_request.createdAt) : desc(company_request.createdAt);
 
-        if (!normalizedSearchTerm) {
-          return createdAtOrder;
-        }
+          if (
+            !enableFuzzySearch ||
+            !normalizedSearchTerm ||
+            normalizedSearchTerm.length < MIN_FUZZY_SEARCH_LENGTH
+          ) {
+            return createdAtOrder;
+          }
 
-        return [desc(buildCompanyRequestSearchRank(normalizedSearchTerm)), createdAtOrder];
+          return [desc(buildCompanyRequestSearchRank(normalizedSearchTerm)), createdAtOrder];
+        },
+        updatedAt: buildColumnSort(company_request.updatedAt),
       },
-      updatedAt: buildColumnSort(company_request.updatedAt),
     },
-  },
-  sortColumns: {
-    id: company_request.id,
-    ownerName: company_request.ownerName,
-    ownerEmail: company_request.ownerEmail,
-    ownerPhoneNumber: company_request.ownerPhoneNumber,
-    companyGstNumber: company_request.companyGstNumber,
-    companyEmail: company_request.companyEmail,
-    createdAt: company_request.createdAt,
-    updatedAt: company_request.updatedAt,
-  },
-});
+    sortColumns: {
+      id: company_request.id,
+      ownerName: company_request.ownerName,
+      ownerEmail: company_request.ownerEmail,
+      ownerPhoneNumber: company_request.ownerPhoneNumber,
+      companyGstNumber: company_request.companyGstNumber,
+      companyEmail: company_request.companyEmail,
+      createdAt: company_request.createdAt,
+      updatedAt: company_request.updatedAt,
+    },
+  });
+}
+
+export const fetchCompanyRequestList = createCompanyRequestListFetcher(true);
+export const fetchCompanyRequestListWithoutFuzzySearch = createCompanyRequestListFetcher(false);
+
+export function isPgTrgmUnavailableError(error: unknown) {
+  const cause =
+    typeof error === "object" && error !== null && "cause" in error
+      ? Reflect.get(error, "cause")
+      : undefined;
+  const code =
+    typeof cause === "object" && cause !== null && "code" in cause
+      ? Reflect.get(cause, "code")
+      : undefined;
+  const message =
+    typeof cause === "object" && cause !== null && "message" in cause
+      ? String(Reflect.get(cause, "message"))
+      : error instanceof Error
+        ? error.message
+        : "";
+
+  return (
+    code === "42883" &&
+    (message.includes("similarity") ||
+      message.includes("operator does not exist: text % text") ||
+      message.includes("operator does not exist: character varying %"))
+  );
+}

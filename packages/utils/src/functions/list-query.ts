@@ -135,6 +135,10 @@ function toConditionArray(result: ListQueryWhereResult) {
   return (Array.isArray(result) ? result : [result]).filter(Boolean) as SQL[];
 }
 
+function flattenConditionResults(results: Array<ListQueryWhereResult | undefined>) {
+  return results.flatMap((result) => toConditionArray(result));
+}
+
 function combineConditions(result: ListQueryWhereResult, mode: "and" | "or" = "and") {
   const conditions = toConditionArray(result);
 
@@ -209,9 +213,10 @@ function resolveSearchWhere<TParams extends BaseListQueryParams>(
     (search?.fields ?? searchFields)?.map((field) => ilike(field, `%${searchTerm}%`)) ?? [];
   const presetConditions = buildSearchConditions(searchTerm, searchPreset);
   const customSearchWhere = combineConditions(
-    [search?.build?.({ searchTerm, params }), searchPreset?.build?.({ searchTerm, params })].filter(
-      Boolean
-    ) as SQL[],
+    flattenConditionResults([
+      search?.build?.({ searchTerm, params }),
+      searchPreset?.build?.({ searchTerm, params }),
+    ]),
     "or"
   );
 
