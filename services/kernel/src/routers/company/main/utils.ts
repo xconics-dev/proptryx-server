@@ -58,6 +58,15 @@ export async function fetchCompanyGstInfo(gstNumber: string) {
     `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`
   );
 
+  if (!gstResponse.ok) {
+    return {
+      success: false as const,
+      status: 400 as const,
+      error: "Invalid GST" as const,
+      message: "GST number is invalid or inactive.",
+    };
+  }
+
   const gstPayload = await gstResponse.json();
   const gstParsedPayload = companyGstInfoSchema.safeParse(gstPayload);
 
@@ -133,12 +142,11 @@ export async function syncCompanyRazorpayCustomer({
   memberData,
 }: RazorpaySyncParams) {
   try {
-    const searchResult = await razorpayClient.customers.all().then((result) => {
-      const matchingItems = result.items.filter((item) => item.email === ownerEmail);
-      return { items: matchingItems };
-    });
-
-    const existingCustomer = searchResult.items?.[0] ?? null;
+    const searchResult = await razorpayClient.customers.all();
+    const existingCustomer =
+      searchResult.items.find(
+        (c) => c.email === ownerEmail || (orgData.gstNumber && c.gstin === orgData.gstNumber)
+      ) ?? null;
     let customerId: string;
 
     if (existingCustomer) {

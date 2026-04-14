@@ -24,6 +24,15 @@ export async function fetchActiveGstInfo(gstNumber: string) {
     `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`
   );
 
+  if (!gstResponse.ok) {
+    return {
+      success: false as const,
+      status: 400 as const,
+      error: "Invalid GST" as const,
+      message: "GST number is invalid or inactive.",
+    };
+  }
+
   const gstPayload = await gstResponse.json();
   const gstParsedPayload = gstInfoResponseSchema.safeParse(gstPayload);
 

@@ -12,6 +12,7 @@ import {
 import { account, checkOrganizationLimit, db, member, user } from "@proptryx/database";
 import { eq } from "drizzle-orm";
 import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx/notification";
+import { logger } from "@/lib/logger";
 import { fetchMemberList } from "./list";
 import { create, get, list, remove, remove_with_user, resend_cred, update } from "./openapi.route";
 import {
@@ -154,17 +155,23 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
   });
 
   if (memberData) {
-    await sendEmail({
-      to: body.email,
-      subject: emailSubject["member-account-cred"].subject,
-      html: await renderMemberAccountCredEmail({
-        credEmail: body.email,
-        credPassword: password,
-        organizationName: orgData.name,
-        role: memberData.role,
-        previewText: emailSubject["member-account-cred"].previewText,
-      }),
-    });
+    renderMemberAccountCredEmail({
+      credEmail: body.email,
+      credPassword: password,
+      organizationName: orgData.name,
+      role: memberData.role,
+      previewText: emailSubject["member-account-cred"].previewText,
+    })
+      .then((html) =>
+        sendEmail({
+          to: body.email,
+          subject: emailSubject["member-account-cred"].subject,
+          html,
+        })
+      )
+      .catch((err) => {
+        logger.error("[company.member.create] Email send failed:", { error: err });
+      });
   }
 
   return c.json(memberData, 201);
@@ -335,17 +342,23 @@ registerOpenApiRoute(companyMembersGroup, resend_cred, async (c) => {
     );
   }
 
-  await sendEmail({
-    to: credentialData.data.email,
-    subject: emailSubject["member-account-cred"].subject,
-    html: await renderMemberAccountCredEmail({
-      credEmail: credentialData.data.email,
-      credPassword: credentialData.data.password,
-      organizationName: credentialData.data.organizationName,
-      role: credentialData.data.role,
-      previewText: emailSubject["member-account-cred"].previewText,
-    }),
-  });
+  renderMemberAccountCredEmail({
+    credEmail: credentialData.data.email,
+    credPassword: credentialData.data.password,
+    organizationName: credentialData.data.organizationName,
+    role: credentialData.data.role,
+    previewText: emailSubject["member-account-cred"].previewText,
+  })
+    .then((html) =>
+      sendEmail({
+        to: credentialData.data.email,
+        subject: emailSubject["member-account-cred"].subject,
+        html,
+      })
+    )
+    .catch((err) => {
+      logger.error("[company.member.resend_cred] Email send failed:", { error: err });
+    });
 
   return c.json(
     createSuccessResponse({

@@ -29,14 +29,14 @@ registerOpenApiRoute(companyRequestGroup, list, async (c) => {
     throw error;
   });
   const items = await Promise.all(
-    response.items.map(async (request) => {
-      const gstResult = await fetchActiveGstInfo(request.companyGstNumber);
-
-      return {
-        ...request,
-        gst_details: gstResult.success ? gstResult.data : null,
-      };
-    })
+    response.items.map((request) =>
+      fetchActiveGstInfo(request.companyGstNumber)
+        .then((gstResult) => ({
+          ...request,
+          gst_details: gstResult.success ? gstResult.data : null,
+        }))
+        .catch(() => ({ ...request, gst_details: null }))
+    )
   );
 
   return c.json(createSuccessResponse({ ...response, items }), 200);
