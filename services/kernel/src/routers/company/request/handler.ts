@@ -18,8 +18,18 @@ export const companyRequestGroup: OpenAPIHono<AppBindings> = new OpenAPIHono<App
 registerOpenApiRoute(companyRequestGroup, list, async (c) => {
   const query = c.req.valid("query");
   const response = await fetchCompanyRequestList(query);
+  const items = await Promise.all(
+    response.items.map(async (request) => {
+      const gstResult = await fetchActiveGstInfo(request.companyGstNumber);
 
-  return c.json(createSuccessResponse(response), 200);
+      return {
+        ...request,
+        gst_details: gstResult.success ? gstResult.data : null,
+      };
+    })
+  );
+
+  return c.json(createSuccessResponse({ ...response, items }), 200);
 });
 
 registerOpenApiRoute(companyRequestGroup, get, async (c) => {

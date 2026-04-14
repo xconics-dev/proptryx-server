@@ -12,6 +12,10 @@ export const companyRequestSchema = companyRequestBaseSchema.extend({
   gst_details: gstInfoResponseSchema,
 });
 
+export const companyRequestListItemSchema = companyRequestBaseSchema.extend({
+  gst_details: gstInfoResponseSchema.nullable(),
+});
+
 export const companyRequestCreateSchema = createDbInsertSchema(company_request, {
   omit: ["id", "createdAt", "updatedAt", "isDeleted", "deletedByUser", "deletedAt"] as const,
 });
@@ -33,4 +37,6 @@ export const companyRequestListQuerySchema = createListQuerySchema({
 
 export type CompanyRequestListQuery = typeof companyRequestListQuerySchema._output;
 
-export const companyRequestListResponseSchema = createListResponseSchema(companyRequestBaseSchema);
+export const companyRequestListResponseSchema = createListResponseSchema(
+  companyRequestListItemSchema
+);
