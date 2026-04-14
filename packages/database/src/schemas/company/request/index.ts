@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "../../auth/schema";
 import { createAuditRelationNames } from "../../utils/audit";
@@ -35,6 +35,21 @@ export const company_request = pgTable(
     index("company_request_owner_email_idx").on(table.ownerEmail),
     index("company_request_owner_phone_idx").on(table.ownerPhoneNumber),
     index("company_request_isDeleted_createdAt_idx").on(table.isDeleted, table.createdAt),
+    index("company_request_owner_name_trgm_idx")
+      .using("gin", sql`lower(${table.ownerName}) gin_trgm_ops`)
+      .where(sql`${table.isDeleted} = false`),
+    index("company_request_owner_email_trgm_idx")
+      .using("gin", sql`lower(${table.ownerEmail}) gin_trgm_ops`)
+      .where(sql`${table.isDeleted} = false`),
+    index("company_request_owner_phone_trgm_idx")
+      .using("gin", sql`lower(${table.ownerPhoneNumber}) gin_trgm_ops`)
+      .where(sql`${table.isDeleted} = false`),
+    index("company_request_company_gst_trgm_idx")
+      .using("gin", sql`lower(${table.companyGstNumber}) gin_trgm_ops`)
+      .where(sql`${table.isDeleted} = false`),
+    index("company_request_company_email_trgm_idx")
+      .using("gin", sql`lower(${table.companyEmail}) gin_trgm_ops`)
+      .where(sql`${table.isDeleted} = false and ${table.companyEmail} is not null`),
   ]
 );
 

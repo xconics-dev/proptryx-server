@@ -9,7 +9,11 @@ import {
 } from "@proptryx/utils";
 import type { AppBindings } from "@/types/app";
 import { eq } from "drizzle-orm";
-import { fetchCompanyRequestList } from "./list";
+import {
+  fetchCompanyRequestList,
+  fetchCompanyRequestListWithoutFuzzySearch,
+  isPgTrgmUnavailableError,
+} from "./list";
 import { check_gst, create, get, list, remove } from "./openapi.route";
 import { fetchActiveGstInfo, findCompanyRequestById } from "./utils";
 
@@ -17,16 +21,22 @@ export const companyRequestGroup: OpenAPIHono<AppBindings> = new OpenAPIHono<App
 
 registerOpenApiRoute(companyRequestGroup, list, async (c) => {
   const query = c.req.valid("query");
-  const response = await fetchCompanyRequestList(query);
-  const items = await Promise.all(
-    response.items.map(async (request) => {
-      const gstResult = await fetchActiveGstInfo(request.companyGstNumber);
+  const response = await fetchCompanyRequestList(query).catch((error) => {
+    if (isPgTrgmUnavailableError(error)) {
+      return fetchCompanyRequestListWithoutFuzzySearch(query);
+    }
 
-      return {
-        ...request,
-        gst_details: gstResult.success ? gstResult.data : null,
-      };
-    })
+    throw error;
+  });
+  const items = await Promise.all(
+    response.items.map((request) =>
+      fetchActiveGstInfo(request.companyGstNumber)
+        .then((gstResult) => ({
+          ...request,
+          gst_details: gstResult.success ? gstResult.data : null,
+        }))
+        .catch(() => ({ ...request, gst_details: null }))
+    )
   );
 
   return c.json(createSuccessResponse({ ...response, items }), 200);

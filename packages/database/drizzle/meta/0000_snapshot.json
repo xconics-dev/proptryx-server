@@ -1,5 +1,5 @@
 {
-  "id": "b0e77ade-0d4c-4c0d-9ad9-189982f2caa9",
+  "id": "f3162b63-82db-476c-ab25-78fa39d02c20",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -899,13 +899,6 @@
           "notNull": true,
           "default": 0
         },
-        "included_properties": {
-          "name": "included_properties",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "additional_properties": {
           "name": "additional_properties",
           "type": "integer",
@@ -1343,13 +1336,6 @@
           "notNull": true,
           "default": 0
         },
-        "included_properties": {
-          "name": "included_properties",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "addon_property_one_time_cost_in_paise": {
           "name": "addon_property_one_time_cost_in_paise",
           "type": "integer",
@@ -1362,7 +1348,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'::jsonb"
+          "default": "'{\"maxProperties\":0,\"maxUsers\":0}'::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -2110,6 +2096,86 @@
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
+          "with": {}
+        },
+        "company_request_owner_name_trgm_idx": {
+          "name": "company_request_owner_name_trgm_idx",
+          "columns": [
+            {
+              "expression": "lower(\"owner_name\") gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"company_request\".\"is_deleted\" = false",
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "company_request_owner_email_trgm_idx": {
+          "name": "company_request_owner_email_trgm_idx",
+          "columns": [
+            {
+              "expression": "lower(\"owner_email\") gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"company_request\".\"is_deleted\" = false",
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "company_request_owner_phone_trgm_idx": {
+          "name": "company_request_owner_phone_trgm_idx",
+          "columns": [
+            {
+              "expression": "lower(\"owner_phone\") gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"company_request\".\"is_deleted\" = false",
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "company_request_company_gst_trgm_idx": {
+          "name": "company_request_company_gst_trgm_idx",
+          "columns": [
+            {
+              "expression": "lower(\"company_gst_number\") gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"company_request\".\"is_deleted\" = false",
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "company_request_company_email_trgm_idx": {
+          "name": "company_request_company_email_trgm_idx",
+          "columns": [
+            {
+              "expression": "lower(\"company_email\") gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"company_request\".\"is_deleted\" = false and \"company_request\".\"company_email\" is not null",
+          "concurrently": false,
+          "method": "gin",
           "with": {}
         }
       },

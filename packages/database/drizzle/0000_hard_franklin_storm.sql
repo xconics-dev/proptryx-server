@@ -107,7 +107,6 @@ CREATE TABLE "organization_subscription" (
 	"base_amount_in_paise" integer DEFAULT 0 NOT NULL,
 	"billing_period" text DEFAULT 'monthly' NOT NULL,
 	"trial_days_applied" integer DEFAULT 0 NOT NULL,
-	"included_properties" integer DEFAULT 0 NOT NULL,
 	"additional_properties" integer DEFAULT 0 NOT NULL,
 	"addon_property_one_time_cost_in_paise" integer DEFAULT 0 NOT NULL,
 	"addon_one_time_total_in_paise" integer DEFAULT 0 NOT NULL,
@@ -151,9 +150,8 @@ CREATE TABLE "subscription_plans" (
 	"total_count" integer,
 	"quantity" integer DEFAULT 1 NOT NULL,
 	"trial_days" integer DEFAULT 0 NOT NULL,
-	"included_properties" integer DEFAULT 0 NOT NULL,
 	"addon_property_one_time_cost_in_paise" integer DEFAULT 0 NOT NULL,
-	"features" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"features" jsonb DEFAULT '{"maxProperties":0,"maxUsers":0}'::jsonb NOT NULL,
 	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -553,6 +551,11 @@ CREATE UNIQUE INDEX "company_request_gst_number_uidx" ON "company_request" USING
 CREATE INDEX "company_request_owner_email_idx" ON "company_request" USING btree ("owner_email");--> statement-breakpoint
 CREATE INDEX "company_request_owner_phone_idx" ON "company_request" USING btree ("owner_phone");--> statement-breakpoint
 CREATE INDEX "company_request_isDeleted_createdAt_idx" ON "company_request" USING btree ("is_deleted","created_at");--> statement-breakpoint
+CREATE INDEX "company_request_owner_name_trgm_idx" ON "company_request" USING gin (lower("owner_name") gin_trgm_ops) WHERE "company_request"."is_deleted" = false;--> statement-breakpoint
+CREATE INDEX "company_request_owner_email_trgm_idx" ON "company_request" USING gin (lower("owner_email") gin_trgm_ops) WHERE "company_request"."is_deleted" = false;--> statement-breakpoint
+CREATE INDEX "company_request_owner_phone_trgm_idx" ON "company_request" USING gin (lower("owner_phone") gin_trgm_ops) WHERE "company_request"."is_deleted" = false;--> statement-breakpoint
+CREATE INDEX "company_request_company_gst_trgm_idx" ON "company_request" USING gin (lower("company_gst_number") gin_trgm_ops) WHERE "company_request"."is_deleted" = false;--> statement-breakpoint
+CREATE INDEX "company_request_company_email_trgm_idx" ON "company_request" USING gin (lower("company_email") gin_trgm_ops) WHERE "company_request"."is_deleted" = false and "company_request"."company_email" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "region_name_uidx" ON "region" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "zone_regionId_idx" ON "zone" USING btree ("region_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "zone_regionId_name_uidx" ON "zone" USING btree ("region_id","name");--> statement-breakpoint

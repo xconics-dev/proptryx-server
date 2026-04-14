@@ -98,10 +98,7 @@ export type TableListFetcherOptions<
   search?: ListSearchPreset<TParams>;
   filterColumns?: ListQueryPreset<TItem, TParams>["filterColumns"];
   filters?: ListQueryPreset<TItem, TParams>["filters"];
-  sorting?: {
-    defaultBy: string;
-    defaultOrder?: ListSortOrder;
-  };
+  sorting?: ListQueryPreset<TItem, TParams>["sorting"];
   sortColumns?: Record<string, SQLWrapper>;
   counts?: ListQueryPreset<TItem, TParams>["counts"];
   mapItem?: (row: any) => TItem;
@@ -136,6 +133,10 @@ function toConditionArray(result: ListQueryWhereResult) {
   }
 
   return (Array.isArray(result) ? result : [result]).filter(Boolean) as SQL[];
+}
+
+function flattenConditionResults(results: Array<ListQueryWhereResult | undefined>) {
+  return results.flatMap((result) => toConditionArray(result));
 }
 
 function combineConditions(result: ListQueryWhereResult, mode: "and" | "or" = "and") {
@@ -212,9 +213,10 @@ function resolveSearchWhere<TParams extends BaseListQueryParams>(
     (search?.fields ?? searchFields)?.map((field) => ilike(field, `%${searchTerm}%`)) ?? [];
   const presetConditions = buildSearchConditions(searchTerm, searchPreset);
   const customSearchWhere = combineConditions(
-    [search?.build?.({ searchTerm, params }), searchPreset?.build?.({ searchTerm, params })].filter(
-      Boolean
-    ) as SQL[],
+    flattenConditionResults([
+      search?.build?.({ searchTerm, params }),
+      searchPreset?.build?.({ searchTerm, params }),
+    ]),
     "or"
   );
 

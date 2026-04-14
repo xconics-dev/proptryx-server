@@ -12,6 +12,7 @@ import {
 import { account, db, member, organization, user } from "@proptryx/database";
 import { and, eq } from "drizzle-orm";
 import { emailSubject, renderAccountCredEmail, sendEmail } from "@proptryx/notification";
+import { logger } from "@/lib/logger";
 import { fetchCompanyList } from "./list";
 import { create, get, get_gst_info, list, remove, resend_cred, update } from "./openapi.route";
 import { COMPANY_CREATION_TOTAL_STEPS, type CompanyCreationStep } from "./schema";
@@ -166,18 +167,6 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
       .returning();
     await ensureDefaultOrganizationRoles(tx, orgData.id);
 
-    if (orgData && userData) {
-      await sendEmail({
-        to: userData.email,
-        subject: emailSubject["account-credentials"].subject,
-        html: await renderAccountCredEmail({
-          credEmail: userData.email,
-          credPassword: password,
-          organizationName: orgData.name,
-          previewText: emailSubject["account-credentials"].previewText,
-        }),
-      });
-    }
     stepsCompleted.push("insert_organization");
 
     // Step 5: Insert member
@@ -196,11 +185,30 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
     return { userData, orgData, memberData };
   });
 
-  await syncCompanyRazorpayCustomer({
-    ownerEmail: body.ownerEmail,
-    userData,
-    orgData,
-    memberData,
+  // Fire-and-forget: email + Razorpay sync must not block the response
+  Promise.all([
+    renderAccountCredEmail({
+      credEmail: userData.email,
+      credPassword: password,
+      organizationName: orgData.name,
+      previewText: emailSubject["account-credentials"].previewText,
+    }).then((html) =>
+      sendEmail({
+        to: userData.email,
+        subject: emailSubject["account-credentials"].subject,
+        html,
+      })
+    ),
+    syncCompanyRazorpayCustomer({
+      ownerEmail: body.ownerEmail,
+      userData,
+      orgData,
+      memberData,
+    }),
+  ]).catch((err) => {
+    logger.error("[company.create] Post-creation tasks failed:", {
+      error: err,
+    });
   });
 
   const createdCompany = await findCompanyById(orgData.id);
@@ -253,8 +261,7 @@ registerOpenApiRoute(companyMainGroup, update, async (c) => {
       ...body,
       updatedByUser: currentAuthUser?.id ?? null,
     })
-    .where(eq(organization.id, id))
-    .returning();
+    .where(eq(organization.id, id));
 
   const updatedCompany = await findCompanyById(id);
 
@@ -331,16 +338,22 @@ registerOpenApiRoute(companyMainGroup, resend_cred, async (c) => {
     );
   }
 
-  await sendEmail({
-    to: credentialData.data.email,
-    subject: emailSubject["account-credentials"].subject,
-    html: await renderAccountCredEmail({
-      credEmail: credentialData.data.email,
-      credPassword: credentialData.data.password,
-      organizationName: credentialData.data.organizationName,
-      previewText: emailSubject["account-credentials"].previewText,
-    }),
-  });
+  renderAccountCredEmail({
+    credEmail: credentialData.data.email,
+    credPassword: credentialData.data.password,
+    organizationName: credentialData.data.organizationName,
+    previewText: emailSubject["account-credentials"].previewText,
+  })
+    .then((html) =>
+      sendEmail({
+        to: credentialData.data.email,
+        subject: emailSubject["account-credentials"].subject,
+        html,
+      })
+    )
+    .catch((err) => {
+      logger.error("[company.resend_cred] Email send failed:", { error: err });
+    });
 
   return c.json(
     createSuccessResponse({
