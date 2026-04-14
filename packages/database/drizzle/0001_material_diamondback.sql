@@ -1,1 +1,0 @@
-ALTER TABLE "subscription_plans" ALTER COLUMN "features" SET DEFAULT '{"maxProperties":0,"maxUsers":0}'::jsonb;

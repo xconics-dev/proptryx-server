@@ -1,1 +1,0 @@
-ALTER TABLE "subscription_plans" DROP COLUMN "included_properties";

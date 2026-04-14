@@ -98,10 +98,7 @@ export type TableListFetcherOptions<
   search?: ListSearchPreset<TParams>;
   filterColumns?: ListQueryPreset<TItem, TParams>["filterColumns"];
   filters?: ListQueryPreset<TItem, TParams>["filters"];
-  sorting?: {
-    defaultBy: string;
-    defaultOrder?: ListSortOrder;
-  };
+  sorting?: ListQueryPreset<TItem, TParams>["sorting"];
   sortColumns?: Record<string, SQLWrapper>;
   counts?: ListQueryPreset<TItem, TParams>["counts"];
   mapItem?: (row: any) => TItem;
