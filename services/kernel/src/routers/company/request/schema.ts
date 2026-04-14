@@ -17,7 +17,16 @@ export const companyRequestListItemSchema = companyRequestBaseSchema.extend({
 });
 
 export const companyRequestCreateSchema = createDbInsertSchema(company_request, {
-  omit: ["id", "createdAt", "updatedAt", "isDeleted", "deletedByUser", "deletedAt"] as const,
+  omit: [
+    "id",
+    "createdAt",
+    "createdByUser",
+    "updatedByUser",
+    "updatedAt",
+    "isDeleted",
+    "deletedByUser",
+    "deletedAt",
+  ] as const,
 });
 
 export const companyRequestListSortFields = [

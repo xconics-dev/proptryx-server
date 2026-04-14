@@ -61,11 +61,7 @@ const gstCheckEndpoint = createAuthEndpoint(
     return ctx.json({
       success: true,
       message: "Company GST info fetched successfully.",
-      data: {
-        gstNumber: ctx.body.gstNumber,
-        tradeName: parsedPayload.data.data?.tradeNam ?? null,
-        status: parsedPayload.data.data?.sts ?? null,
-      },
+      data: parsedPayload.data,
     });
   }
 );
