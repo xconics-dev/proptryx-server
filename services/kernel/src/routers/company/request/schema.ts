@@ -12,9 +12,7 @@ export const companyRequestSchema = companyRequestBaseSchema.extend({
   gst_details: gstInfoResponseSchema,
 });
 
-export const companyRequestListItemSchema = companyRequestBaseSchema.extend({
-  gst_details: gstInfoResponseSchema.nullable(),
-});
+export const companyRequestListItemSchema = companyRequestBaseSchema;
 
 export const companyRequestCreateSchema = createDbInsertSchema(company_request, {
   omit: [
