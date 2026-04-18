@@ -15,7 +15,20 @@ import {
   isPgTrgmUnavailableError,
 } from "./list";
 import { check_gst, create, get, list, remove } from "./openapi.route";
-import { fetchActiveGstInfo, findCompanyRequestById } from "./utils";
+import {
+  fetchActiveGstInfo,
+  findCompanyRequestById,
+  findCompanyRequestGstConflict,
+  GST_REQUEST_EXISTS_MESSAGE,
+} from "./utils";
+
+const isCompanyRequestGstUniqueViolation = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  (error as { code?: string }).code === "23505" &&
+  "constraint" in error &&
+  (error as { constraint?: string }).constraint === "company_request_gst_number_uidx";
 
 export const companyRequestGroup: OpenAPIHono<AppBindings> = new OpenAPIHono<AppBindings>();
 
@@ -69,19 +82,77 @@ registerOpenApiRoute(companyRequestGroup, get, async (c) => {
 
 registerOpenApiRoute(companyRequestGroup, create, async (c) => {
   const body = c.req.valid("json");
-  const [request] = await db
-    .insert(company_request)
-    .values({
-      id: generateRandomId(),
-      ...body,
-    })
-    .returning();
+  const gstConflict = await findCompanyRequestGstConflict(body.companyGstNumber);
 
-  return c.json(createSuccessResponse(request), 201);
+  if (gstConflict) {
+    return c.json(
+      createErrorResponse({
+        error: "Conflict",
+        message: gstConflict.message,
+        details: {
+          code: gstConflict.code,
+        },
+      }),
+      409
+    );
+  }
+
+  const gstResult = await fetchActiveGstInfo(body.companyGstNumber);
+
+  if (!gstResult.success) {
+    return c.json(
+      createErrorResponse({
+        error: gstResult.error,
+        message: gstResult.message,
+      }),
+      gstResult.status
+    );
+  }
+
+  try {
+    const [request] = await db
+      .insert(company_request)
+      .values({
+        id: generateRandomId(),
+        ...body,
+      })
+      .returning();
+
+    return c.json(createSuccessResponse(request), 201);
+  } catch (error) {
+    if (isCompanyRequestGstUniqueViolation(error)) {
+      return c.json(
+        createErrorResponse({
+          error: "Conflict",
+          message: GST_REQUEST_EXISTS_MESSAGE,
+          details: {
+            code: "GST_COMPANY_REQUEST_EXISTS",
+          },
+        }),
+        409
+      );
+    }
+
+    throw error;
+  }
 });
 
 registerOpenApiRoute(companyRequestGroup, check_gst, async (c) => {
   const { gstNumber } = c.req.valid("param");
+  const gstConflict = await findCompanyRequestGstConflict(gstNumber);
+
+  if (gstConflict) {
+    return c.json(
+      createErrorResponse({
+        error: "Conflict",
+        message: gstConflict.message,
+        details: {
+          code: gstConflict.code,
+        },
+      }),
+      409
+    );
+  }
 
   const gstResult = await fetchActiveGstInfo(gstNumber);
 
