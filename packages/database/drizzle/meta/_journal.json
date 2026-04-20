@@ -8,6 +8,13 @@
       "when": 1776153862000,
       "tag": "0000_hard_franklin_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776714190059,
+      "tag": "0001_milky_pestilence",
+      "breakpoints": true
     }
   ]
 }
