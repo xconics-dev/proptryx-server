@@ -9,8 +9,8 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { account, db, member, organization, user } from "@proptryx/database";
-import { and, eq } from "drizzle-orm";
+import { account, company_request, db, member, organization, user } from "@proptryx/database";
+import { and, eq, or } from "drizzle-orm";
 import { emailSubject, renderAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { logger } from "@/lib/logger";
 import { fetchCompanyList } from "./list";
@@ -168,6 +168,24 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
     await ensureDefaultOrganizationRoles(tx, orgData.id);
 
     stepsCompleted.push("insert_organization");
+
+    // Soft delete any existing company requests from the same owner email (and GST number, if provided)
+    const companyRequestDeleteWhere =
+      body.gstNumber != null
+        ? and(
+            eq(company_request.ownerEmail, body.ownerEmail),
+            eq(company_request.companyGstNumber, body.gstNumber)
+          )
+        : eq(company_request.ownerEmail, body.ownerEmail);
+
+    await tx
+      .update(company_request)
+      .set({
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedByUser: currentAuthUser?.id ?? null,
+      })
+      .where(companyRequestDeleteWhere);
 
     // Step 5: Insert member
     const [memberData] = await tx

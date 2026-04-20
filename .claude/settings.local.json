@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"/Volumes/DEV DOCK/XCONICS/proptryx-server\" diff HEAD~1 --name-only)",
+      "Bash(git -C \"/Volumes/DEV DOCK/XCONICS/proptryx-server\" status)",
+      "Bash(git -C \"/Volumes/DEV DOCK/XCONICS/proptryx-server\" diff services/kernel/src/routers/company/member/)"
+    ]
+  }
+}

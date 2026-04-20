@@ -5,6 +5,7 @@ export const OrganizationType = pgEnum("organization_type", [
   "OCCUPIER",
   "MANAGEMENT",
   "APPLICATION",
+  "BROKER",
 ]);
 export type OrganizationType = (typeof OrganizationType.enumValues)[number];
 export const BusinessType = pgEnum("business_type", ["B2B", "B2C", "BOTH", "GENERAL"]);

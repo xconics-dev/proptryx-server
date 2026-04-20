@@ -12,12 +12,19 @@ export const companyRequestSchema = companyRequestBaseSchema.extend({
   gst_details: gstInfoResponseSchema,
 });
 
-export const companyRequestListItemSchema = companyRequestBaseSchema.extend({
-  gst_details: gstInfoResponseSchema.nullable(),
-});
+export const companyRequestListItemSchema = companyRequestBaseSchema;
 
 export const companyRequestCreateSchema = createDbInsertSchema(company_request, {
-  omit: ["id", "createdAt", "updatedAt", "isDeleted", "deletedByUser", "deletedAt"] as const,
+  omit: [
+    "id",
+    "createdAt",
+    "createdByUser",
+    "updatedByUser",
+    "updatedAt",
+    "isDeleted",
+    "deletedByUser",
+    "deletedAt",
+  ] as const,
 });
 
 export const companyRequestListSortFields = [

@@ -91,19 +91,19 @@
     ]
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.10",
+    "@biomejs/biome": "^2.4.12",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.6.0",
     "drizzle-orm": "^0.45.2",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "npm-check-updates": "^20.0.0",
+    "npm-check-updates": "^21.0.2",
     "pg": "^8.20.0",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
-    "turbo": "^2.9.3",
-    "typescript": "^6.0.2",
-    "ultracite": "^7.4.2"
+    "turbo": "^2.9.6",
+    "typescript": "^6.0.3",
+    "ultracite": "^7.6.0"
   }
 }
