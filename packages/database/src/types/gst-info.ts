@@ -8,6 +8,7 @@ export const gstNumberSchema = z
 
 export const gstCheckBodySchema = z.object({
   gstNumber: gstNumberSchema,
+  isExistingCompanyCheck: z.boolean().default(false),
 });
 
 export const gstInfoResponseSchema = z.object({

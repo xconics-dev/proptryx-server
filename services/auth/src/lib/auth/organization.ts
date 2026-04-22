@@ -70,9 +70,10 @@ const gstCheckEndpoint = createAuthEndpoint(
   async (ctx) => {
     let payload: unknown;
     const gstNumber = ctx.body.gstNumber;
+    const isExistingCompanyCheck = ctx.body.isExistingCompanyCheck;
     const existingConflict = await findGstConflict(gstNumber);
 
-    if (existingConflict) {
+    if (existingConflict && isExistingCompanyCheck) {
       throw new APIError("BAD_REQUEST", {
         message: existingConflict.message,
       });
