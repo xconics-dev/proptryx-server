@@ -10,7 +10,7 @@ import {
 import { eq } from "drizzle-orm";
 import { create, get, list, remove, update } from "./openapi.route";
 import { fetchFaqList } from "./list";
-import { findFaqById } from "./utils";
+import { findActivePropertyById, findFaqById } from "./utils";
 
 export const faqsGroup = new OpenAPIHono<AppBindings>();
 
@@ -42,6 +42,20 @@ registerOpenApiRoute(faqsGroup, create, async (c) => {
   const body = c.req.valid("json");
   const { user } = getBetterAuthContext(c);
 
+  if (body.propertyId !== undefined && body.propertyId !== null) {
+    const linkedProperty = await findActivePropertyById(body.propertyId);
+
+    if (!linkedProperty) {
+      return c.json(
+        createErrorResponse({
+          error: "Not Found",
+          message: `No active property found with id ${body.propertyId}`,
+        }),
+        404
+      );
+    }
+  }
+
   const [createdFaq] = await db
     .insert(faq)
     .values({
@@ -68,6 +82,20 @@ registerOpenApiRoute(faqsGroup, update, async (c) => {
       }),
       404
     );
+  }
+
+  if (body.propertyId !== undefined && body.propertyId !== null) {
+    const linkedProperty = await findActivePropertyById(body.propertyId);
+
+    if (!linkedProperty) {
+      return c.json(
+        createErrorResponse({
+          error: "Not Found",
+          message: `No active property found with id ${body.propertyId}`,
+        }),
+        404
+      );
+    }
   }
 
   const [updatedFaq] = await db

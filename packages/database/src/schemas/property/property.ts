@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import { boolean, index, jsonb, pgTable, real, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { user } from "../auth/schema";
 import { meeting } from "../meeting/schema";
+import { faq } from "../site-data/faqs/schema";
 import { createAuditRelationNames } from "../utils/audit";
 import {
   AreaType,
@@ -29,7 +30,7 @@ const auditRelations = {
 export const property = pgTable(
   "property",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
+    id: text("id").primaryKey(),
     name: text("name").notNull(),
     description: text("description"),
 
@@ -147,6 +148,7 @@ export const propertyRelations = relations(property, ({ one, many }) => {
     owners: many(propertyOwner),
     mediaItems: many(propertyMedia),
     meetings: many(meeting),
+    faqs: many(faq),
     propertyZones: many(propertyZone, {
       relationName: "propertyZoneMappings",
     }),
