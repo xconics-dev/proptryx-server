@@ -23,6 +23,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
       description: "Company onboarding and request-management endpoints.",
     },
     {
+      name: "Company / Requests / Broker",
+      description: "Broker request-management endpoints under the company request domain.",
+    },
+    {
       name: "Regions",
       description: "Region master-data endpoints.",
     },
@@ -42,7 +46,7 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
   "x-tagGroups": [
     {
       name: "Company APIs",
-      tags: ["Company", "Company / Members", "Company / Requests"],
+      tags: ["Company", "Company / Members", "Company / Requests", "Company / Requests / Broker"],
     },
     {
       name: "Location Master Data",

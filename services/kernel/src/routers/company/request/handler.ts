@@ -20,15 +20,8 @@ import {
   findCompanyRequestById,
   findCompanyRequestGstConflict,
   GST_REQUEST_EXISTS_MESSAGE,
+  isCompanyRequestGstUniqueViolation,
 } from "./utils";
-
-const isCompanyRequestGstUniqueViolation = (error: unknown) =>
-  typeof error === "object" &&
-  error !== null &&
-  "code" in error &&
-  (error as { code?: string }).code === "23505" &&
-  "constraint" in error &&
-  (error as { constraint?: string }).constraint === "company_request_gst_number_uidx";
 
 export const companyRequestGroup: OpenAPIHono<AppBindings> = new OpenAPIHono<AppBindings>();
 

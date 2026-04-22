@@ -73,3 +73,5 @@ export const companyRequestRelations = relations(company_request, ({ one }) => {
     deletedByUser: auditUser(company_request.deletedByUser, auditRelations.deleted),
   };
 });
+
+export * from "./broker";
