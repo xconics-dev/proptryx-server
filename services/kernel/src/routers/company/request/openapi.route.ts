@@ -1,4 +1,4 @@
-import { DATABASE_RESOURCES, gstInfoResponseSchema } from "@proptryx/database";
+import { DATABASE_RESOURCES } from "@proptryx/database";
 import {
   createApiJsonBody,
   ApiNotFoundOpenApi,
@@ -74,22 +74,6 @@ export const create = createOpenApiRoute({
   },
   responses: {
     201: createApiSuccessResponse(companyRequestBaseSchema, "Company request created successfully"),
-  },
-});
-
-export const check_gst = createOpenApiRoute({
-  method: "get",
-  path: "/check-gst/{gstNumber}",
-  operationId: "companyRequestCheckGst",
-  tags,
-  middleware: [companyMethodsRateLimit],
-  summary: "Check GST number validity",
-  request: {
-    params: IdStringParamSchema("gstNumber"),
-  },
-  responses: {
-    200: createApiSuccessResponse(gstInfoResponseSchema, "GST number checked successfully"),
-    404: ApiNotFoundOpenApi,
   },
 });
 

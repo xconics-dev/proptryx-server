@@ -15,6 +15,13 @@
       "when": 1776714190059,
       "tag": "0001_milky_pestilence",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776873756290,
+      "tag": "0002_cool_wallflower",
+      "breakpoints": true
     }
   ]
 }
