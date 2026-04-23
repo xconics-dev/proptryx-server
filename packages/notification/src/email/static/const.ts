@@ -9,7 +9,7 @@ export const imgesdata = {
 
 export const metadata = {
   mainpageUrl: "https://www.proptryx.app",
-  consoleUrl: "https://console.proptryx.app",
+  consoleUrl: "https://software.proptryx.app",
   privacyPolicyOccupier: "https://www.proptryx.app/privacy-policy-occupier",
   privacyPolicyDeveloper: "https://www.proptryx.app/privacy-policy-developer",
   termsAndConditionsUrl: "https://www.proptryx.app/terms-of-service",
