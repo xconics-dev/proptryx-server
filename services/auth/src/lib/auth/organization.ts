@@ -27,7 +27,9 @@ async function findGstConflict(gstNumber: string) {
     db
       .select({ id: company_request.id })
       .from(company_request)
-      .where(eq(company_request.companyGstNumber, gstNumber))
+      .where(
+        and(eq(company_request.companyGstNumber, gstNumber), eq(company_request.isDeleted, false))
+      )
       .limit(1)
       .then((rows) => rows[0]),
   ]);
