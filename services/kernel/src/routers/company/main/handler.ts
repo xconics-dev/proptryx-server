@@ -133,7 +133,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
         name: body.ownerName,
         email: body.ownerEmail,
         phoneNumber: body.ownerPhoneNumber,
-        role: "developer",
+        role: body.type.toLowerCase(),
       })
       .returning();
     stepsCompleted.push("insert_user");
@@ -242,6 +242,8 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
         id: userData.id,
         name: userData.name,
         email: userData.email,
+        emailVerified: userData.emailVerified,
+        phoneNumber: userData.phoneNumber,
       },
       completedSteps: stepsCompleted.length,
       totalSteps: COMPANY_CREATION_TOTAL_STEPS,

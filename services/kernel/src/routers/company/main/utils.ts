@@ -222,24 +222,34 @@ export async function getCompanyOwnerCredentialDeliveryData(id: string, secret: 
   }
 
   const ownerAccount = await db
-    .select({ password: account.password })
+    .select({ id: account.id })
     .from(account)
-    .where(eq(account.userId, ownerMember.userId))
+    .where(and(eq(account.userId, ownerMember.userId), eq(account.providerId, "credential")))
     .limit(1)
     .then((rows) => rows[0]);
 
-  if (!ownerAccount?.password) {
+  if (!ownerAccount?.id) {
     return {
       success: false as const,
       message: "Owner account not found",
     };
   }
 
+  const password = decryptPassword(ownerAccount.id, secret);
+  const hashedPassword = await PasswordUtils.hash(password);
+
+  await db
+    .update(account)
+    .set({
+      password: hashedPassword,
+    })
+    .where(eq(account.id, ownerAccount.id));
+
   return {
     success: true as const,
     data: {
       email: ownerMember.email,
-      password: decryptPassword(ownerAccount.password, secret),
+      password,
       organizationName: company.name,
       role: ownerMember.role,
     },

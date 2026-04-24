@@ -107,9 +107,9 @@ export async function getMemberCredentialDeliveryData(id: string, secret: string
   const [orgData, memberAccount] = await Promise.all([
     findOrganizationSummaryById(memberData.organizationId),
     db
-      .select({ password: account.password })
+      .select({ id: account.id })
       .from(account)
-      .where(eq(account.userId, memberData.userId))
+      .where(and(eq(account.userId, memberData.userId), eq(account.providerId, "credential")))
       .limit(1)
       .then((rows) => rows[0]),
   ]);
@@ -121,18 +121,28 @@ export async function getMemberCredentialDeliveryData(id: string, secret: string
     };
   }
 
-  if (!memberAccount?.password) {
+  if (!memberAccount?.id) {
     return {
       success: false as const,
       message: "Member account not found",
     };
   }
 
+  const password = decryptPassword(memberAccount.id, secret);
+  const hashedPassword = await PasswordUtils.hash(password);
+
+  await db
+    .update(account)
+    .set({
+      password: hashedPassword,
+    })
+    .where(eq(account.id, memberAccount.id));
+
   return {
     success: true as const,
     data: {
       email: memberData.user.email,
-      password: decryptPassword(memberAccount.password, secret),
+      password,
       organizationName: orgData.name,
       role: memberData.role,
     },

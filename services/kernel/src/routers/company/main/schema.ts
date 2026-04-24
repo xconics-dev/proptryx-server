@@ -61,6 +61,8 @@ export const companyCreateResponseSchema = z.object({
     id: z.string(),
     name: z.string(),
     email: z.email(),
+    emailVerified: z.boolean(),
+    phoneNumber: z.string().nullable(),
   }),
   completedSteps: z.number(),
   totalSteps: z.number(),
@@ -89,6 +91,7 @@ const companyOwnerSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.email(),
+  emailVerified: z.boolean(),
   phoneNumber: z.string().nullable(),
 });
 

@@ -11,7 +11,7 @@ function companyListJoins(queryBuilder: any) {
 }
 
 function mapCompanyListItem(row: Record<string, unknown>) {
-  const { ownerId, ownerName, ownerEmail, ownerPhoneNumber, ...company } = row;
+  const { ownerId, ownerName, ownerEmail, ownerPhoneNumber, ownerEmailVerified, ...company } = row;
 
   return {
     ...company,
@@ -21,6 +21,7 @@ function mapCompanyListItem(row: Record<string, unknown>) {
             id: ownerId,
             name: ownerName,
             email: ownerEmail,
+            emailVerified: Boolean(ownerEmailVerified),
             phoneNumber: ownerPhoneNumber ?? null,
           }
         : null,
@@ -40,6 +41,7 @@ export const fetchCompanyList = createTableListFetcher<
     ownerName: user.name,
     ownerEmail: user.email,
     ownerPhoneNumber: user.phoneNumber,
+    ownerEmailVerified: user.emailVerified,
   }),
   joins: companyListJoins,
   where: eq(organization.isDeleted, false),
