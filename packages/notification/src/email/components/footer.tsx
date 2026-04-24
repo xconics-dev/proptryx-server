@@ -78,7 +78,7 @@ export default function Footer() {
         </table>
       </Section> */}
 
-      <Section className="mobile:px-6! px-10 pt-4 pb-6 bg-bg border-t border-stroke">
+      <Section className="mobile:px-6! px-8 pt-4 pb-6 bg-bg border-t border-stroke">
         <Text className="font-11 font-inter text-fg m-0 mb-2 text-center font-[500]">
           © 2026 Proptryx. All rights reserved.
         </Text>

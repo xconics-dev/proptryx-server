@@ -12,8 +12,8 @@ import {
   Text,
 } from "@react-email/components";
 import { pretty, render } from "@react-email/render";
-import { SatoshiFonts } from "./satoshi-fonts";
-import { collageTailwindConfig } from "./theme";
+import { SatoshiFonts } from "../satoshi-fonts";
+import { collageTailwindConfig } from "../theme";
 import { metadata } from "../../static/const";
 import EmailHeader from "../../components/email-header";
 import { OtpDigits } from "../../components/otp-digits";
@@ -47,7 +47,7 @@ export const PasswordResetOtpEmail = ({
           <Section>
             <Section className="bg-bg border-stroke border">
               <EmailHeader />
-              <Section className="mobile:px-6! px-10 pt-8 pb-10">
+              <Section className="mobile:px-6! px-8 pt-8 pb-10">
                 <Text className="font-32 text-fg m-0 font-sans">Reset Your Password</Text>
                 <Text className="font-14 font-inter text-fg-2 m-0 mt-4">Hello,</Text>
                 <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">

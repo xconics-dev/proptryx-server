@@ -10,8 +10,8 @@ import {
   Text,
 } from "@react-email/components";
 import { pretty, render } from "@react-email/render";
-import { SatoshiFonts } from "./satoshi-fonts";
-import { collageTailwindConfig } from "./theme";
+import { SatoshiFonts } from "../satoshi-fonts";
+import { collageTailwindConfig } from "../theme";
 import { metadata } from "../../static/const";
 import EmailHeader from "../../components/email-header";
 import { CredentialsBox } from "../../components/credentials-box";
@@ -19,29 +19,26 @@ import { EmailButton } from "../../components/email-button";
 import Footer from "../../components/footer";
 
 const defaultData = {
-  previewText: "You're invited to join Proptryx!",
+  previewText: "Your Proptryx Account is Ready!",
   credEmail: "mondalsuman97322@gmail.com",
   credPassword: "password123",
   organizationName: "Acme Pvt Ltd",
-  role: "Admin",
 };
 
-type MemberAccountCredEmailProps = {
+type AccountCredEmailProps = {
   previewText: string;
   credEmail?: string;
   credPassword?: string;
   organizationName?: string;
-  role?: string;
 };
 
-export const MemberAccountCredEmail = ({
+export const AccountCredEmail = ({
   previewText,
   credEmail = "",
   credPassword = "",
   organizationName,
-  role,
-}: MemberAccountCredEmailProps) => {
-  const getStartedLink = `${metadata.consoleUrl}/auth?cred_email=${encodeURIComponent(credEmail)}&cred_password=${encodeURIComponent(credPassword)}&redirect=member-invitation`;
+}: AccountCredEmailProps) => {
+  const getStartedLink = `${metadata.consoleUrl}/auth?cred_email=${encodeURIComponent(credEmail)}&cred_password=${encodeURIComponent(credPassword)}`;
 
   return (
     <Tailwind config={collageTailwindConfig}>
@@ -51,27 +48,25 @@ export const MemberAccountCredEmail = ({
         </Head>
         <Body className="bg-canvas font-14 font-inter text-fg m-0 p-0">
           <Preview>{previewText}</Preview>
-          <Container className="mx-auto max-w-[580px] px-4 pt-16 pb-6">
+          <Container className="mx-auto max-w-[580px] px-4 pt-10 pb-6">
             <Section>
               <Section className="bg-bg border-stroke border">
                 <EmailHeader />
-                <Section className="mobile:px-6! px-10 pt-8 pb-10">
-                  <Text className="font-32 text-fg m-0 font-sans">
-                    Welcome to {organizationName}!
-                  </Text>
+                <Section className="mobile:px-6! px-8 pt-8 pb-10">
+                  <Text className="font-32 text-fg m-0 font-sans">Proptryx Account Activated</Text>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-4">Hello,</Text>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
-                    You have been invited to join{" "}
-                    <span className="font-semibold text-fg">{organizationName}</span> on Proptryx as
-                    a <span className="font-semibold text-fg">{role}</span>.
+                    Your organization{" "}
+                    <span className="font-semibold text-fg">{organizationName}</span> has been
+                    successfully activated to Proptryx.
                   </Text>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
                     Here's your Login Details:
                   </Text>
                   <CredentialsBox email={credEmail} password={credPassword} />
-                  <EmailButton href={getStartedLink}>Accept Invitation&nbsp;&nbsp;→</EmailButton>
+                  <EmailButton href={getStartedLink}>Get started&nbsp;&nbsp;→</EmailButton>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[18px]">
-                    We're excited to have you onboard. Start collaborating with your team.
+                    We're excited to help you streamline your operations and grow.
                   </Text>
                   <Section className="mt-6">
                     <Text className="font-14 font-inter text-fg-2 m-0">
@@ -96,9 +91,23 @@ export const MemberAccountCredEmail = ({
   );
 };
 
-MemberAccountCredEmail.PreviewProps = defaultData;
+AccountCredEmail.PreviewProps = defaultData;
 
-export default MemberAccountCredEmail;
+export default AccountCredEmail;
 
-export const renderMemberAccountCredEmail = async (props: MemberAccountCredEmailProps) =>
-  pretty(await render(<MemberAccountCredEmail {...props} />));
+export const renderAccountCredEmail = async ({
+  previewText,
+  credEmail,
+  credPassword,
+  organizationName,
+}: AccountCredEmailProps) =>
+  pretty(
+    await render(
+      <AccountCredEmail
+        credEmail={credEmail}
+        credPassword={credPassword}
+        previewText={previewText}
+        organizationName={organizationName}
+      />
+    )
+  );
