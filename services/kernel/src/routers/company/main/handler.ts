@@ -156,7 +156,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
         name: body.name,
         gstNumber: body.gstNumber,
         slug: body.slug,
-        type: body.organizationType,
+        type: body.type,
         companyType: body.companyType,
         industry: body.industry,
         email: body.ownerEmail,
