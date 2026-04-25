@@ -1,5 +1,5 @@
-import { db, region, zone } from "@proptryx/database";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { db, region, user, zone } from "@proptryx/database";
+import { and, count, eq, inArray, ne } from "drizzle-orm";
 
 type IncludeDeletedOptions = {
   includeDeleted?: boolean;
@@ -15,6 +15,10 @@ type AttachZonesOptions = {
 
 type AttachRegionOptions = {
   includeRegion?: boolean;
+};
+
+type ZoneUserCount = {
+  userCount: number;
 };
 
 export async function findRegionById(id: string, options?: IncludeDeletedOptions) {
@@ -132,5 +136,34 @@ export async function attachRegionToZones<TZone extends { regionId: string }>(
   return zonesData.map((zoneData) => ({
     ...zoneData,
     region: regionById.get(zoneData.regionId),
+  }));
+}
+
+export async function attachUserCountsToZones<TZone extends { id: string }>(
+  zonesData: TZone[]
+): Promise<Array<TZone & ZoneUserCount>> {
+  if (zonesData.length === 0) {
+    return zonesData.map((zoneData) => ({ ...zoneData, userCount: 0 }));
+  }
+
+  const zoneIds = zonesData.map((item) => item.id);
+  const userCountRows = await db
+    .select({
+      zoneId: user.zoneId,
+      userCount: count(user.id),
+    })
+    .from(user)
+    .where(and(inArray(user.zoneId, zoneIds), eq(user.isDeleted, false)))
+    .groupBy(user.zoneId);
+
+  const userCountByZoneId = new Map(
+    userCountRows
+      .filter((row) => row.zoneId)
+      .map((row) => [row.zoneId as string, Number(row.userCount)])
+  );
+
+  return zonesData.map((zoneData) => ({
+    ...zoneData,
+    userCount: userCountByZoneId.get(zoneData.id) ?? 0,
   }));
 }
