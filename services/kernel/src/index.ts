@@ -18,6 +18,7 @@ import { companyGroup } from "@/routers/company";
 import type { AppBindings } from "@/types/app";
 import { zoneRegionGroup } from "@/routers/zone-region/handler";
 import { siteDataGroup } from "@/routers/site-data";
+import { proptryxGroup } from "@/routers/proptryx";
 
 const app = new OpenAPIHono<AppBindings>();
 
@@ -40,6 +41,7 @@ app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
 
 const routes = app
+  .route("/proptryx", proptryxGroup)
   .route("/company", companyGroup)
   .route("/site-data", siteDataGroup)
   .route("/", zoneRegionGroup);

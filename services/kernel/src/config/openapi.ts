@@ -27,6 +27,14 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
       description: "Broker request-management endpoints under the company request domain.",
     },
     {
+      name: "Proptryx / Users",
+      description: "Proptryx platform user management endpoints.",
+    },
+    {
+      name: "Proptryx / Roles & Permissions",
+      description: "Proptryx platform RBAC role and permission management endpoints.",
+    },
+    {
       name: "Regions",
       description: "Region master-data endpoints.",
     },
@@ -47,6 +55,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     {
       name: "Company APIs",
       tags: ["Company", "Company / Members", "Company / Requests", "Company / Requests / Broker"],
+    },
+    {
+      name: "Proptryx APIs",
+      tags: ["Proptryx / Users", "Proptryx / Roles & Permissions"],
     },
     {
       name: "Location Master Data",
