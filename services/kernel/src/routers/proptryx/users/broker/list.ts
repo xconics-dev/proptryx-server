@@ -1,19 +1,19 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Drizzle query builders are intentionally passed through reusable helpers. */
-import { getDB, region, user, zone } from "@proptryx/database";
+import { broker_request, getDB, region, user, zone } from "@proptryx/database";
 import { createTableListFetcher } from "@proptryx/utils";
-import { and, eq, ne } from "drizzle-orm";
-import type { ScopedProptryxUserListQuery } from "./schema";
+import { and, eq, ne, sql } from "drizzle-orm";
+import type { ScopedProptryxBrokerUserListQuery } from "./schema";
 
-function proptryxUserListJoins(queryBuilder: any) {
+function proptryxBrokerUserListJoins(queryBuilder: any) {
   return queryBuilder
     .leftJoin(zone, eq(zone.id, user.zoneId))
     .leftJoin(region, eq(region.id, zone.regionId));
 }
 
-export const fetchProptryxUserList = createTableListFetcher<
+export const fetchProptryxBrokerUserList = createTableListFetcher<
   typeof user,
-  typeof user.$inferSelect & { zone: string | null; region: string | null },
-  ScopedProptryxUserListQuery
+  typeof user.$inferSelect & { zone: string | null; region: string | null; pincode: string | null },
+  ScopedProptryxBrokerUserListQuery
 >({
   db: getDB,
   table: user,
@@ -21,22 +21,33 @@ export const fetchProptryxUserList = createTableListFetcher<
     ...columns,
     zone: zone.name,
     region: region.name,
+    pincode: sql<string | null>`(
+      SELECT ${broker_request.pincode}
+      FROM ${broker_request}
+      WHERE lower(trim(${broker_request.email})) = lower(trim(${user.email}))
+      LIMIT 1
+    )`,
   }),
-  joins: proptryxUserListJoins,
+  joins: proptryxBrokerUserListJoins,
   where: ({ params }) =>
     and(
       eq(user.panel, "proptryx"),
+      eq(user.role, "broker"),
       eq(user.isDeleted, false),
-      ne(user.role, "broker"), // Exclude brokers from the user list
       params.excludeUserId ? ne(user.id, params.excludeUserId) : undefined
     ),
   search: {
     exact: [user.id, user.role],
     prefix: [user.email, user.phoneNumber],
     contains: [user.name, zone.name, region.name],
+    build: ({ searchTerm }) =>
+      sql`EXISTS (
+        SELECT 1 FROM ${broker_request}
+        WHERE lower(trim(${broker_request.email})) = lower(trim(${user.email}))
+          AND ${broker_request.pincode} ILIKE ${"%" + searchTerm + "%"}
+      )`,
   },
   filterColumns: {
-    role: user.role,
     zoneId: user.zoneId,
     regionId: zone.regionId,
   },

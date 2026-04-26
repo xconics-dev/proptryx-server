@@ -64,7 +64,7 @@ export const MemberAccountCredEmail = ({
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
                     You have been invited to join{" "}
                     <span className="font-semibold text-fg">{organizationName}</span> on Proptryx as
-                    a <span className="font-semibold text-fg">{role}</span>.
+                    a <span className="font-semibold text-fg">{role?.toUpperCase()}</span>.
                   </Text>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
                     Here's your Login Details:

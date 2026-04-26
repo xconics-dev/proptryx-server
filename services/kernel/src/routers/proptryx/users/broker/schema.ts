@@ -1,25 +1,22 @@
 import { user } from "@proptryx/database";
 import {
   createDbInsertSchema,
-  createDbSelectSchema,
   createDbUpdateSchema,
   createListQuerySchema,
   createListResponseSchema,
 } from "@proptryx/utils";
 import z from "zod";
+import { proptryxUserSchema, proptryxUserWithLocationSchema } from "../schema";
 
-export const proptryxUserSchema = createDbSelectSchema(user);
+export const proptryxBrokerUserSchema = proptryxUserSchema;
 
-export const proptryxUserWithLocationSchema = proptryxUserSchema.extend({
-  zone: z.string().nullable(),
-  region: z.string().nullable(),
-  pincode: z.string().nullable(),
-});
+export const proptryxBrokerUserWithLocationSchema = proptryxUserWithLocationSchema;
 
-export const proptryxUserCreateSchema = createDbInsertSchema(user, {
+export const proptryxBrokerUserCreateSchema = createDbInsertSchema(user, {
   omit: [
     "id",
     "panel",
+    "role",
     "emailVerified",
     "phoneNumberVerified",
     "banned",
@@ -37,7 +34,6 @@ export const proptryxUserCreateSchema = createDbInsertSchema(user, {
     return schema.extend({
       name: z.string().min(1, "Name is required"),
       email: z.email("Invalid email address"),
-      role: z.string().min(1, "Role is required"),
       image: z.url("Invalid URL").optional(),
       phoneNumber: z.string().optional(),
       zoneId: z.string().optional(),
@@ -45,10 +41,11 @@ export const proptryxUserCreateSchema = createDbInsertSchema(user, {
   },
 });
 
-export const proptryxUserUpdateSchema = createDbUpdateSchema(user, {
+export const proptryxBrokerUserUpdateSchema = createDbUpdateSchema(user, {
   omit: [
     "id",
     "panel",
+    "role",
     "emailVerified",
     "phoneNumberVerified",
     "createdAt",
@@ -63,7 +60,6 @@ export const proptryxUserUpdateSchema = createDbUpdateSchema(user, {
     return schema.extend({
       name: z.string().min(1, "Name is required").optional(),
       email: z.email("Invalid email address").optional(),
-      role: z.string().min(1, "Role is required").optional(),
       image: z.url("Invalid URL").optional().nullable(),
       phoneNumber: z.string().optional().nullable(),
       zoneId: z.string().optional().nullable(),
@@ -71,20 +67,19 @@ export const proptryxUserUpdateSchema = createDbUpdateSchema(user, {
   },
 });
 
-export const proptryxUserListQuerySchema = createListQuerySchema({
+export const proptryxBrokerUserListQuerySchema = createListQuerySchema({
   sortFields: ["name", "email", "role", "zone", "region", "createdAt", "updatedAt"],
   extraShape: {
-    role: z.string().optional(),
     zoneId: z.string().optional(),
     regionId: z.string().optional(),
   },
 });
 
-export type ProptryxUserListQuery = z.infer<typeof proptryxUserListQuerySchema>;
-export type ScopedProptryxUserListQuery = ProptryxUserListQuery & {
+export type ProptryxBrokerUserListQuery = z.infer<typeof proptryxBrokerUserListQuerySchema>;
+export type ScopedProptryxBrokerUserListQuery = ProptryxBrokerUserListQuery & {
   excludeUserId?: string;
 };
 
-export const proptryxUserListResponseSchema = createListResponseSchema(
-  proptryxUserWithLocationSchema
+export const proptryxBrokerUserListResponseSchema = createListResponseSchema(
+  proptryxBrokerUserWithLocationSchema
 );

@@ -63,6 +63,22 @@ export async function findProptryxUserConflictByEmail(email: string, excludeUser
     .then((rows) => rows[0]);
 }
 
+export async function findProptryxUserConflictByPhoneNumber(
+  phoneNumber: string,
+  excludeUserId?: string
+) {
+  const whereClause = excludeUserId
+    ? and(eq(user.phoneNumber, phoneNumber), ne(user.id, excludeUserId))
+    : eq(user.phoneNumber, phoneNumber);
+
+  return db
+    .select({ id: user.id })
+    .from(user)
+    .where(whereClause)
+    .limit(1)
+    .then((rows) => rows[0]);
+}
+
 export async function createProptryxUserAuthSeed(secret: string) {
   const password = generateRandomPassword();
   const [hashedPassword, accountId] = await Promise.all([

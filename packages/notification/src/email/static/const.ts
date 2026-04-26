@@ -49,4 +49,8 @@ export const emailSubject: Record<string, EmailSubPrev> = {
     subject: "Your Proptryx Account Credentials",
     previewText: "Here are your Proptryx account login credentials.",
   },
+  "broker-cred": {
+    subject: "You're now a Broker on Proptryx — Here are your credentials",
+    previewText: "You're now a registered Broker on Proptryx!",
+  },
 };

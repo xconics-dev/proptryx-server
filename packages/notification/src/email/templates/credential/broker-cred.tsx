@@ -20,25 +20,31 @@ import Footer from "../../components/footer";
 import { createCredentialAuthLink } from "./utils";
 
 const defaultData = {
-  previewText: "You're invited to join Proptryx!",
-  credEmail: "mondalsuman97322@gmail.com",
+  previewText: "You're now a registered Broker on Proptryx!",
+  credEmail: "broker@example.com",
   credPassword: "password123",
-  role: "Admin",
+  brokerName: "Suman Mondal",
+  regionName: "INDIA",
+  zoneName: "EAST",
 };
 
-type ProptryxAccountCredEmailProps = {
+type BrokerCredEmailProps = {
   previewText: string;
   credEmail?: string;
   credPassword?: string;
-  role?: string;
+  brokerName?: string;
+  regionName?: string;
+  zoneName?: string;
 };
 
-export const ProptryxAccountCredEmail = ({
+export const BrokerCredEmail = ({
   previewText,
   credEmail = "",
   credPassword = "",
-  role,
-}: ProptryxAccountCredEmailProps) => {
+  brokerName,
+  regionName,
+  zoneName,
+}: BrokerCredEmailProps) => {
   const getStartedLink = createCredentialAuthLink({ credEmail, credPassword });
 
   return (
@@ -55,18 +61,44 @@ export const ProptryxAccountCredEmail = ({
                 <EmailHeader />
                 <Section className="mobile:px-6! px-8 pt-8 pb-10">
                   <Text className="font-32 text-fg m-0 font-sans">Welcome to Proptryx</Text>
-                  <Text className="font-14 font-inter text-fg-2 m-0 mt-4">Hello,</Text>
-                  <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
-                    Your Proptryx account has been successfully set up as a{" "}
-                    <span className="font-semibold text-fg">{role?.toUpperCase()}</span>.
+                  <Text className="font-14 font-inter text-fg-2 m-0 mt-4">
+                    Hello{brokerName ? `, ${brokerName}` : ""},
                   </Text>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
-                    Here's your Login Details:
+                    You have been successfully registered as a{" "}
+                    <span className="font-semibold text-fg">Broker</span> on Proptryx.
+                    {regionName || zoneName ? (
+                      <>
+                        {" "}
+                        You are assigned to{" "}
+                        {zoneName ? (
+                          <>
+                            <span className="font-semibold text-fg">{zoneName}</span>
+                            {regionName ? (
+                              <>
+                                {" "}
+                                zone under the{" "}
+                                <span className="font-semibold text-fg">{regionName}</span> region
+                              </>
+                            ) : null}
+                          </>
+                        ) : (
+                          <>
+                            the <span className="font-semibold text-fg">{regionName}</span> region
+                          </>
+                        )}
+                        .
+                      </>
+                    ) : null}
+                  </Text>
+                  <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
+                    Here are your login credentials to get started:
                   </Text>
                   <CredentialsBox email={credEmail} password={credPassword} />
-                  <EmailButton href={getStartedLink}>Accept Invitation&nbsp;&nbsp;→</EmailButton>
+                  <EmailButton href={getStartedLink}>Get Started&nbsp;&nbsp;→</EmailButton>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[18px]">
-                    We're excited to have you onboard. Start collaborating with your team.
+                    Please change your password after your first login. If you have any questions,
+                    feel free to reach out to our support team.
                   </Text>
                   <Section className="mt-6">
                     <Text className="font-14 font-inter text-fg-2 m-0">
@@ -91,9 +123,9 @@ export const ProptryxAccountCredEmail = ({
   );
 };
 
-ProptryxAccountCredEmail.PreviewProps = defaultData;
+BrokerCredEmail.PreviewProps = defaultData;
 
-export default ProptryxAccountCredEmail;
+export default BrokerCredEmail;
 
-export const renderProptryxAccountCredEmail = async (props: ProptryxAccountCredEmailProps) =>
-  pretty(await render(<ProptryxAccountCredEmail {...props} />));
+export const renderBrokerCredEmail = async (props: BrokerCredEmailProps) =>
+  pretty(await render(<BrokerCredEmail {...props} />));
