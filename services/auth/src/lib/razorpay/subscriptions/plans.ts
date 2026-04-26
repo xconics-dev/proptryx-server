@@ -1,45 +1,71 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Better Auth runtime context is runtime-shaped */
 import * as schema from "@proptryx/database";
 import type { SubscriptionPlanFeatures } from "@proptryx/database";
+import { generateRandomId } from "@proptryx/utils";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
   createPlanBodySchema,
-  deactivatePlanBodySchema,
+  deletePlanBodySchema,
   getPlanByCode,
   getPlanById,
   getPlanQuerySchema,
+  listPlansQuerySchema,
   normalizePlanCode,
   signedInSessionMiddleware,
   updatePlanBodySchema,
 } from "./shared";
 import { resolveAuthDatabase } from "../../auth/utils";
-import { generateRandomId } from "@proptryx/utils";
 
 const listPlansEndpoint = createAuthEndpoint(
   "/subscription/plans",
   {
     method: "GET",
+    query: listPlansQuerySchema,
     metadata: {
       openapi: {
-        summary: "List active subscription plans",
-        description: "Returns all active subscription plans ordered by price. Public endpoint.",
+        summary: "List subscription plans",
+        description:
+          "Returns subscription plans ordered by price. Pass includeInactive=true to include inactive plans.",
         responses: {
-          200: { description: "Active plans" },
+          200: { description: "Plans list" },
         },
       },
     },
   },
   async (ctx) => {
     const db = resolveAuthDatabase();
+    const includeInactive = ctx.query.includeInactive ?? false;
+    const whereClause = includeInactive
+      ? eq(schema.subscriptionPlans.isDeleted, false)
+      : and(
+          eq(schema.subscriptionPlans.isDeleted, false),
+          eq(schema.subscriptionPlans.isActive, true)
+        );
+
+    const countRows = await db
+      .select({
+        subscriptionPlanId: schema.organizationSubscription.subscriptionPlanId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(schema.organizationSubscription)
+      .groupBy(schema.organizationSubscription.subscriptionPlanId);
+
+    const countMap = new Map(countRows.map((row) => [row.subscriptionPlanId, Number(row.count)]));
+
     const plans = await db
       .select()
       .from(schema.subscriptionPlans)
-      .where(eq(schema.subscriptionPlans.isActive, true))
+      .where(whereClause)
       .orderBy(asc(schema.subscriptionPlans.amountInPaise));
 
-    return ctx.json({ plans });
+    const plansWithCounts = plans.map((plan) => ({
+      ...plan,
+      subscriptionCount: countMap.get(plan.id) ?? 0,
+    }));
+
+    return ctx.json({ plans: plansWithCounts });
   }
 );
 
@@ -103,7 +129,9 @@ const createPlanEndpoint = createAuthEndpoint(
     const [existing] = await db
       .select({ id: schema.subscriptionPlans.id })
       .from(schema.subscriptionPlans)
-      .where(eq(schema.subscriptionPlans.code, code))
+      .where(
+        and(eq(schema.subscriptionPlans.code, code), eq(schema.subscriptionPlans.isDeleted, false))
+      )
       .limit(1);
 
     if (existing) {
@@ -113,6 +141,7 @@ const createPlanEndpoint = createAuthEndpoint(
     }
 
     const now = new Date();
+    const session = ctx.context.session as any;
 
     const [plan] = await db
       .insert(schema.subscriptionPlans)
@@ -122,6 +151,8 @@ const createPlanEndpoint = createAuthEndpoint(
         name: ctx.body.name,
         description: ctx.body.description || null,
         amountInPaise: ctx.body.amountInPaise,
+        discountedAmountInPaise: ctx.body.discountedAmountInPaise ?? null,
+        discountAvailableTill: ctx.body.discountAvailableTill ?? null,
         currency: ctx.body.currency,
         billingInterval: ctx.body.billingInterval,
         razorpayPlanId: ctx.body.razorpayPlanId,
@@ -132,6 +163,8 @@ const createPlanEndpoint = createAuthEndpoint(
         isActive: ctx.body.isActive ?? true,
         features: ctx.body.features as SubscriptionPlanFeatures,
         metadata: ctx.body.metadata ?? {},
+        createdByUser: session.user.id,
+        updatedByUser: session.user.id,
         createdAt: now,
         updatedAt: now,
       })
@@ -169,10 +202,17 @@ const updatePlanEndpoint = createAuthEndpoint(
     const updatePayload: Record<string, unknown> = {
       updatedAt: new Date(),
     };
+    const session = ctx.context.session as any;
 
     if (ctx.body.name !== undefined) updatePayload.name = ctx.body.name;
     if (ctx.body.description !== undefined) updatePayload.description = ctx.body.description;
     if (ctx.body.amountInPaise !== undefined) updatePayload.amountInPaise = ctx.body.amountInPaise;
+    if (ctx.body.discountedAmountInPaise !== undefined) {
+      updatePayload.discountedAmountInPaise = ctx.body.discountedAmountInPaise;
+    }
+    if (ctx.body.discountAvailableTill !== undefined) {
+      updatePayload.discountAvailableTill = ctx.body.discountAvailableTill;
+    }
     if (ctx.body.currency !== undefined) updatePayload.currency = ctx.body.currency;
     if (ctx.body.billingInterval !== undefined) {
       updatePayload.billingInterval = ctx.body.billingInterval;
@@ -191,6 +231,7 @@ const updatePlanEndpoint = createAuthEndpoint(
       updatePayload.features = ctx.body.features as SubscriptionPlanFeatures;
     }
     if (ctx.body.metadata !== undefined) updatePayload.metadata = ctx.body.metadata;
+    updatePayload.updatedByUser = session.user.id;
 
     const [updated] = await db
       .update(schema.subscriptionPlans)
@@ -202,18 +243,18 @@ const updatePlanEndpoint = createAuthEndpoint(
   }
 );
 
-const deactivatePlanEndpoint = createAuthEndpoint(
+const deletePlanEndpoint = createAuthEndpoint(
   "/subscription/plan",
   {
     method: "DELETE",
-    body: deactivatePlanBodySchema,
+    body: deletePlanBodySchema,
     use: [signedInSessionMiddleware],
     metadata: {
       openapi: {
-        summary: "Deactivate a subscription plan",
-        description: "Sets isActive=false on the plan. Does not delete existing subscriptions.",
+        summary: "Soft delete a subscription plan",
+        description: "Soft-deletes a plan and keeps subscription history intact.",
         responses: {
-          200: { description: "Plan deactivated" },
+          200: { description: "Plan deleted" },
           404: { description: "Plan not found" },
         },
       },
@@ -227,13 +268,71 @@ const deactivatePlanEndpoint = createAuthEndpoint(
       throw new APIError("NOT_FOUND", { message: "Subscription plan not found." });
     }
 
-    const [updated] = await db
-      .update(schema.subscriptionPlans)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(schema.subscriptionPlans.id, existing.id))
-      .returning();
+    const [countRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.organizationSubscription)
+      .where(eq(schema.organizationSubscription.subscriptionPlanId, existing.id));
 
-    return ctx.json({ plan: updated });
+    const subscriptionCount = Number(countRow?.count ?? 0);
+
+    if (subscriptionCount > 0) {
+      throw new APIError("BAD_REQUEST", {
+        message: `This plan has ${subscriptionCount} connected subscription(s) and cannot be deleted.`,
+      });
+    }
+
+    const session = ctx.context.session as any;
+    const now = new Date();
+
+    await db
+      .update(schema.subscriptionPlans)
+      .set({
+        isActive: false,
+        isDeleted: true,
+        deletedAt: now,
+        deletedByUser: session.user.id,
+        updatedByUser: session.user.id,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.subscriptionPlans.id, existing.id),
+          eq(schema.subscriptionPlans.isDeleted, false)
+        )
+      );
+
+    return ctx.json({ success: true, id: existing.id });
+  }
+);
+
+const listActivePlansPublicEndpoint = createAuthEndpoint(
+  "/subscription/active-plans",
+  {
+    method: "GET",
+    metadata: {
+      openapi: {
+        summary: "List active subscription plans (public)",
+        description: "Returns only active plans ordered by price. No auth required. No params.",
+        responses: {
+          200: { description: "Active plans" },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const db = resolveAuthDatabase();
+    const plans = await db
+      .select()
+      .from(schema.subscriptionPlans)
+      .where(
+        and(
+          eq(schema.subscriptionPlans.isDeleted, false),
+          eq(schema.subscriptionPlans.isActive, true)
+        )
+      )
+      .orderBy(asc(schema.subscriptionPlans.amountInPaise));
+
+    return ctx.json({ plans });
   }
 );
 
@@ -241,9 +340,10 @@ export const subscriptionPlansPlugin = {
   id: "subscription-plans",
   endpoints: {
     listSubscriptionPlans: listPlansEndpoint,
+    listActiveSubscriptionPlans: listActivePlansPublicEndpoint,
     getSubscriptionPlan: getPlanEndpoint,
     createSubscriptionPlan: createPlanEndpoint,
     updateSubscriptionPlan: updatePlanEndpoint,
-    deactivateSubscriptionPlan: deactivatePlanEndpoint,
+    deleteSubscriptionPlan: deletePlanEndpoint,
   },
 } satisfies BetterAuthPlugin;

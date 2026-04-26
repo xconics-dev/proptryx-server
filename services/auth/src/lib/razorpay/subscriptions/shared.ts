@@ -33,8 +33,8 @@ export type SubscriptionNotificationContactInput = {
 
 export const planFeaturesSchema = z
   .object({
-    maxProperties: z.number().int().min(-1),
-    maxUsers: z.number().int().min(-1),
+    maxProperties: z.number().int().min(-1).default(-1),
+    maxUsers: z.number().int().min(-1).default(-1),
   })
   .catchall(z.union([z.string(), z.number(), z.boolean()]));
 
@@ -43,6 +43,8 @@ export const createPlanBodySchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
   amountInPaise: z.number().int().positive(),
+  discountedAmountInPaise: z.number().int().positive().nullable().optional(),
+  discountAvailableTill: z.coerce.date().nullable().optional(),
   currency: z.string().min(3).default("INR"),
   billingInterval: z.enum(["monthly", "yearly"]).default("monthly"),
   razorpayPlanId: z.string().min(1),
@@ -60,6 +62,8 @@ export const updatePlanBodySchema = z.object({
   name: z.string().min(2).optional(),
   description: z.string().nullable().optional(),
   amountInPaise: z.number().int().positive().optional(),
+  discountedAmountInPaise: z.number().int().positive().nullable().optional(),
+  discountAvailableTill: z.coerce.date().nullable().optional(),
   currency: z.string().min(3).optional(),
   billingInterval: z.enum(["monthly", "yearly"]).optional(),
   razorpayPlanId: z.string().min(1).optional(),
@@ -77,7 +81,15 @@ export const getPlanQuerySchema = z.object({
   code: z.string().optional(),
 });
 
+export const listPlansQuerySchema = z.object({
+  includeInactive: z.coerce.boolean().optional(),
+});
+
 export const deactivatePlanBodySchema = z.object({
+  id: z.string().min(1),
+});
+
+export const deletePlanBodySchema = z.object({
   id: z.string().min(1),
 });
 
@@ -319,7 +331,9 @@ export async function getPlanById(planId: string | null | undefined) {
   const [plan] = await db
     .select()
     .from(schema.subscriptionPlans)
-    .where(eq(schema.subscriptionPlans.id, planId))
+    .where(
+      and(eq(schema.subscriptionPlans.id, planId), eq(schema.subscriptionPlans.isDeleted, false))
+    )
     .limit(1);
 
   return plan ?? null;
@@ -330,7 +344,12 @@ export async function getPlanByCode(code: string) {
   const [plan] = await db
     .select()
     .from(schema.subscriptionPlans)
-    .where(eq(schema.subscriptionPlans.code, normalizePlanCode(code)))
+    .where(
+      and(
+        eq(schema.subscriptionPlans.code, normalizePlanCode(code)),
+        eq(schema.subscriptionPlans.isDeleted, false)
+      )
+    )
     .limit(1);
 
   return plan ?? null;
@@ -341,7 +360,12 @@ export async function getPlanByRazorpayPlanId(razorpayPlanId: string) {
   const [plan] = await db
     .select()
     .from(schema.subscriptionPlans)
-    .where(eq(schema.subscriptionPlans.razorpayPlanId, razorpayPlanId))
+    .where(
+      and(
+        eq(schema.subscriptionPlans.razorpayPlanId, razorpayPlanId),
+        eq(schema.subscriptionPlans.isDeleted, false)
+      )
+    )
     .limit(1);
 
   return plan ?? null;

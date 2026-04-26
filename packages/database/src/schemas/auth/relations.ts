@@ -33,6 +33,7 @@ const auditRelations = {
   property: createAuditRelationNames("property"),
   propertyZone: createAuditRelationNames("propertyZone"),
   region: createAuditRelationNames("region"),
+  subscriptionPlan: createAuditRelationNames("subscriptionPlan"),
   testimonial: createAuditRelationNames("testimonial"),
   user: createAuditRelationNames("user"),
   zone: createAuditRelationNames("zone"),
@@ -175,6 +176,15 @@ export const userRelations = relations(user, ({ many, one }) => {
     deletedMembers: many(member, {
       relationName: auditRelations.member.deleted,
     }),
+    createdSubscriptionPlans: many(subscriptionPlans, {
+      relationName: auditRelations.subscriptionPlan.created,
+    }),
+    updatedSubscriptionPlans: many(subscriptionPlans, {
+      relationName: auditRelations.subscriptionPlan.updated,
+    }),
+    deletedSubscriptionPlans: many(subscriptionPlans, {
+      relationName: auditRelations.subscriptionPlan.deleted,
+    }),
   };
 });
 
@@ -272,9 +282,36 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   }),
 }));
 
-export const subscriptionPlansRelations = relations(subscriptionPlans, ({ many }) => ({
-  organizationSubscriptions: many(organizationSubscription),
-}));
+export const subscriptionPlansRelations = relations(subscriptionPlans, ({ many, one }) => {
+  const auditUser = (
+    field:
+      | typeof subscriptionPlans.createdByUser
+      | typeof subscriptionPlans.updatedByUser
+      | typeof subscriptionPlans.deletedByUser,
+    relationName: (typeof auditRelations.subscriptionPlan)[keyof typeof auditRelations.subscriptionPlan]
+  ) =>
+    one(user, {
+      fields: [field],
+      references: [user.id],
+      relationName,
+    });
+
+  return {
+    organizationSubscriptions: many(organizationSubscription),
+    createdByUser: auditUser(
+      subscriptionPlans.createdByUser,
+      auditRelations.subscriptionPlan.created
+    ),
+    updatedByUser: auditUser(
+      subscriptionPlans.updatedByUser,
+      auditRelations.subscriptionPlan.updated
+    ),
+    deletedByUser: auditUser(
+      subscriptionPlans.deletedByUser,
+      auditRelations.subscriptionPlan.deleted
+    ),
+  };
+});
 
 export const organizationSubscriptionRelations = relations(organizationSubscription, ({ one }) => ({
   organization: one(organization, {

@@ -230,10 +230,12 @@ export const subscriptionPlans = pgTable(
   "subscription_plans",
   {
     id: text("id").primaryKey(),
-    code: text("code").notNull().unique(),
+    code: text("code").notNull(),
     name: text("name").notNull(),
     description: text("description"),
     amountInPaise: integer("amount_in_paise").notNull(),
+    discountedAmountInPaise: integer("discounted_amount_in_paise"),
+    discountAvailableTill: timestamp("discount_available_till"),
     currency: text("currency").default("INR").notNull(),
     billingInterval: text("billing_interval").default("monthly").notNull(),
     razorpayPlanId: text("razorpay_plan_id").notNull(),
@@ -252,6 +254,17 @@ export const subscriptionPlans = pgTable(
       .default(sql`'{}'::jsonb`)
       .notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    createdByUser: text("created_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
+    updatedByUser: text("updated_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
+    deletedByUser: text("deleted_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
+    isDeleted: boolean("is_deleted").default(false).notNull(),
+    deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -259,9 +272,14 @@ export const subscriptionPlans = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("subscription_plans_code_uidx").on(table.code),
-    uniqueIndex("subscription_plans_razorpayPlanId_uidx").on(table.razorpayPlanId),
-    index("subscription_plans_isActive_idx").on(table.isActive),
+    uniqueIndex("subscription_plans_code_uidx")
+      .on(table.code)
+      .where(sql`${table.isDeleted} = false`),
+    uniqueIndex("subscription_plans_razorpayPlanId_uidx")
+      .on(table.razorpayPlanId)
+      .where(sql`${table.isDeleted} = false`),
+    index("subscription_plans_isDeleted_isActive_idx").on(table.isDeleted, table.isActive),
+    index("subscription_plans_discountAvailableTill_idx").on(table.discountAvailableTill),
   ]
 );
 

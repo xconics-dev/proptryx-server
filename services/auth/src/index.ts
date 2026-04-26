@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import { env } from "@/config/env";
 import { initializeAuthSecondaryStorage } from "@/lib/auth/utils";
 import { logger } from "@/lib/logger";
+import { startSubscriptionPlanDiscountExpiryCron } from "@/lib/razorpay/subscriptions/discount-expiry";
 
 const app = new Hono();
 const authSubscriptionWebhookPath = "/api/auth/organization/subscription/webhook";
@@ -33,6 +34,7 @@ app.get("/docs", (c) => c.redirect("/api/auth/docs", 302));
 app.get("/", (c) => c.redirect("/docs", 302));
 
 await initDB({ logger, serviceName: "auth" });
+startSubscriptionPlanDiscountExpiryCron();
 const authModulePromise = import("@/lib/auth");
 
 // Start expensive auth runtime initialization in background to reduce cold-start latency.

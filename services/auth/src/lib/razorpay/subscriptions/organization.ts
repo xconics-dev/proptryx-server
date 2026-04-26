@@ -34,6 +34,18 @@ import {
 import { logger } from "@/lib/logger";
 import { resolveAuthDatabase } from "../../auth/utils";
 
+function getEffectivePlanAmountInPaise(plan: any) {
+  if (
+    plan?.discountedAmountInPaise &&
+    plan.discountedAmountInPaise > 0 &&
+    (!plan.discountAvailableTill || plan.discountAvailableTill >= new Date())
+  ) {
+    return plan.discountedAmountInPaise;
+  }
+
+  return plan?.amountInPaise ?? 0;
+}
+
 const createSubscriptionEndpoint = createAuthEndpoint(
   "/organization/subscription/create",
   {
@@ -90,6 +102,7 @@ const createSubscriptionEndpoint = createAuthEndpoint(
     const addonPropertyOneTimeCostInPaise =
       ctx.body.addonPropertyOneTimeCostInPaise ?? plan.addonPropertyOneTimeCostInPaise ?? 0;
     const addonOneTimeTotalInPaise = additionalProperties * addonPropertyOneTimeCostInPaise;
+    const baseAmountInPaise = getEffectivePlanAmountInPaise(plan);
 
     if (additionalProperties > 0 && addonPropertyOneTimeCostInPaise <= 0) {
       throw new APIError("BAD_REQUEST", {
@@ -113,7 +126,10 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       planCode: plan.code,
       requestedRazorpayCustomerId: requestedCustomerId,
       createdByUserId: session.user.id,
-      baseAmountInPaise: String(plan.amountInPaise),
+      baseAmountInPaise: String(baseAmountInPaise),
+      listAmountInPaise: String(plan.amountInPaise),
+      discountedAmountInPaise: String(plan.discountedAmountInPaise ?? ""),
+      discountAvailableTill: plan.discountAvailableTill?.toISOString?.() ?? "",
       additionalProperties: String(additionalProperties),
       addonPropertyOneTimeCostInPaise: String(addonPropertyOneTimeCostInPaise),
       addonOneTimeTotalInPaise: String(addonOneTimeTotalInPaise),
@@ -224,7 +240,7 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       razorpaySubscription,
       plan: { id: plan.id, code: plan.code },
       existing: currentSubscription,
-      baseAmountInPaise: plan.amountInPaise,
+      baseAmountInPaise,
       billingPeriod: plan.billingInterval,
       trialDaysApplied,
       additionalProperties,

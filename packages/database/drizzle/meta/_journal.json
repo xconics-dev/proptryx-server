@@ -50,6 +50,13 @@
       "when": 1776877370286,
       "tag": "0006_flaky_lady_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777241446274,
+      "tag": "0007_wooden_moon_knight",
+      "breakpoints": true
     }
   ]
 }
