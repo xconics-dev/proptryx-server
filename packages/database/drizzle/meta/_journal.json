@@ -5,57 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1776153862000,
-      "tag": "0000_hard_franklin_storm",
+      "when": 1777242302140,
+      "tag": "0000_puzzling_fantastic_four",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1776714190059,
-      "tag": "0001_milky_pestilence",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1776873756290,
-      "tag": "0002_cool_wallflower",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776889800000,
-      "tag": "0003_faq_property_link",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1776876543699,
-      "tag": "0004_sad_bruce_banner",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1776892200000,
-      "tag": "0005_testimonial_property_link",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1776877370286,
-      "tag": "0006_flaky_lady_mastermind",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1777241446274,
-      "tag": "0007_wooden_moon_knight",
+      "when": 1777242575729,
+      "tag": "0008_nosy_leech",
       "breakpoints": true
     }
   ]

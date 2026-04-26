@@ -1,5 +1,5 @@
 {
-  "id": "3567166d-d20a-4d67-96a3-ad8548eb9a25",
+  "id": "31ae565b-a455-4c2a-baec-dd8b6662ab26",
   "prevId": "413b9c5d-13b7-46c0-b0c4-303cf4aeb229",
   "version": "7",
   "dialect": "postgresql",
@@ -1296,6 +1296,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "discounted_amount_in_paise": {
+          "name": "discounted_amount_in_paise",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discount_available_till": {
+          "name": "discount_available_till",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "currency": {
           "name": "currency",
           "type": "text",
@@ -1364,6 +1376,37 @@
           "notNull": true,
           "default": true
         },
+        "created_by_user": {
+          "name": "created_by_user",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by_user": {
+          "name": "updated_by_user",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by_user": {
+          "name": "deleted_by_user",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1391,6 +1434,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"subscription_plans\".\"is_deleted\" = false",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1406,13 +1450,20 @@
             }
           ],
           "isUnique": true,
+          "where": "\"subscription_plans\".\"is_deleted\" = false",
           "concurrently": false,
           "method": "btree",
           "with": {}
         },
-        "subscription_plans_isActive_idx": {
-          "name": "subscription_plans_isActive_idx",
+        "subscription_plans_isDeleted_isActive_idx": {
+          "name": "subscription_plans_isDeleted_isActive_idx",
           "columns": [
+            {
+              "expression": "is_deleted",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "is_active",
               "isExpression": false,
@@ -1424,17 +1475,54 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "subscription_plans_discountAvailableTill_idx": {
+          "name": "subscription_plans_discountAvailableTill_idx",
+          "columns": [
+            {
+              "expression": "discount_available_till",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "subscription_plans_created_by_user_user_id_fk": {
+          "name": "subscription_plans_created_by_user_user_id_fk",
+          "tableFrom": "subscription_plans",
+          "tableTo": "user",
+          "columnsFrom": ["created_by_user"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "subscription_plans_updated_by_user_user_id_fk": {
+          "name": "subscription_plans_updated_by_user_user_id_fk",
+          "tableFrom": "subscription_plans",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by_user"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "subscription_plans_deleted_by_user_user_id_fk": {
+          "name": "subscription_plans_deleted_by_user_user_id_fk",
+          "tableFrom": "subscription_plans",
+          "tableTo": "user",
+          "columnsFrom": ["deleted_by_user"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "subscription_plans_code_unique": {
-          "name": "subscription_plans_code_unique",
-          "nullsNotDistinct": false,
-          "columns": ["code"]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2724,10 +2812,9 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "name": {
           "name": "name",
@@ -3151,7 +3238,7 @@
         },
         "property_id": {
           "name": "property_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -3403,7 +3490,7 @@
         },
         "property_id": {
           "name": "property_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -3492,7 +3579,7 @@
         },
         "property_id": {
           "name": "property_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -3617,7 +3704,7 @@
         },
         "property_id": {
           "name": "property_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -3738,7 +3825,7 @@
         },
         "property_id": {
           "name": "property_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -3852,7 +3939,7 @@
         },
         "property_id": {
           "name": "property_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -3935,7 +4022,7 @@
         },
         "property_id": {
           "name": "property_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -4217,7 +4304,7 @@
         },
         "property_id": {
           "name": "property_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -4516,6 +4603,12 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "question": {
           "name": "question",
           "type": "text",
@@ -4582,6 +4675,21 @@
         }
       },
       "indexes": {
+        "faq_property_id_idx": {
+          "name": "faq_property_id_idx",
+          "columns": [
+            {
+              "expression": "property_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "faq_question_idx": {
           "name": "faq_question_idx",
           "columns": [
@@ -4626,6 +4734,15 @@
         }
       },
       "foreignKeys": {
+        "faq_property_id_property_id_fk": {
+          "name": "faq_property_id_property_id_fk",
+          "tableFrom": "faq",
+          "tableTo": "property",
+          "columnsFrom": ["property_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "faq_deleted_by_user_user_id_fk": {
           "name": "faq_deleted_by_user_user_id_fk",
           "tableFrom": "faq",
@@ -4669,6 +4786,12 @@
           "type": "text",
           "primaryKey": true,
           "notNull": true
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "image": {
           "name": "image",
@@ -4754,6 +4877,21 @@
         }
       },
       "indexes": {
+        "testimonial_property_id_idx": {
+          "name": "testimonial_property_id_idx",
+          "columns": [
+            {
+              "expression": "property_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "testimonial_author_name_idx": {
           "name": "testimonial_author_name_idx",
           "columns": [

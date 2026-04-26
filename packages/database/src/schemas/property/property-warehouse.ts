@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { index, pgTable, real, unique, uuid } from "drizzle-orm/pg-core";
+import { index, pgTable, real, text, unique, uuid } from "drizzle-orm/pg-core";
 import { WarehouseConstructionType } from "./enums";
 import { property } from "./property";
 
@@ -7,7 +7,7 @@ export const propertyWarehouse = pgTable(
   "property_warehouse",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    propertyId: uuid("property_id")
+    propertyId: text("property_id")
       .notNull()
       .references(() => property.id, { onDelete: "cascade" }),
 

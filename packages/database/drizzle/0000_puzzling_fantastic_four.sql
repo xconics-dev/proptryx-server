@@ -1,6 +1,6 @@
 CREATE TYPE "public"."access_panel" AS ENUM('proptryx', 'company');--> statement-breakpoint
 CREATE TYPE "public"."business_type" AS ENUM('B2B', 'B2C', 'BOTH', 'GENERAL');--> statement-breakpoint
-CREATE TYPE "public"."organization_type" AS ENUM('DEVELOPER', 'OCCUPIER', 'MANAGEMENT', 'APPLICATION');--> statement-breakpoint
+CREATE TYPE "public"."organization_type" AS ENUM('DEVELOPER', 'OCCUPIER', 'MANAGEMENT', 'APPLICATION', 'BROKER');--> statement-breakpoint
 CREATE TYPE "public"."permission_access_level" AS ENUM('company', 'user', 'all');--> statement-breakpoint
 CREATE TYPE "public"."area_type" AS ENUM('SINGLE', 'SPLIT');--> statement-breakpoint
 CREATE TYPE "public"."business_district_type" AS ENUM('CBD', 'SBD', 'TBD');--> statement-breakpoint
@@ -144,6 +144,8 @@ CREATE TABLE "subscription_plans" (
 	"name" text NOT NULL,
 	"description" text,
 	"amount_in_paise" integer NOT NULL,
+	"discounted_amount_in_paise" integer,
+	"discount_available_till" timestamp,
 	"currency" text DEFAULT 'INR' NOT NULL,
 	"billing_interval" text DEFAULT 'monthly' NOT NULL,
 	"razorpay_plan_id" text NOT NULL,
@@ -154,9 +156,13 @@ CREATE TABLE "subscription_plans" (
 	"features" jsonb DEFAULT '{"maxProperties":0,"maxUsers":0}'::jsonb NOT NULL,
 	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
+	"created_by_user" text,
+	"updated_by_user" text,
+	"deleted_by_user" text,
+	"is_deleted" boolean DEFAULT false NOT NULL,
+	"deleted_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "subscription_plans_code_unique" UNIQUE("code")
+	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "user" (
@@ -222,6 +228,22 @@ CREATE TABLE "company_request" (
 	"deleted_by_user" text
 );
 --> statement-breakpoint
+CREATE TABLE "broker_request" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"email" text NOT NULL,
+	"phone_number" text NOT NULL,
+	"pincode" text NOT NULL,
+	"address" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"created_by_user" text,
+	"updated_by_user" text,
+	"is_deleted" boolean DEFAULT false NOT NULL,
+	"deleted_at" timestamp,
+	"deleted_by_user" text
+);
+--> statement-breakpoint
 CREATE TABLE "region" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -251,7 +273,7 @@ CREATE TABLE "zone" (
 );
 --> statement-breakpoint
 CREATE TABLE "property" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"description" text,
 	"country" text NOT NULL,
@@ -416,6 +438,7 @@ CREATE TABLE "meeting" (
 --> statement-breakpoint
 CREATE TABLE "faq" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"property_id" text,
 	"question" text NOT NULL,
 	"answer" text,
 	"is_archived" boolean DEFAULT false NOT NULL,
@@ -430,6 +453,7 @@ CREATE TABLE "faq" (
 --> statement-breakpoint
 CREATE TABLE "testimonial" (
 	"id" text PRIMARY KEY NOT NULL,
+	"property_id" text,
 	"image" text,
 	"author_name" text NOT NULL,
 	"is_archived" boolean DEFAULT false NOT NULL,
@@ -460,6 +484,9 @@ ALTER TABLE "organization_subscription" ADD CONSTRAINT "organization_subscriptio
 ALTER TABLE "organization_subscription" ADD CONSTRAINT "organization_subscription_subscription_plan_id_subscription_plans_id_fk" FOREIGN KEY ("subscription_plan_id") REFERENCES "public"."subscription_plans"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_active_organization_id_organization_id_fk" FOREIGN KEY ("active_organization_id") REFERENCES "public"."organization"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "subscription_plans" ADD CONSTRAINT "subscription_plans_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "subscription_plans" ADD CONSTRAINT "subscription_plans_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "subscription_plans" ADD CONSTRAINT "subscription_plans_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user" ADD CONSTRAINT "user_zone_id_zone_id_fk" FOREIGN KEY ("zone_id") REFERENCES "public"."zone"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user" ADD CONSTRAINT "user_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user" ADD CONSTRAINT "user_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -469,6 +496,9 @@ ALTER TABLE "rbac_role_permission" ADD CONSTRAINT "rbac_role_permission_role_id_
 ALTER TABLE "company_request" ADD CONSTRAINT "company_request_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "company_request" ADD CONSTRAINT "company_request_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "company_request" ADD CONSTRAINT "company_request_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "broker_request" ADD CONSTRAINT "broker_request_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "broker_request" ADD CONSTRAINT "broker_request_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "broker_request" ADD CONSTRAINT "broker_request_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "region" ADD CONSTRAINT "region_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "region" ADD CONSTRAINT "region_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "region" ADD CONSTRAINT "region_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -502,6 +532,7 @@ ALTER TABLE "meeting" ADD CONSTRAINT "meeting_requested_by_user_user_id_fk" FORE
 ALTER TABLE "meeting" ADD CONSTRAINT "meeting_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meeting" ADD CONSTRAINT "meeting_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meeting" ADD CONSTRAINT "meeting_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "faq" ADD CONSTRAINT "faq_property_id_property_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."property"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "faq" ADD CONSTRAINT "faq_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "faq" ADD CONSTRAINT "faq_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "faq" ADD CONSTRAINT "faq_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -534,9 +565,10 @@ CREATE UNIQUE INDEX "session_token_uidx" ON "session" USING btree ("token");--> 
 CREATE INDEX "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "session_activeOrganizationId_idx" ON "session" USING btree ("active_organization_id");--> statement-breakpoint
 CREATE INDEX "session_expiresAt_idx" ON "session" USING btree ("expires_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "subscription_plans_code_uidx" ON "subscription_plans" USING btree ("code");--> statement-breakpoint
-CREATE UNIQUE INDEX "subscription_plans_razorpayPlanId_uidx" ON "subscription_plans" USING btree ("razorpay_plan_id");--> statement-breakpoint
-CREATE INDEX "subscription_plans_isActive_idx" ON "subscription_plans" USING btree ("is_active");--> statement-breakpoint
+CREATE UNIQUE INDEX "subscription_plans_code_uidx" ON "subscription_plans" USING btree ("code") WHERE "subscription_plans"."is_deleted" = false;--> statement-breakpoint
+CREATE UNIQUE INDEX "subscription_plans_razorpayPlanId_uidx" ON "subscription_plans" USING btree ("razorpay_plan_id") WHERE "subscription_plans"."is_deleted" = false;--> statement-breakpoint
+CREATE INDEX "subscription_plans_isDeleted_isActive_idx" ON "subscription_plans" USING btree ("is_deleted","is_active");--> statement-breakpoint
+CREATE INDEX "subscription_plans_discountAvailableTill_idx" ON "subscription_plans" USING btree ("discount_available_till");--> statement-breakpoint
 CREATE INDEX "user_name_idx" ON "user" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "user_role_idx" ON "user" USING btree ("role");--> statement-breakpoint
 CREATE INDEX "user_panel_idx" ON "user" USING btree ("panel");--> statement-breakpoint
@@ -556,6 +588,12 @@ CREATE INDEX "company_request_owner_email_trgm_idx" ON "company_request" USING g
 CREATE INDEX "company_request_owner_phone_trgm_idx" ON "company_request" USING gin (lower("owner_phone") gin_trgm_ops) WHERE "company_request"."is_deleted" = false;--> statement-breakpoint
 CREATE INDEX "company_request_company_gst_trgm_idx" ON "company_request" USING gin (lower("company_gst_number") gin_trgm_ops) WHERE "company_request"."is_deleted" = false;--> statement-breakpoint
 CREATE INDEX "company_request_company_email_trgm_idx" ON "company_request" USING gin (lower("company_email") gin_trgm_ops) WHERE "company_request"."is_deleted" = false and "company_request"."company_email" is not null;--> statement-breakpoint
+CREATE INDEX "broker_request_email_idx" ON "broker_request" USING btree ("email");--> statement-breakpoint
+CREATE INDEX "broker_request_phone_idx" ON "broker_request" USING btree ("phone_number");--> statement-breakpoint
+CREATE INDEX "broker_request_isDeleted_createdAt_idx" ON "broker_request" USING btree ("is_deleted","created_at");--> statement-breakpoint
+CREATE INDEX "broker_request_name_trgm_idx" ON "broker_request" USING gin (lower("name") gin_trgm_ops) WHERE "broker_request"."is_deleted" = false;--> statement-breakpoint
+CREATE INDEX "broker_request_email_trgm_idx" ON "broker_request" USING gin (lower("email") gin_trgm_ops) WHERE "broker_request"."is_deleted" = false;--> statement-breakpoint
+CREATE INDEX "broker_request_phone_trgm_idx" ON "broker_request" USING gin (lower("phone_number") gin_trgm_ops) WHERE "broker_request"."is_deleted" = false;--> statement-breakpoint
 CREATE UNIQUE INDEX "region_name_uidx" ON "region" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "zone_regionId_idx" ON "zone" USING btree ("region_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "zone_regionId_name_uidx" ON "zone" USING btree ("region_id","name");--> statement-breakpoint
@@ -591,7 +629,9 @@ CREATE INDEX "meeting_status_idx" ON "meeting" USING btree ("status");--> statem
 CREATE INDEX "meeting_requestedAt_idx" ON "meeting" USING btree ("requested_at");--> statement-breakpoint
 CREATE INDEX "meeting_scheduledAt_idx" ON "meeting" USING btree ("scheduled_at");--> statement-breakpoint
 CREATE INDEX "meeting_isDeleted_type_status_requestedAt_idx" ON "meeting" USING btree ("is_deleted","type","status","requested_at");--> statement-breakpoint
+CREATE INDEX "faq_property_id_idx" ON "faq" USING btree ("property_id");--> statement-breakpoint
 CREATE INDEX "faq_question_idx" ON "faq" USING btree ("question");--> statement-breakpoint
 CREATE INDEX "faq_isDeleted_isArchived_createdAt_idx" ON "faq" USING btree ("is_deleted","is_archived","created_at");--> statement-breakpoint
+CREATE INDEX "testimonial_property_id_idx" ON "testimonial" USING btree ("property_id");--> statement-breakpoint
 CREATE INDEX "testimonial_author_name_idx" ON "testimonial" USING btree ("author_name");--> statement-breakpoint
 CREATE INDEX "testimonial_isDeleted_isArchived_createdAt_idx" ON "testimonial" USING btree ("is_deleted","is_archived","created_at");

@@ -7,7 +7,7 @@ export const propertyOffice = pgTable(
   "property_office",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    propertyId: uuid("property_id")
+    propertyId: text("property_id")
       .notNull()
       .references(() => property.id, { onDelete: "cascade" }),
 
