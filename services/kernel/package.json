@@ -24,11 +24,11 @@
     "@proptryx/utils": "workspace:*",
     "@proptryx/notification": "workspace:*",
     "@t3-oss/env-core": "^0.13.11",
-    "hono": "^4.12.14",
+    "hono": "^4.12.15",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.12",
+    "@biomejs/biome": "^2.4.13",
     "@proptryx/typescript-config": "workspace:*",
     "@types/node": "^25.6.0",
     "tsup": "^8.5.1",
