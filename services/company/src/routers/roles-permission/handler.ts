@@ -1,7 +1,7 @@
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
-import { db, rbacRole, rbacRolePermission } from "@proptryx/database";
+import { db, getRbacResourceMetadata, rbacRole, rbacRolePermission } from "@proptryx/database";
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -17,6 +17,7 @@ import {
   list,
   remove,
   remove_permission,
+  resources,
   update,
   update_permission,
 } from "./openapi.route";
@@ -66,6 +67,16 @@ registerOpenApiRoute(rolesPermissionGroup, list, async (c) => {
   const response = await fetchRoleList(query, scopedOrganization.organizationId);
 
   return c.json(createSuccessResponse(response), 200);
+});
+
+registerOpenApiRoute(rolesPermissionGroup, resources, async (c) => {
+  const scopedOrganization = resolveCurrentOrganizationContext(c);
+
+  if (scopedOrganization.errorResponse) {
+    return scopedOrganization.errorResponse;
+  }
+
+  return c.json(createSuccessResponse(getRbacResourceMetadata("company")), 200);
 });
 
 registerOpenApiRoute(rolesPermissionGroup, get, async (c) => {

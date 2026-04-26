@@ -16,6 +16,7 @@ import {
   rolePermissionCreateSchema,
   rolePermissionSchema,
   rolePermissionUpdateSchema,
+  resourceMetadataListSchema,
   roleUpdateSchema,
   roleWithPermissionsSchema,
 } from "./schema";
@@ -64,6 +65,21 @@ export const list = createOpenApiRoute({
   request: { query: roleListQuerySchema },
   responses: {
     200: createApiSuccessResponse(roleListResponseSchema, "Roles fetched successfully"),
+  },
+});
+
+export const resources = createOpenApiRoute({
+  method: "get",
+  path: "/resources",
+  operationId: "companyRolePermissionResourceList",
+  tags,
+  middleware: [rateLimit, roleRbac.custom("getAll")],
+  summary: "List company RBAC resources with table columns and actions",
+  responses: {
+    200: createApiSuccessResponse(
+      resourceMetadataListSchema,
+      "RBAC resources fetched successfully"
+    ),
   },
 });
 

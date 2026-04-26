@@ -17,6 +17,7 @@ import EmailHeader from "../../components/email-header";
 import { CredentialsBox } from "../../components/credentials-box";
 import { EmailButton } from "../../components/email-button";
 import Footer from "../../components/footer";
+import { createCredentialAuthLink } from "./utils";
 
 const defaultData = {
   previewText: "You're invited to join Proptryx!",
@@ -38,7 +39,7 @@ export const ProptryxAccountCredEmail = ({
   credPassword = "",
   role,
 }: ProptryxAccountCredEmailProps) => {
-  const getStartedLink = `${metadata.consoleUrl}/auth?cred_email=${encodeURIComponent(credEmail)}&cred_password=${encodeURIComponent(credPassword)}&redirect=member-invitation`;
+  const getStartedLink = createCredentialAuthLink({ credEmail, credPassword });
 
   return (
     <Tailwind config={collageTailwindConfig}>

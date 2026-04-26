@@ -8,6 +8,27 @@ import z from "zod";
 
 export const rolePermissionActionsSchema = z.record(z.string(), z.boolean());
 
+export const resourceColumnMetadataSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  dataType: z.string(),
+  columnType: z.string(),
+  notNull: z.boolean(),
+  hasDefault: z.boolean(),
+  enumValues: z.array(z.string()),
+});
+
+export const resourceMetadataSchema = z.object({
+  resource: z.string(),
+  tableName: z.string(),
+  label: z.string(),
+  scopes: z.array(z.enum(["proptryx", "company"])),
+  actions: z.array(z.string()),
+  columns: z.array(resourceColumnMetadataSchema),
+});
+
+export const resourceMetadataListSchema = z.array(resourceMetadataSchema);
+
 export const rolePermissionSchema = createDbSelectSchema(rbacRolePermission).extend({
   actions: rolePermissionActionsSchema,
 });
