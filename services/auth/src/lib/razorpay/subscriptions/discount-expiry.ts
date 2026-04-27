@@ -3,8 +3,8 @@ import { and, eq, lte } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { resolveAuthDatabase } from "../../auth/utils";
 
-const DISCOUNT_EXPIRY_CRON_INTERVAL_MS = 60 * 60 * 1000;
-const DISCOUNT_EXPIRY_CRON_INITIAL_DELAY_MS = 5_000;
+const DISCOUNT_EXPIRY_CRON_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const DISCOUNT_EXPIRY_CRON_INITIAL_DELAY_MS = 5_000; // 5 seconds
 
 let discountExpiryCronStarted = false;
 let discountExpiryCronPromise: Promise<void> | null = null;

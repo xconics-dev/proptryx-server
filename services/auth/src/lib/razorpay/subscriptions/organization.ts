@@ -5,7 +5,7 @@ import { getOrganizationSubscriptionLimits } from "@proptryx/database";
 import { emailSubject, renderCompleteSubscriptionEmail, sendEmail } from "@proptryx/notification";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   cancelSubscriptionBodySchema,
   createAuthorizedOrganizationMiddleware,
@@ -23,6 +23,7 @@ import {
   isActiveSubscriptionStatus,
   normalizeStringRecord,
   pauseSubscriptionBodySchema,
+  paymentStatusQuerySchema,
   resolveSubscriptionNotifyContacts,
   resumeSubscriptionBodySchema,
   rzClient,
@@ -553,6 +554,230 @@ const resumeSubscriptionEndpoint = createAuthEndpoint(
   }
 );
 
+const paymentStatusEndpoint = createAuthEndpoint(
+  "/organization/subscription/payment-status",
+  {
+    method: "GET",
+    query: paymentStatusQuerySchema,
+    use: [createAuthorizedOrganizationMiddleware((ctx) => ctx.query?.organizationId)],
+    metadata: {
+      openapi: {
+        operationId: "getOrganizationSubscriptionPaymentStatus",
+        summary: "Poll subscription payment status",
+        description:
+          "Lightweight single-JOIN polling endpoint. Returns payment confirmation state and minimal plan details without any Razorpay API calls. Call on an interval (e.g. every 3 s) after subscription creation to detect when isPaid flips to true.",
+        tags: ["Organization-subscription"],
+        parameters: [
+          {
+            name: "organizationId",
+            in: "query" as const,
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Target organization ID. Falls back to the session activeOrganizationId when omitted.",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Payment status resolved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: [
+                    "status",
+                    "isPaid",
+                    "isActive",
+                    "cancelAtCycleEnd",
+                    "paidCount",
+                    "razorpaySubscriptionId",
+                    "shortUrl",
+                    "plan",
+                  ],
+                  properties: {
+                    status: {
+                      type: "string",
+                      nullable: true,
+                      description:
+                        "Razorpay subscription status or null if no subscription exists.",
+                      enum: [
+                        "created",
+                        "authenticated",
+                        "active",
+                        "pending",
+                        "halted",
+                        "paused",
+                        "cancelled",
+                        "completed",
+                        "expired",
+                        null,
+                      ],
+                    },
+                    isPaid: {
+                      type: "boolean",
+                      description:
+                        "True when paidCount > 0 — at least one billing cycle has been paid.",
+                    },
+                    isActive: {
+                      type: "boolean",
+                      description:
+                        "True when status is one of created | authenticated | active | pending | halted | paused.",
+                    },
+                    cancelAtCycleEnd: {
+                      type: "boolean",
+                      description:
+                        "Whether the subscription will cancel at the end of the current billing cycle.",
+                    },
+                    paidCount: {
+                      type: "integer",
+                      minimum: 0,
+                      description: "Number of billing cycles already paid.",
+                    },
+                    razorpaySubscriptionId: {
+                      type: "string",
+                      nullable: true,
+                      description: "Razorpay subscription ID if one has been created.",
+                    },
+                    shortUrl: {
+                      type: "string",
+                      nullable: true,
+                      description:
+                        "Hosted payment / authentication link from Razorpay. Present until the mandate is authorised.",
+                    },
+                    plan: {
+                      type: "object",
+                      nullable: true,
+                      description: "Minimal plan details. null when no plan is linked.",
+                      required: [
+                        "id",
+                        "code",
+                        "name",
+                        "amountInPaise",
+                        "discountedAmountInPaise",
+                        "discountAvailableTill",
+                        "currency",
+                        "billingInterval",
+                        "trialDays",
+                      ],
+                      properties: {
+                        id: { type: "string" },
+                        code: { type: "string" },
+                        name: { type: "string" },
+                        amountInPaise: {
+                          type: "integer",
+                          description: "Full list price in paise.",
+                        },
+                        discountedAmountInPaise: {
+                          type: "integer",
+                          nullable: true,
+                          description: "Discounted price in paise, if a discount is configured.",
+                        },
+                        discountAvailableTill: {
+                          type: "string",
+                          format: "date-time",
+                          nullable: true,
+                          description: "ISO 8601 UTC datetime until which the discount is valid.",
+                        },
+                        currency: {
+                          type: "string",
+                          example: "INR",
+                        },
+                        billingInterval: {
+                          type: "string",
+                          enum: ["monthly", "yearly"],
+                        },
+                        trialDays: {
+                          type: "integer",
+                          minimum: 0,
+                          description: "Number of trial days on this plan.",
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: "Unauthenticated — valid session required." },
+          403: {
+            description:
+              "Forbidden — the authenticated user is not a member of the requested organization.",
+          },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const organizationId = ctx.context.organizationId as string;
+    const db = resolveAuthDatabase();
+
+    const [row] = await db
+      .select({
+        status: schema.organizationSubscription.status,
+        paidCount: schema.organizationSubscription.paidCount,
+        cancelAtCycleEnd: schema.organizationSubscription.cancelAtCycleEnd,
+        razorpaySubscriptionId: schema.organizationSubscription.razorpaySubscriptionId,
+        shortUrl: schema.organizationSubscription.shortUrl,
+        planId: schema.subscriptionPlans.id,
+        planCode: schema.subscriptionPlans.code,
+        planName: schema.subscriptionPlans.name,
+        amountInPaise: schema.subscriptionPlans.amountInPaise,
+        discountedAmountInPaise: schema.subscriptionPlans.discountedAmountInPaise,
+        discountAvailableTill: schema.subscriptionPlans.discountAvailableTill,
+        currency: schema.subscriptionPlans.currency,
+        billingInterval: schema.subscriptionPlans.billingInterval,
+        trialDays: schema.subscriptionPlans.trialDays,
+      })
+      .from(schema.organizationSubscription)
+      .leftJoin(
+        schema.subscriptionPlans,
+        eq(schema.subscriptionPlans.id, schema.organizationSubscription.subscriptionPlanId)
+      )
+      .where(eq(schema.organizationSubscription.organizationId, organizationId))
+      .limit(1);
+
+    if (!row) {
+      return ctx.json({
+        status: null,
+        isPaid: false,
+        isActive: false,
+        cancelAtCycleEnd: false,
+        paidCount: 0,
+        razorpaySubscriptionId: null,
+        shortUrl: null,
+        plan: null,
+      });
+    }
+
+    const status = row.status;
+    const isPaid = row.paidCount > 0;
+    const isActive = isActiveSubscriptionStatus(status);
+
+    return ctx.json({
+      status,
+      isPaid,
+      isActive,
+      cancelAtCycleEnd: row.cancelAtCycleEnd,
+      paidCount: row.paidCount,
+      razorpaySubscriptionId: row.razorpaySubscriptionId,
+      shortUrl: row.shortUrl,
+      plan: row.planId
+        ? {
+            id: row.planId,
+            code: row.planCode,
+            name: row.planName,
+            amountInPaise: row.amountInPaise,
+            discountedAmountInPaise: row.discountedAmountInPaise ?? null,
+            discountAvailableTill: row.discountAvailableTill?.toISOString() ?? null,
+            currency: row.currency,
+            billingInterval: row.billingInterval,
+            trialDays: row.trialDays,
+          }
+        : null,
+    });
+  }
+);
+
 const webhookEndpoint = createAuthEndpoint(
   "/organization/subscription/webhook",
   {
@@ -679,6 +904,7 @@ export const organizationSubscriptionPlugin = {
     createOrganizationSubscription: createSubscriptionEndpoint,
     getCurrentOrganizationSubscription: currentSubscriptionEndpoint,
     getOrganizationSubscriptionLimits: limitsEndpoint,
+    getOrganizationSubscriptionPaymentStatus: paymentStatusEndpoint,
     syncOrganizationSubscription: syncSubscriptionEndpoint,
     cancelOrganizationSubscription: cancelSubscriptionEndpoint,
     pauseOrganizationSubscription: pauseSubscriptionEndpoint,

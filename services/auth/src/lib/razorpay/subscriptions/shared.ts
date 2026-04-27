@@ -132,6 +132,10 @@ export const getCurrentSubscriptionQuerySchema = z.object({
   organizationId: z.string().optional(),
 });
 
+export const paymentStatusQuerySchema = z.object({
+  organizationId: z.string().optional(),
+});
+
 export const getLimitsQuerySchema = z.object({
   organizationId: z.string().optional(),
 });
