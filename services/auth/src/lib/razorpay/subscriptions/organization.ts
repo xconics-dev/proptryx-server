@@ -5,7 +5,7 @@ import { getOrganizationSubscriptionLimits } from "@proptryx/database";
 import { emailSubject, renderCompleteSubscriptionEmail, sendEmail } from "@proptryx/notification";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, gte, lte, ilike, count, asc, desc } from "drizzle-orm";
 import {
   cancelSubscriptionBodySchema,
   createAuthorizedOrganizationMiddleware,
@@ -21,6 +21,7 @@ import {
   getPlanIncludedProperties,
   getRazorpayErrorMessage,
   isActiveSubscriptionStatus,
+  listSubscriptionsQuerySchema,
   normalizeStringRecord,
   pauseSubscriptionBodySchema,
   paymentStatusQuerySchema,
@@ -28,6 +29,7 @@ import {
   resumeSubscriptionBodySchema,
   rzClient,
   saveOrganizationSubscriptionRecord,
+  signedInSessionMiddleware,
   SUBSCRIPTION_NOTIFICATION_CONFIG,
   syncSubscriptionBodySchema,
   toNullableNumber,
@@ -252,6 +254,8 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       metadata: ctx.body.metadata ?? {},
       notes,
       razorpayCustomerId: requestedCustomerId,
+      createdByUserId: session.user.id,
+      updatedByUserId: session.user.id,
     });
 
     const notificationSentByApp = await fallbackEmailPromise;
@@ -380,6 +384,7 @@ const syncSubscriptionEndpoint = createAuthEndpoint(
       trialStart: subscription.trialStart,
       trialEnd: subscription.trialEnd,
       razorpayCustomerId: subscription.razorpayCustomerId,
+      updatedByUserId: (ctx.context.session as any)?.user?.id ?? null,
     });
 
     return ctx.json({ subscription: syncedSubscription });
@@ -436,6 +441,7 @@ const cancelSubscriptionEndpoint = createAuthEndpoint(
       trialStart: subscription.trialStart,
       trialEnd: subscription.trialEnd,
       razorpayCustomerId: subscription.razorpayCustomerId,
+      updatedByUserId: (ctx.context.session as any)?.user?.id ?? null,
     });
 
     return ctx.json({ subscription: cancelledSubscription });
@@ -492,6 +498,7 @@ const pauseSubscriptionEndpoint = createAuthEndpoint(
       trialStart: subscription.trialStart,
       trialEnd: subscription.trialEnd,
       razorpayCustomerId: subscription.razorpayCustomerId,
+      updatedByUserId: (ctx.context.session as any)?.user?.id ?? null,
     });
 
     return ctx.json({ subscription: pausedSubscription });
@@ -548,6 +555,7 @@ const resumeSubscriptionEndpoint = createAuthEndpoint(
       trialStart: subscription.trialStart,
       trialEnd: subscription.trialEnd,
       razorpayCustomerId: subscription.razorpayCustomerId,
+      updatedByUserId: (ctx.context.session as any)?.user?.id ?? null,
     });
 
     return ctx.json({ subscription: resumedSubscription });
@@ -898,6 +906,151 @@ const webhookEndpoint = createAuthEndpoint(
   }
 );
 
+const listSubscriptionsEndpoint = createAuthEndpoint(
+  "/organization/subscription/list",
+  {
+    method: "GET",
+    query: listSubscriptionsQuerySchema,
+    use: [signedInSessionMiddleware],
+    metadata: {
+      openapi: {
+        operationId: "listOrganizationSubscriptions",
+        summary: "List all organization subscriptions",
+        description:
+          "Paginated, filtered list of all organization subscriptions with joined plan and organization details. Requires authentication.",
+        tags: ["Organization-subscription"],
+        responses: {
+          200: { description: "Paginated subscription list" },
+          401: { description: "Unauthenticated" },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const db = resolveAuthDatabase();
+    const {
+      page,
+      limit,
+      search,
+      status,
+      organizationId,
+      planCode,
+      billingPeriod,
+      createdFrom,
+      createdTo,
+      sortBy,
+      sortOrder: sortDir,
+    } = ctx.query;
+
+    const offset = (page - 1) * limit;
+
+    const conditions = [
+      status ? eq(schema.organizationSubscription.status, status) : undefined,
+      organizationId
+        ? eq(schema.organizationSubscription.organizationId, organizationId)
+        : undefined,
+      planCode ? eq(schema.organizationSubscription.planCode, planCode) : undefined,
+      billingPeriod ? eq(schema.organizationSubscription.billingPeriod, billingPeriod) : undefined,
+      createdFrom ? gte(schema.organizationSubscription.createdAt, createdFrom) : undefined,
+      createdTo ? lte(schema.organizationSubscription.createdAt, createdTo) : undefined,
+      search
+        ? or(
+            ilike(schema.organization.name, `%${search}%`),
+            ilike(schema.organizationSubscription.planCode, `%${search}%`),
+            ilike(schema.organizationSubscription.razorpaySubscriptionId, `%${search}%`)
+          )
+        : undefined,
+    ].filter(Boolean) as ReturnType<typeof eq>[];
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const sortColumn =
+      {
+        createdAt: schema.organizationSubscription.createdAt,
+        updatedAt: schema.organizationSubscription.updatedAt,
+        status: schema.organizationSubscription.status,
+        paidCount: schema.organizationSubscription.paidCount,
+      }[sortBy] ?? schema.organizationSubscription.createdAt;
+
+    const orderFn = sortDir === "asc" ? asc : desc;
+
+    const [rows, [countRow]] = await Promise.all([
+      db
+        .select({
+          id: schema.organizationSubscription.id,
+          organizationId: schema.organizationSubscription.organizationId,
+          organizationName: schema.organization.name,
+          organizationSlug: schema.organization.slug,
+          organizationEmail: schema.organization.email,
+          subscriptionPlanId: schema.organizationSubscription.subscriptionPlanId,
+          planCode: schema.organizationSubscription.planCode,
+          planName: schema.subscriptionPlans.name,
+          planBillingInterval: schema.subscriptionPlans.billingInterval,
+          planAmountInPaise: schema.subscriptionPlans.amountInPaise,
+          planCurrency: schema.subscriptionPlans.currency,
+          razorpaySubscriptionId: schema.organizationSubscription.razorpaySubscriptionId,
+          razorpayCustomerId: schema.organizationSubscription.razorpayCustomerId,
+          status: schema.organizationSubscription.status,
+          quantity: schema.organizationSubscription.quantity,
+          totalCount: schema.organizationSubscription.totalCount,
+          paidCount: schema.organizationSubscription.paidCount,
+          remainingCount: schema.organizationSubscription.remainingCount,
+          baseAmountInPaise: schema.organizationSubscription.baseAmountInPaise,
+          billingPeriod: schema.organizationSubscription.billingPeriod,
+          trialDaysApplied: schema.organizationSubscription.trialDaysApplied,
+          additionalProperties: schema.organizationSubscription.additionalProperties,
+          addonOneTimeTotalInPaise: schema.organizationSubscription.addonOneTimeTotalInPaise,
+          currentStart: schema.organizationSubscription.currentStart,
+          currentEnd: schema.organizationSubscription.currentEnd,
+          trialStart: schema.organizationSubscription.trialStart,
+          trialEnd: schema.organizationSubscription.trialEnd,
+          endedAt: schema.organizationSubscription.endedAt,
+          cancelledAt: schema.organizationSubscription.cancelledAt,
+          pausedAt: schema.organizationSubscription.pausedAt,
+          shortUrl: schema.organizationSubscription.shortUrl,
+          cancelAtCycleEnd: schema.organizationSubscription.cancelAtCycleEnd,
+          createdByUser: schema.organizationSubscription.createdByUser,
+          updatedByUser: schema.organizationSubscription.updatedByUser,
+          createdAt: schema.organizationSubscription.createdAt,
+          updatedAt: schema.organizationSubscription.updatedAt,
+        })
+        .from(schema.organizationSubscription)
+        .leftJoin(
+          schema.organization,
+          eq(schema.organization.id, schema.organizationSubscription.organizationId)
+        )
+        .leftJoin(
+          schema.subscriptionPlans,
+          eq(schema.subscriptionPlans.id, schema.organizationSubscription.subscriptionPlanId)
+        )
+        .where(where)
+        .orderBy(orderFn(sortColumn))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: count() })
+        .from(schema.organizationSubscription)
+        .leftJoin(
+          schema.organization,
+          eq(schema.organization.id, schema.organizationSubscription.organizationId)
+        )
+        .where(where),
+    ]);
+
+    const totalItems = Number(countRow?.count ?? 0);
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+
+    return ctx.json({
+      items: rows,
+      page,
+      limit,
+      offset,
+      totalItems,
+      totalPages,
+    });
+  }
+);
+
 export const organizationSubscriptionPlugin = {
   id: "organization-subscription",
   endpoints: {
@@ -905,6 +1058,7 @@ export const organizationSubscriptionPlugin = {
     getCurrentOrganizationSubscription: currentSubscriptionEndpoint,
     getOrganizationSubscriptionLimits: limitsEndpoint,
     getOrganizationSubscriptionPaymentStatus: paymentStatusEndpoint,
+    listOrganizationSubscriptions: listSubscriptionsEndpoint,
     syncOrganizationSubscription: syncSubscriptionEndpoint,
     cancelOrganizationSubscription: cancelSubscriptionEndpoint,
     pauseOrganizationSubscription: pauseSubscriptionEndpoint,

@@ -95,8 +95,16 @@ const companyOwnerSummarySchema = z.object({
   phoneNumber: z.string().nullable(),
 });
 
+const companyActiveSubscriptionSchema = z.object({
+  planName: z.string(),
+  status: z.string(),
+});
+
 export const companyListItemSchema = createDbSelectSchema(organization).extend({
   owner: companyOwnerSummarySchema.nullable(),
+  memberCount: z.number(),
+  propertyCount: z.number(),
+  activeSubscription: companyActiveSubscriptionSchema.nullable(),
 });
 
 export const companyListSortFields = [
@@ -116,6 +124,7 @@ export const companyListQuerySchema = createListQuerySchema({
     type: z.enum(OrganizationType.enumValues).optional(),
     companyType: z.string().optional(),
     industry: z.string().optional(),
+    subscriptionPlanId: z.string().optional(),
   },
 });
 export type CompanyListQuery = z.infer<typeof companyListQuerySchema>;

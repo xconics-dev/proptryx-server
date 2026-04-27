@@ -201,6 +201,16 @@ export const member = pgTable(
     index("member_userId_idx").on(table.userId),
     index("member_panel_idx").on(table.panel),
     index("member_organizationId_role_idx").on(table.organizationId, table.role),
+    index("member_organizationId_isDeleted_userId_idx").on(
+      table.organizationId,
+      table.isDeleted,
+      table.userId
+    ),
+    index("member_organizationId_isDeleted_role_idx").on(
+      table.organizationId,
+      table.isDeleted,
+      table.role
+    ),
   ]
 );
 
@@ -324,6 +334,12 @@ export const organizationSubscription = pgTable(
       .$type<Record<string, unknown>>()
       .default(sql`'{}'::jsonb`)
       .notNull(),
+    createdByUser: text("created_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
+    updatedByUser: text("updated_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -338,5 +354,12 @@ export const organizationSubscription = pgTable(
     index("organization_subscription_status_idx").on(table.status),
     index("organization_subscription_planCode_idx").on(table.planCode),
     index("organization_subscription_subscriptionPlanId_idx").on(table.subscriptionPlanId),
+    index("organization_subscription_subscriptionPlanId_status_idx").on(
+      table.subscriptionPlanId,
+      table.status
+    ),
+    index("organization_subscription_billingPeriod_idx").on(table.billingPeriod),
+    index("organization_subscription_createdAt_idx").on(table.createdAt),
+    index("organization_subscription_createdByUser_idx").on(table.createdByUser),
   ]
 );

@@ -109,11 +109,14 @@ export const property = pgTable(
   (table) => [
     index("property_name_idx").on(table.name),
     index("property_superOwnerId_idx").on(table.superOwnerId),
+    index("property_createdByUser_idx").on(table.createdByUser),
     index("property_type_idx").on(table.type),
     index("property_status_idx").on(table.status),
     index("property_city_idx").on(table.city),
     index("property_pincode_idx").on(table.pincode),
     index("property_certificateStatus_idx").on(table.certificateStatus),
+    index("property_isDeleted_superOwnerId_idx").on(table.isDeleted, table.superOwnerId),
+    index("property_isDeleted_createdByUser_idx").on(table.isDeleted, table.createdByUser),
     index("property_isDeleted_isPublished_createdAt_idx").on(
       table.isDeleted,
       table.isPublished,

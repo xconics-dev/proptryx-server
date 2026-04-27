@@ -15,6 +15,20 @@
       "when": 1777242575729,
       "tag": "0008_nosy_leech",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777295369246,
+      "tag": "0002_org_subscription_audit_cols",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777296252626,
+      "tag": "0003_groovy_stark_industries",
+      "breakpoints": true
     }
   ]
 }

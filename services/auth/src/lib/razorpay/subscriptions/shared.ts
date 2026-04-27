@@ -472,6 +472,20 @@ export async function getOrganizationSubscriptionRecordByRazorpaySubscriptionId(
   return subscription ?? null;
 }
 
+export const listSubscriptionsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().optional(),
+  status: z.string().optional(),
+  organizationId: z.string().optional(),
+  planCode: z.string().optional(),
+  billingPeriod: z.enum(["monthly", "yearly"]).optional(),
+  createdFrom: z.coerce.date().optional(),
+  createdTo: z.coerce.date().optional(),
+  sortBy: z.enum(["createdAt", "updatedAt", "status", "paidCount"]).default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+});
+
 type SaveOrganizationSubscriptionRecordParams = {
   organizationId: string;
   razorpaySubscription: any;
@@ -492,6 +506,8 @@ type SaveOrganizationSubscriptionRecordParams = {
   metadata?: Record<string, unknown>;
   notes?: Record<string, string>;
   razorpayCustomerId?: string | null;
+  createdByUserId?: string | null;
+  updatedByUserId?: string | null;
 };
 
 function buildOrganizationSubscriptionRecordValues(
@@ -550,6 +566,10 @@ function buildOrganizationSubscriptionRecordValues(
     cancelAtCycleEnd: Boolean(params.razorpaySubscription.has_scheduled_changes),
     metadata: params.metadata ?? existing?.metadata ?? {},
     notes: params.notes ?? existing?.notes ?? {},
+    updatedByUser:
+      params.updatedByUserId !== undefined
+        ? params.updatedByUserId
+        : (existing?.updatedByUser ?? null),
     updatedAt: new Date(),
   };
 }
@@ -567,6 +587,7 @@ export async function createOrganizationSubscriptionRecord(
       id: generateRandomId(),
       organizationId: params.organizationId,
       ...values,
+      createdByUser: params.createdByUserId ?? null,
       createdAt: now,
       updatedAt: now,
     })

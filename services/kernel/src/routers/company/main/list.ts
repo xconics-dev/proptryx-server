@@ -1,36 +1,72 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Drizzle query builders are intentionally passed through reusable helpers. */
-import { getDB, member, organization, user } from "@proptryx/database";
+import {
+  db,
+  getDB,
+  member,
+  organization,
+  organizationSubscription,
+  property,
+  subscriptionPlans,
+  user,
+} from "@proptryx/database";
 import { createTableListFetcher } from "@proptryx/utils";
-import { and, eq } from "drizzle-orm";
+import { and, count, countDistinct, eq, inArray, or } from "drizzle-orm";
 import type { CompanyListQuery } from "./schema";
+
+const ACTIVE_SUBSCRIPTION_STATUSES = [
+  "created",
+  "authenticated",
+  "active",
+  "pending",
+  "halted",
+  "paused",
+] as const;
+
+type CompanyListBaseItem = ReturnType<typeof mapCompanyListItem>;
+type CompanyOwnerSummary = {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  phoneNumber: unknown;
+};
+
+type CompanyListBase = Record<string, unknown> & {
+  id: string;
+  owner: CompanyOwnerSummary | null;
+};
 
 function companyListJoins(queryBuilder: any) {
   return queryBuilder
     .leftJoin(member, and(eq(member.organizationId, organization.id), eq(member.role, "owner")))
-    .leftJoin(user, eq(user.id, member.userId));
+    .leftJoin(user, eq(user.id, member.userId))
+    .leftJoin(
+      organizationSubscription,
+      eq(organizationSubscription.organizationId, organization.id)
+    );
 }
 
 function mapCompanyListItem(row: Record<string, unknown>) {
   const { ownerId, ownerName, ownerEmail, ownerPhoneNumber, ownerEmailVerified, ...company } = row;
 
   return {
-    ...company,
+    ...(company as Record<string, unknown> & { id: string }),
     owner:
       ownerId && ownerName && ownerEmail
         ? {
-            id: ownerId,
-            name: ownerName,
-            email: ownerEmail,
+            id: String(ownerId),
+            name: String(ownerName),
+            email: String(ownerEmail),
             emailVerified: Boolean(ownerEmailVerified),
             phoneNumber: ownerPhoneNumber ?? null,
           }
         : null,
-  };
+  } satisfies CompanyListBase;
 }
 
-export const fetchCompanyList = createTableListFetcher<
+const fetchCompanyBaseList = createTableListFetcher<
   typeof organization,
-  ReturnType<typeof mapCompanyListItem>,
+  CompanyListBaseItem,
   CompanyListQuery
 >({
   db: getDB,
@@ -62,6 +98,15 @@ export const fetchCompanyList = createTableListFetcher<
     companyType: organization.companyType,
     industry: organization.industry,
   },
+  filters: {
+    subscriptionPlanId: {
+      build: ({ value }) =>
+        and(
+          eq(organizationSubscription.subscriptionPlanId, String(value)),
+          inArray(organizationSubscription.status, ACTIVE_SUBSCRIPTION_STATUSES)
+        ),
+    },
+  },
   sorting: { defaultBy: "createdAt", defaultOrder: "desc" },
   sortColumns: {
     id: organization.id,
@@ -74,6 +119,90 @@ export const fetchCompanyList = createTableListFetcher<
   },
   mapItem: mapCompanyListItem,
   counts: {
-    totalJoins: "data",
+    totalJoins: companyListJoins,
   },
 });
+
+async function attachCompanyListMetrics(items: CompanyListBaseItem[]) {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const organizationIds = items.map((item) => item.id as string);
+
+  const [memberCountRows, propertyCountRows, subscriptionRows] = await Promise.all([
+    db
+      .select({
+        organizationId: member.organizationId,
+        memberCount: count(member.id),
+      })
+      .from(member)
+      .where(and(inArray(member.organizationId, organizationIds), eq(member.isDeleted, false)))
+      .groupBy(member.organizationId),
+    db
+      .select({
+        organizationId: member.organizationId,
+        propertyCount: countDistinct(property.id),
+      })
+      .from(member)
+      .innerJoin(
+        property,
+        and(
+          eq(property.isDeleted, false),
+          or(eq(property.superOwnerId, member.userId), eq(property.createdByUser, member.userId))
+        )
+      )
+      .where(and(inArray(member.organizationId, organizationIds), eq(member.isDeleted, false)))
+      .groupBy(member.organizationId),
+    db
+      .select({
+        organizationId: organizationSubscription.organizationId,
+        planName: subscriptionPlans.name,
+        status: organizationSubscription.status,
+      })
+      .from(organizationSubscription)
+      .innerJoin(
+        subscriptionPlans,
+        eq(subscriptionPlans.id, organizationSubscription.subscriptionPlanId)
+      )
+      .where(
+        and(
+          inArray(organizationSubscription.organizationId, organizationIds),
+          inArray(organizationSubscription.status, ACTIVE_SUBSCRIPTION_STATUSES),
+          eq(subscriptionPlans.isDeleted, false)
+        )
+      ),
+  ]);
+
+  const memberCountByOrganizationId = new Map(
+    memberCountRows.map((row) => [row.organizationId, Number(row.memberCount)])
+  );
+  const propertyCountByOrganizationId = new Map(
+    propertyCountRows.map((row) => [row.organizationId, Number(row.propertyCount)])
+  );
+  const subscriptionByOrganizationId = new Map(
+    subscriptionRows.map((row) => [
+      row.organizationId,
+      {
+        planName: row.planName,
+        status: row.status,
+      },
+    ])
+  );
+
+  return items.map((item) => ({
+    ...item,
+    memberCount: memberCountByOrganizationId.get(item.id as string) ?? 0,
+    propertyCount: propertyCountByOrganizationId.get(item.id as string) ?? 0,
+    activeSubscription: subscriptionByOrganizationId.get(item.id as string) ?? null,
+  }));
+}
+
+export async function fetchCompanyList(query: CompanyListQuery) {
+  const response = await fetchCompanyBaseList(query);
+
+  return {
+    ...response,
+    items: await attachCompanyListMetrics(response.items),
+  };
+}
