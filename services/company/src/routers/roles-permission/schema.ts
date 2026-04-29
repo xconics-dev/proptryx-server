@@ -3,6 +3,7 @@ import {
   createDbSelectSchema,
   createListQuerySchema,
   createListResponseSchema,
+  optionalBooleanQuerySchema,
 } from "@proptryx/utils";
 import z from "zod";
 
@@ -85,7 +86,7 @@ export const rolePermissionUpdateSchema = z
 export const roleListQuerySchema = createListQuerySchema({
   sortFields: ["name", "slug", "createdAt", "updatedAt"],
   extraShape: {
-    isActive: z.coerce.boolean().optional(),
+    isActive: optionalBooleanQuerySchema,
   },
 });
 
