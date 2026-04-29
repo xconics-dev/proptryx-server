@@ -26,6 +26,7 @@ export const RBAC_ACTIONS = {
   unpublish: "unpublish",
   update: "update",
   view: "view",
+  resend_cred: "resend_cred",
 } as const;
 export type RbacAction =
   | (typeof RBAC_ACTIONS)[keyof typeof RBAC_ACTIONS]

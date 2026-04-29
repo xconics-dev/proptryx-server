@@ -133,7 +133,7 @@ export const resend_cred = createOpenApiRoute({
   path: "/{id}/resend-cred",
   operationId: "companyResendMemberCredentials",
   tags,
-  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("activate")],
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("resend_cred")],
   summary: "Resend credentials to a company member by member ID",
   request: {
     params: IdStringParamSchema(),

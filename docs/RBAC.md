@@ -422,6 +422,48 @@ auth.authorization.permissions.client_request
 // }
 ```
 
+## Default Access Level
+
+When a permission row is created without an explicit `accessLevel`, it defaults to `"all"`.
+
+This is set in `normalizePermissionValues` inside each `roles-permission/utils.ts`:
+
+```ts
+accessLevel: input.accessLevel ?? "all",
+```
+
+So new permissions are maximally permissive until you explicitly set them to `"company"` or `"user"`.
+
+## Concrete Example — `meeting` Resource
+
+| Role | `accessLevel` | Data visible |
+|---|---|---|
+| Proptryx admin | `all` | All meetings across every company |
+| Company admin | `company` | All meetings inside their org only |
+| Company executive | `user` | Only their own meetings |
+
+## Frontend UI Integration
+
+The frontend permissions UI renders an access level dropdown per resource row in:
+
+- `proptryx/app/(routes)/utility/rbac/permissions/_components/content.tsx`
+
+The labels shown in that dropdown come from:
+
+```ts
+const ACCESS_LEVEL_LABELS: Record<RolePermissionAccessLevel, string> = {
+  all: "All",
+  company: "Company",
+  user: "User",
+};
+```
+
+The available levels are sourced from the schema constant `rolePermissionAccessLevels` in:
+
+- `proptryx/types/rbac/roles-permission/schema.ts`
+
+So the dropdown values are always kept in sync with the Zod enum and the Postgres enum.
+
 ## Permission Helpers
 
 Permission helpers live in:
