@@ -121,6 +121,10 @@ export const cancelSubscriptionBodySchema = z.object({
   cancelAtCycleEnd: z.boolean().optional(),
 });
 
+export const deleteSubscriptionBodySchema = z.object({
+  organizationId: z.string().optional(),
+});
+
 export const pauseSubscriptionBodySchema = z.object({
   organizationId: z.string().optional(),
   pauseAt: z.enum(["now"]).optional(),
@@ -485,7 +489,12 @@ export async function getOrganizationSubscriptionRecord(organizationId: string) 
   const [subscription] = await db
     .select()
     .from(schema.organizationSubscription)
-    .where(eq(schema.organizationSubscription.organizationId, organizationId))
+    .where(
+      and(
+        eq(schema.organizationSubscription.organizationId, organizationId),
+        eq(schema.organizationSubscription.isDeleted, false)
+      )
+    )
     .limit(1);
 
   return subscription ?? null;
@@ -498,7 +507,12 @@ export async function getOrganizationSubscriptionRecordByRazorpaySubscriptionId(
   const [subscription] = await db
     .select()
     .from(schema.organizationSubscription)
-    .where(eq(schema.organizationSubscription.razorpaySubscriptionId, razorpaySubscriptionId))
+    .where(
+      and(
+        eq(schema.organizationSubscription.razorpaySubscriptionId, razorpaySubscriptionId),
+        eq(schema.organizationSubscription.isDeleted, false)
+      )
+    )
     .limit(1);
 
   return subscription ?? null;
@@ -642,6 +656,27 @@ export async function updateOrganizationSubscriptionRecord(
     .returning();
 
   return updated ?? existing;
+}
+
+export async function deleteOrganizationSubscriptionRecord(
+  id: string,
+  deletedByUserId?: string | null
+) {
+  const db = resolveAuthDatabase();
+  const now = new Date();
+  const [deleted] = await db
+    .update(schema.organizationSubscription)
+    .set({
+      isDeleted: true,
+      deletedAt: now,
+      deletedByUser: deletedByUserId ?? null,
+      updatedByUser: deletedByUserId ?? null,
+      updatedAt: now,
+    })
+    .where(eq(schema.organizationSubscription.id, id))
+    .returning();
+
+  return deleted ?? null;
 }
 
 export async function saveOrganizationSubscriptionRecord(

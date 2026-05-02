@@ -8,9 +8,11 @@ import { createAuthEndpoint } from "better-auth/api";
 import { eq, and, or, gte, lte, ilike, count, asc, desc } from "drizzle-orm";
 import {
   cancelSubscriptionBodySchema,
+  deleteSubscriptionBodySchema,
   createAuthorizedOrganizationMiddleware,
   createRazorpaySubscriptionWithLink,
   createSubscriptionBodySchema,
+  deleteOrganizationSubscriptionRecord,
   ensureOrganizationWithCustomer,
   getCurrentSubscriptionQuerySchema,
   getLimitsQuerySchema,
@@ -86,7 +88,10 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       });
     }
 
-    if (currentSubscription && isActiveSubscriptionStatus(currentSubscription.status)) {
+    // Block only if the subscription has already been authorized/paid.
+    // "created" status means payment was never completed — allow replacing it.
+    const PAID_STATUSES = new Set(["authenticated", "active", "pending", "halted", "paused"]);
+    if (currentSubscription && PAID_STATUSES.has(currentSubscription.status?.toLowerCase() ?? "")) {
       throw new APIError("BAD_REQUEST", {
         message: "Organization already has an active or pending subscription.",
       });
@@ -299,7 +304,14 @@ const currentSubscriptionEndpoint = createAuthEndpoint(
   },
   async (ctx) => {
     const organizationId = ctx.context.organizationId as string;
-    const subscription = await getOrganizationSubscriptionRecord(organizationId);
+    const raw = await getOrganizationSubscriptionRecord(organizationId);
+
+    // Treat terminal statuses as if no subscription exists so the client
+    // can proceed to /upgrade and create a fresh one.
+    const TERMINAL_STATUSES = new Set(["cancelled", "expired", "completed"]);
+    const subscription =
+      raw && TERMINAL_STATUSES.has(raw.status?.toLowerCase?.() ?? "") ? null : raw;
+
     const plan = await getPlanById(subscription?.subscriptionPlanId ?? null);
 
     return ctx.json({ subscription, plan });
@@ -416,13 +428,15 @@ const cancelSubscriptionEndpoint = createAuthEndpoint(
       });
     }
 
-    const cancelAtCycleEnd = ctx.body.cancelAtCycleEnd ?? true;
+    // "created" subscriptions have no billing cycle — cancel immediately
+    const cancelAtCycleEnd =
+      subscription.status === "created" ? false : (ctx.body.cancelAtCycleEnd ?? true);
     const razorpaySubscription = await rzClient.subscriptions.cancel(
       subscription.razorpaySubscriptionId,
       cancelAtCycleEnd
     );
-    const linkedPlan = await getPlanById(subscription.subscriptionPlanId);
 
+    const linkedPlan = await getPlanById(subscription.subscriptionPlanId);
     const cancelledSubscription = await saveOrganizationSubscriptionRecord({
       organizationId,
       razorpaySubscription,
@@ -444,6 +458,55 @@ const cancelSubscriptionEndpoint = createAuthEndpoint(
     });
 
     return ctx.json({ subscription: cancelledSubscription });
+  }
+);
+
+const deleteSubscriptionEndpoint = createAuthEndpoint(
+  "/organization/subscription/delete",
+  {
+    method: "POST",
+    body: deleteSubscriptionBodySchema,
+    use: [createAuthorizedOrganizationMiddleware((ctx) => ctx.body?.organizationId)],
+    metadata: {
+      openapi: {
+        summary: "Delete cancelled organization subscription record",
+        description:
+          "Soft deletes a cancelled organization subscription record from organization_subscription",
+        responses: {
+          200: { description: "Subscription record deleted" },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const organizationId = ctx.context.organizationId as string;
+    const deletedByUserId = (ctx.context.session as any)?.user?.id ?? null;
+    const subscription = await getOrganizationSubscriptionRecord(organizationId);
+
+    if (!subscription) {
+      throw new APIError("BAD_REQUEST", {
+        message: "No subscription record was found for this organization.",
+      });
+    }
+
+    if (subscription.status !== "cancelled") {
+      throw new APIError("BAD_REQUEST", {
+        message: "Only cancelled subscription records can be deleted.",
+      });
+    }
+
+    const deletedSubscription = await deleteOrganizationSubscriptionRecord(
+      subscription.id,
+      deletedByUserId
+    );
+
+    if (!deletedSubscription) {
+      throw new APIError("BAD_REQUEST", {
+        message: "Failed to delete the subscription record.",
+      });
+    }
+
+    return ctx.json({ subscription: deletedSubscription });
   }
 );
 
@@ -950,6 +1013,7 @@ const listSubscriptionsEndpoint = createAuthEndpoint(
     const offset = (page - 1) * limit;
 
     const conditions = [
+      eq(schema.organizationSubscription.isDeleted, false),
       status ? eq(schema.organizationSubscription.status, status) : undefined,
       organizationId
         ? eq(schema.organizationSubscription.organizationId, organizationId)
@@ -1014,6 +1078,9 @@ const listSubscriptionsEndpoint = createAuthEndpoint(
           pausedAt: schema.organizationSubscription.pausedAt,
           shortUrl: schema.organizationSubscription.shortUrl,
           cancelAtCycleEnd: schema.organizationSubscription.cancelAtCycleEnd,
+          isDeleted: schema.organizationSubscription.isDeleted,
+          deletedAt: schema.organizationSubscription.deletedAt,
+          deletedByUser: schema.organizationSubscription.deletedByUser,
           createdByUser: schema.organizationSubscription.createdByUser,
           updatedByUser: schema.organizationSubscription.updatedByUser,
           createdAt: schema.organizationSubscription.createdAt,
@@ -1066,6 +1133,7 @@ export const organizationSubscriptionPlugin = {
     listOrganizationSubscriptions: listSubscriptionsEndpoint,
     syncOrganizationSubscription: syncSubscriptionEndpoint,
     cancelOrganizationSubscription: cancelSubscriptionEndpoint,
+    deleteOrganizationSubscription: deleteSubscriptionEndpoint,
     pauseOrganizationSubscription: pauseSubscriptionEndpoint,
     resumeOrganizationSubscription: resumeSubscriptionEndpoint,
     organizationSubscriptionWebhook: webhookEndpoint,

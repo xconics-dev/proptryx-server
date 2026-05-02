@@ -344,6 +344,11 @@ export const organizationSubscription = pgTable(
     updatedByUser: text("updated_by_user").references((): AnyPgColumn => user.id, {
       onDelete: "set null",
     }),
+    isDeleted: boolean("is_deleted").default(false).notNull(),
+    deletedAt: timestamp("deleted_at"),
+    deletedByUser: text("deleted_by_user").references((): AnyPgColumn => user.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -351,10 +356,12 @@ export const organizationSubscription = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("organization_subscription_organizationId_uidx").on(table.organizationId),
-    uniqueIndex("organization_subscription_razorpaySubscriptionId_uidx").on(
-      table.razorpaySubscriptionId
-    ),
+    uniqueIndex("organization_subscription_organizationId_uidx")
+      .on(table.organizationId)
+      .where(sql`${table.isDeleted} = false`),
+    uniqueIndex("organization_subscription_razorpaySubscriptionId_uidx")
+      .on(table.razorpaySubscriptionId)
+      .where(sql`${table.isDeleted} = false and ${table.razorpaySubscriptionId} is not null`),
     index("organization_subscription_status_idx").on(table.status),
     index("organization_subscription_planCode_idx").on(table.planCode),
     index("organization_subscription_subscriptionPlanId_idx").on(table.subscriptionPlanId),
@@ -365,5 +372,6 @@ export const organizationSubscription = pgTable(
     index("organization_subscription_billingPeriod_idx").on(table.billingPeriod),
     index("organization_subscription_createdAt_idx").on(table.createdAt),
     index("organization_subscription_createdByUser_idx").on(table.createdByUser),
+    index("organization_subscription_isDeleted_idx").on(table.isDeleted),
   ]
 );

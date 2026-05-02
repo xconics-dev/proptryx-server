@@ -43,6 +43,13 @@
       "when": 1777716711106,
       "tag": "0005_sticky_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777716720000,
+      "tag": "0010_nimble_frog_thor",
+      "breakpoints": true
     }
   ]
 }
