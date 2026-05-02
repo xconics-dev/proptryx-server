@@ -13,7 +13,7 @@ import {
 } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
 import { fetchProptryxUserList } from "./list";
-import { create, get, list, remove, resend_cred, update } from "./openapi.route";
+import { create, get, list, remove, resendCredentials, update } from "./openapi.route";
 import { proptryxBrokerUsersGroup } from "./broker/handler";
 import {
   createProptryxUserAuthSeed,
@@ -216,7 +216,7 @@ registerOpenApiRoute(proptryxUsersGroup, remove, async (c) => {
   return c.json(createSuccessResponse(deletedUser), 200);
 });
 
-registerOpenApiRoute(proptryxUsersGroup, resend_cred, async (c) => {
+registerOpenApiRoute(proptryxUsersGroup, resendCredentials, async (c) => {
   const { id } = c.req.valid("param");
 
   const credentialData = await getProptryxUserCredentialDeliveryData(id, env.BETTER_AUTH_SECRET);
@@ -245,7 +245,7 @@ registerOpenApiRoute(proptryxUsersGroup, resend_cred, async (c) => {
       })
     )
     .catch((err) => {
-      logger.error("[proptryx.users.resend_cred] Email send failed:", { error: err });
+      logger.error("[proptryx.users.resendCredentials] Email send failed:", { error: err });
     });
 
   return c.json(

@@ -14,7 +14,15 @@ import { eq } from "drizzle-orm";
 import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { logger } from "@/lib/logger";
 import { fetchMemberList } from "./list";
-import { create, get, list, remove, remove_with_user, resend_cred, update } from "./openapi.route";
+import {
+  create,
+  get,
+  list,
+  remove,
+  remove_with_user,
+  resendCredentials,
+  update,
+} from "./openapi.route";
 import {
   createMemberAuthSeed,
   getMemberCredentialDeliveryData,
@@ -327,7 +335,7 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
   return c.json(null);
 });
 
-registerOpenApiRoute(companyMembersGroup, resend_cred, async (c) => {
+registerOpenApiRoute(companyMembersGroup, resendCredentials, async (c) => {
   const { id } = c.req.valid("param");
 
   const credentialData = await getMemberCredentialDeliveryData(id, env.BETTER_AUTH_SECRET);
@@ -357,7 +365,7 @@ registerOpenApiRoute(companyMembersGroup, resend_cred, async (c) => {
       })
     )
     .catch((err) => {
-      logger.error("[company.member.resend_cred] Email send failed:", { error: err });
+      logger.error("[company.member.resendCredentials] Email send failed:", { error: err });
     });
 
   return c.json(

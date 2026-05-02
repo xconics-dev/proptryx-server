@@ -18,7 +18,7 @@ import {
 } from "@proptryx/utils";
 import { and, eq, sql } from "drizzle-orm";
 import { fetchProptryxBrokerUserList } from "./list";
-import { create, get, list, remove, resend_cred, update } from "./openapi.route";
+import { create, get, list, remove, resendCredentials, update } from "./openapi.route";
 import { findProptryxBrokerUserById, getProptryxBrokerUserCredentialDeliveryData } from "./utils";
 import {
   createProptryxUserAuthSeed,
@@ -296,7 +296,7 @@ registerOpenApiRoute(proptryxBrokerUsersGroup, remove, async (c) => {
   return c.json(createSuccessResponse(deletedUser), 200);
 });
 
-registerOpenApiRoute(proptryxBrokerUsersGroup, resend_cred, async (c) => {
+registerOpenApiRoute(proptryxBrokerUsersGroup, resendCredentials, async (c) => {
   const { id } = c.req.valid("param");
 
   const credentialData = await getProptryxBrokerUserCredentialDeliveryData(
@@ -328,7 +328,7 @@ registerOpenApiRoute(proptryxBrokerUsersGroup, resend_cred, async (c) => {
       })
     )
     .catch((err) => {
-      logger.error("[proptryx.users.broker.resend_cred] Email send failed:", { error: err });
+      logger.error("[proptryx.users.broker.resendCredentials] Email send failed:", { error: err });
     });
 
   return c.json(

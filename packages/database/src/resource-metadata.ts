@@ -27,12 +27,12 @@ const DEFAULT_RESOURCE_ACTIONS = ["get", "getAll", "create", "update", "delete"]
 
 const ACTIONS: Partial<Record<DatabaseResource, readonly string[]>> = {
   meeting: [...DEFAULT_RESOURCE_ACTIONS, "publish"],
-  organization: [...DEFAULT_RESOURCE_ACTIONS, "resend_cred"],
-  member: [...DEFAULT_RESOURCE_ACTIONS, "activate", "deactivate", "resend_cred"],
-  property: [...DEFAULT_RESOURCE_ACTIONS, "publish", "unpublish", "search"],
+  organization: [...DEFAULT_RESOURCE_ACTIONS, "activate"],
+  member: [...DEFAULT_RESOURCE_ACTIONS, "activate", "deactivate"],
+  property: [...DEFAULT_RESOURCE_ACTIONS, "publish", "unpublish"],
   subscription_plans: [...DEFAULT_RESOURCE_ACTIONS, "activate", "deactivate"],
   organization_subscription: [...DEFAULT_RESOURCE_ACTIONS, "subscription", "terminate"],
-  user: [...DEFAULT_RESOURCE_ACTIONS, "activate", "deactivate", "resend_cred"],
+  user: [...DEFAULT_RESOURCE_ACTIONS, "activate", "deactivate"],
 };
 
 const COMPANY_RESOURCES = new Set<DatabaseResource>([

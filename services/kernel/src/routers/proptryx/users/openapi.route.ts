@@ -108,12 +108,12 @@ export const remove = createOpenApiRoute({
   },
 });
 
-export const resend_cred = createOpenApiRoute({
+export const resendCredentials = createOpenApiRoute({
   method: "post",
   path: "/{id}/resend-cred",
   operationId: "proptryxUserResendCredentialsById",
   tags,
-  middleware: [proptryxUserMethodsRateLimit, proptryxUserRbac.custom("resend_cred")],
+  middleware: [proptryxUserMethodsRateLimit, proptryxUserRbac.custom("activate")],
   summary: "Resend credentials to a Proptryx user",
   request: {
     params: IdStringParamSchema(),

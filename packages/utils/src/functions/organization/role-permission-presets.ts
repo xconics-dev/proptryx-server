@@ -40,15 +40,15 @@ const ROLE_RESOURCE_OVERRIDES: Record<
   }
 > = {
   owner: {
-    defaultAccessLevel: "all",
+    defaultAccessLevel: "company",
     defaultActions: fullActions,
   },
   admin: {
-    defaultAccessLevel: "all",
+    defaultAccessLevel: "company",
     defaultActions: fullActions,
   },
   executive: {
-    defaultAccessLevel: "company",
+    defaultAccessLevel: "user",
     defaultActions: fullActions,
     includeResources: ["account", "property", "meeting", "faq", "testimonial"],
   },

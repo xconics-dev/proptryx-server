@@ -27,6 +27,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
       description: "Broker request-management endpoints under the company request domain.",
     },
     {
+      name: "Company / Roles & Permissions",
+      description: "Company RBAC role and permission management endpoints from kernel.",
+    },
+    {
       name: "Proptryx / Users",
       description: "Proptryx platform user management endpoints.",
     },
@@ -58,7 +62,13 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
   "x-tagGroups": [
     {
       name: "Company APIs",
-      tags: ["Company", "Company / Members", "Company / Requests", "Company / Requests / Broker"],
+      tags: [
+        "Company",
+        "Company / Members",
+        "Company / Requests",
+        "Company / Requests / Broker",
+        "Company / Roles & Permissions",
+      ],
     },
     {
       name: "Proptryx APIs",

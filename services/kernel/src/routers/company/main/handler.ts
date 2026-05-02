@@ -14,7 +14,15 @@ import { and, eq, or } from "drizzle-orm";
 import { emailSubject, renderAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { logger } from "@/lib/logger";
 import { fetchCompanyList } from "./list";
-import { create, get, get_gst_info, list, remove, resend_cred, update } from "./openapi.route";
+import {
+  create,
+  get,
+  get_gst_info,
+  list,
+  remove,
+  resendCredentials,
+  update,
+} from "./openapi.route";
 import { COMPANY_CREATION_TOTAL_STEPS, type CompanyCreationStep } from "./schema";
 import {
   createCompanyAuthSeed,
@@ -343,7 +351,7 @@ registerOpenApiRoute(companyMainGroup, remove, async (c) => {
   );
 });
 
-registerOpenApiRoute(companyMainGroup, resend_cred, async (c) => {
+registerOpenApiRoute(companyMainGroup, resendCredentials, async (c) => {
   const { id } = c.req.valid("param");
 
   const credentialData = await getCompanyOwnerCredentialDeliveryData(id, env.BETTER_AUTH_SECRET);
@@ -372,7 +380,7 @@ registerOpenApiRoute(companyMainGroup, resend_cred, async (c) => {
       })
     )
     .catch((err) => {
-      logger.error("[company.resend_cred] Email send failed:", { error: err });
+      logger.error("[company.resendCredentials] Email send failed:", { error: err });
     });
 
   return c.json(
