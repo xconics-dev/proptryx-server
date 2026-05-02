@@ -1,6 +1,6 @@
 {
-  "id": "5157b8d1-6b28-496d-965b-63c2f6f5e414",
-  "prevId": "d0156034-efe9-427b-a780-6345b034c44b",
+  "id": "671a93bf-233d-4e8b-8eec-f2871c559d81",
+  "prevId": "5157b8d1-6b28-496d-965b-63c2f6f5e414",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1055,6 +1055,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by_user": {
+          "name": "deleted_by_user",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1082,6 +1101,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"organization_subscription\".\"is_deleted\" = false",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1097,6 +1117,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"organization_subscription\".\"is_deleted\" = false and \"organization_subscription\".\"razorpay_subscription_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1211,6 +1232,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "organization_subscription_isDeleted_idx": {
+          "name": "organization_subscription_isDeleted_idx",
+          "columns": [
+            {
+              "expression": "is_deleted",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1246,6 +1282,15 @@
           "tableFrom": "organization_subscription",
           "tableTo": "user",
           "columnsFrom": ["updated_by_user"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "organization_subscription_deleted_by_user_user_id_fk": {
+          "name": "organization_subscription_deleted_by_user_user_id_fk",
+          "tableFrom": "organization_subscription",
+          "tableTo": "user",
+          "columnsFrom": ["deleted_by_user"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
