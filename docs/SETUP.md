@@ -13,15 +13,14 @@ proptryx/
 ├── docker/
 │   ├── docker-compose.yml
 │   ├── docker-compose.prod.yml
-│   ├── docker-compose.dockploy.yml
 │   ├── gateway.Dockerfile
 │   ├── auth.Dockerfile
-│   └── kernel.Dockerfile
+│   ├── kernel.Dockerfile
+│   └── company.Dockerfile
 ├── env/
 │   ├── .env
 │   ├── .env.example
-│   ├── .env.prod
-│   └── .env.dockploy.example
+│   └── .env.prod
 │
 ├── apps/                            ← future Next.js / Expo apps (empty for now)
 │

@@ -11,7 +11,7 @@ The stack is optimized for:
 
 - fast local development with Turbo + pnpm workspaces
 - reusable service patterns
-- predictable Docker builds with `pnpm@10.30.3`
+- predictable Docker builds with the repo-pinned `pnpm@10.33.2`
 - production-ready structured logging and health checks
 
 ## Architecture Overview
@@ -47,15 +47,14 @@ The stack is optimized for:
 ├── docker/
 │   ├── docker-compose.yml
 │   ├── docker-compose.prod.yml
-│   ├── docker-compose.dockploy.yml
 │   ├── gateway.Dockerfile
 │   ├── auth.Dockerfile
-│   └── kernel.Dockerfile
+│   ├── kernel.Dockerfile
+│   └── company.Dockerfile
 ├── env/
 │   ├── .env
 │   ├── .env.example
-│   ├── .env.prod
-│   └── .env.dockploy.example
+│   └── .env.prod
 ├── package.json
 ├── pnpm-workspace.yaml
 ├── turbo.json
@@ -81,7 +80,7 @@ The stack is optimized for:
 
 ## Build & Tooling
 
-- package manager: `pnpm@10.30.3`
+- package manager: `pnpm@10.33.2`
 - workspace orchestration: Turbo
 - transpile/bundle: `tsup`
 - runtime: Node 20 + ESM
@@ -114,7 +113,7 @@ pnpm docker:prod:up:build:d
 
 Current Docker strategy per service:
 
-1. Base stage uses Node 20 Alpine + `pnpm@10.30.3` via Corepack
+1. Base stage uses Node 20 Alpine + `pnpm@10.33.2` via Corepack
 2. Build stage installs workspace deps and builds:
    - shared logger package first
    - target service second

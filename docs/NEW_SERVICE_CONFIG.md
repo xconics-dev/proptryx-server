@@ -61,6 +61,6 @@ Then add env validation fields in:
 
 ## Docker Notes
 
-- Service Dockerfiles are compatible with `pnpm@10.30.3`.
+- Service Dockerfiles are compatible with the repo-pinned `pnpm@10.33.2`.
 - Build flow compiles `@proptryx/logger` before each service build.
 - Runtime image uses `pnpm deploy --prod --legacy` output for minimal runtime contents.
