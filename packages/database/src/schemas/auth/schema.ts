@@ -263,6 +263,7 @@ export const subscriptionPlans = pgTable(
       .$type<Record<string, unknown>>()
       .default(sql`'{}'::jsonb`)
       .notNull(),
+    isRecommended: boolean("is_recommended").default(false).notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     createdByUser: text("created_by_user").references((): AnyPgColumn => user.id, {
       onDelete: "set null",
@@ -288,6 +289,9 @@ export const subscriptionPlans = pgTable(
     uniqueIndex("subscription_plans_razorpayPlanId_uidx")
       .on(table.razorpayPlanId)
       .where(sql`${table.isDeleted} = false`),
+    uniqueIndex("subscription_plans_isRecommended_uidx")
+      .on(table.isRecommended)
+      .where(sql`${table.isDeleted} = false and ${table.isRecommended} = true`),
     index("subscription_plans_isDeleted_isActive_idx").on(table.isDeleted, table.isActive),
     index("subscription_plans_discountAvailableTill_idx").on(table.discountAvailableTill),
   ]

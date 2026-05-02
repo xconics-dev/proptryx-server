@@ -1,6 +1,6 @@
 {
-  "id": "d0156034-efe9-427b-a780-6345b034c44b",
-  "prevId": "4aebf15d-858b-418e-ad8e-8c57c21083c1",
+  "id": "5157b8d1-6b28-496d-965b-63c2f6f5e414",
+  "prevId": "31ae565b-a455-4c2a-baec-dd8b6662ab26",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1146,6 +1146,27 @@
           "method": "btree",
           "with": {}
         },
+        "organization_subscription_subscriptionPlanId_status_idx": {
+          "name": "organization_subscription_subscriptionPlanId_status_idx",
+          "columns": [
+            {
+              "expression": "subscription_plan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "organization_subscription_billingPeriod_idx": {
           "name": "organization_subscription_billingPeriod_idx",
           "columns": [
@@ -1498,6 +1519,13 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
+        "is_recommended": {
+          "name": "is_recommended",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "is_active": {
           "name": "is_active",
           "type": "boolean",
@@ -1580,6 +1608,22 @@
           ],
           "isUnique": true,
           "where": "\"subscription_plans\".\"is_deleted\" = false",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "subscription_plans_isRecommended_uidx": {
+          "name": "subscription_plans_isRecommended_uidx",
+          "columns": [
+            {
+              "expression": "is_recommended",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"subscription_plans\".\"is_deleted\" = false and \"subscription_plans\".\"is_recommended\" = true",
           "concurrently": false,
           "method": "btree",
           "with": {}

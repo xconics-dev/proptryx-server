@@ -4,7 +4,7 @@ import type { SubscriptionPlanFeatures } from "@proptryx/database";
 import { generateRandomId, getRazorpayClient } from "@proptryx/utils";
 import { APIError } from "better-auth";
 import { createAuthMiddleware, sessionMiddleware } from "better-auth/api";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { resolveAuthDatabase } from "../../auth/utils";
 
@@ -52,6 +52,7 @@ export const createPlanBodySchema = z.object({
   quantity: z.number().int().positive().optional(),
   trialDays: z.number().int().min(0).optional(),
   addonPropertyOneTimeCostInPaise: z.number().int().min(0).optional(),
+  isRecommended: z.boolean(),
   isActive: z.boolean().optional(),
   features: planFeaturesSchema,
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -71,6 +72,7 @@ export const updatePlanBodySchema = z.object({
   quantity: z.number().int().positive().optional(),
   trialDays: z.number().int().min(0).optional(),
   addonPropertyOneTimeCostInPaise: z.number().int().min(0).optional(),
+  isRecommended: z.boolean(),
   isActive: z.boolean().optional(),
   features: planFeaturesSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -375,6 +377,26 @@ export async function getPlanByRazorpayPlanId(razorpayPlanId: string) {
         eq(schema.subscriptionPlans.isDeleted, false)
       )
     )
+    .limit(1);
+
+  return plan ?? null;
+}
+
+export async function getRecommendedPlan(excludePlanId?: string | null) {
+  const db = resolveAuthDatabase();
+  const filters = [
+    eq(schema.subscriptionPlans.isDeleted, false),
+    eq(schema.subscriptionPlans.isRecommended, true),
+  ];
+
+  if (excludePlanId) {
+    filters.push(ne(schema.subscriptionPlans.id, excludePlanId));
+  }
+
+  const [plan] = await db
+    .select()
+    .from(schema.subscriptionPlans)
+    .where(and(...filters))
     .limit(1);
 
   return plan ?? null;

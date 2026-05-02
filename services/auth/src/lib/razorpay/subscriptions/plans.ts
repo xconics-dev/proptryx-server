@@ -4,13 +4,14 @@ import type { SubscriptionPlanFeatures } from "@proptryx/database";
 import { generateRandomId } from "@proptryx/utils";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
   createPlanBodySchema,
   deletePlanBodySchema,
   getPlanByCode,
   getPlanById,
   getPlanByRazorpayPlanId,
+  getRecommendedPlan,
   getRazorpayErrorMessage,
   getPlanQuerySchema,
   listPlansQuerySchema,
@@ -62,7 +63,10 @@ const listPlansEndpoint = createAuthEndpoint(
       .select()
       .from(schema.subscriptionPlans)
       .where(whereClause)
-      .orderBy(asc(schema.subscriptionPlans.amountInPaise));
+      .orderBy(
+        desc(schema.subscriptionPlans.isRecommended),
+        asc(schema.subscriptionPlans.amountInPaise)
+      );
 
     const plansWithCounts = plans.map((plan) => ({
       ...plan,
@@ -219,6 +223,16 @@ const createPlanEndpoint = createAuthEndpoint(
       });
     }
 
+    if (ctx.body.isRecommended) {
+      const recommendedPlan = await getRecommendedPlan();
+
+      if (recommendedPlan) {
+        throw new APIError("BAD_REQUEST", {
+          message: `"${recommendedPlan.name}" is already marked as the recommended plan.`,
+        });
+      }
+    }
+
     const now = new Date();
     const session = ctx.context.session as any;
 
@@ -239,6 +253,7 @@ const createPlanEndpoint = createAuthEndpoint(
         quantity: ctx.body.quantity ?? 1,
         trialDays: ctx.body.trialDays ?? 0,
         addonPropertyOneTimeCostInPaise: ctx.body.addonPropertyOneTimeCostInPaise ?? 0,
+        isRecommended: ctx.body.isRecommended,
         isActive: ctx.body.isActive ?? true,
         features: ctx.body.features as SubscriptionPlanFeatures,
         metadata: ctx.body.metadata ?? {},
@@ -283,6 +298,16 @@ const updatePlanEndpoint = createAuthEndpoint(
     };
     const session = ctx.context.session as any;
 
+    if (ctx.body.isRecommended) {
+      const recommendedPlan = await getRecommendedPlan(existing.id);
+
+      if (recommendedPlan) {
+        throw new APIError("BAD_REQUEST", {
+          message: `"${recommendedPlan.name}" is already marked as the recommended plan.`,
+        });
+      }
+    }
+
     if (ctx.body.name !== undefined) updatePayload.name = ctx.body.name;
     if (ctx.body.description !== undefined) updatePayload.description = ctx.body.description;
     if (ctx.body.amountInPaise !== undefined) updatePayload.amountInPaise = ctx.body.amountInPaise;
@@ -305,6 +330,7 @@ const updatePlanEndpoint = createAuthEndpoint(
     if (ctx.body.addonPropertyOneTimeCostInPaise !== undefined) {
       updatePayload.addonPropertyOneTimeCostInPaise = ctx.body.addonPropertyOneTimeCostInPaise;
     }
+    updatePayload.isRecommended = ctx.body.isRecommended;
     if (ctx.body.isActive !== undefined) updatePayload.isActive = ctx.body.isActive;
     if (ctx.body.features !== undefined) {
       updatePayload.features = ctx.body.features as SubscriptionPlanFeatures;
@@ -409,7 +435,10 @@ const listActivePlansPublicEndpoint = createAuthEndpoint(
           eq(schema.subscriptionPlans.isActive, true)
         )
       )
-      .orderBy(asc(schema.subscriptionPlans.amountInPaise));
+      .orderBy(
+        desc(schema.subscriptionPlans.isRecommended),
+        asc(schema.subscriptionPlans.amountInPaise)
+      );
 
     return ctx.json({ plans });
   }
