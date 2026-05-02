@@ -167,7 +167,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
         type: body.type,
         companyType: body.companyType,
         industry: body.industry,
-        email: body.ownerEmail,
+        email: body.email,
         phoneNumber: body.phoneNumber,
         isActive: body.isActive ?? true,
         createdByUser: currentAuthUser?.id ?? null,

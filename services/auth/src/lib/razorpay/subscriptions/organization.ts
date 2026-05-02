@@ -139,7 +139,6 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       trialDaysApplied: String(trialDaysApplied),
       customerNotifyRequested: String(customerNotifyRequested),
       notificationMode,
-      applicationNotifyOnly: String(applicationNotifyOnly),
       ...(ctx.body.notes ?? {}),
     };
 
@@ -749,6 +748,7 @@ const paymentStatusEndpoint = createAuthEndpoint(
         status: null,
         isPaid: false,
         isActive: false,
+        isPaymentAuthorized: false,
         cancelAtCycleEnd: false,
         paidCount: 0,
         razorpaySubscriptionId: null,
@@ -760,11 +760,16 @@ const paymentStatusEndpoint = createAuthEndpoint(
     const status = row.status;
     const isPaid = row.paidCount > 0;
     const isActive = isActiveSubscriptionStatus(status);
+    // true only when the customer has completed the Razorpay payment/mandate flow.
+    // "created" means the subscription exists but the customer hasn't paid yet.
+    const isPaymentAuthorized = status === "authenticated" || status === "active";
+    // || status === "pending";
 
     return ctx.json({
       status,
       isPaid,
       isActive,
+      isPaymentAuthorized,
       cancelAtCycleEnd: row.cancelAtCycleEnd,
       paidCount: row.paidCount,
       razorpaySubscriptionId: row.razorpaySubscriptionId,

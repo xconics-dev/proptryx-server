@@ -186,7 +186,12 @@ export function createAuthorizedOrganizationMiddleware(
         session,
         resolveExplicitOrganizationId(ctx)
       );
-      await assertOrganizationAccess(session.user.id, organizationId);
+
+      // Proptryx internal users are not organization members but have full access
+      const isInternalUser = session.user.panel === "proptryx";
+      if (!isInternalUser) {
+        await assertOrganizationAccess(session.user.id, organizationId);
+      }
 
       return {
         session,
