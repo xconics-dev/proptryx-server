@@ -81,6 +81,11 @@ export const getPlanQuerySchema = z.object({
   code: z.string().optional(),
 });
 
+export const razorpayPlanLookupQuerySchema = z.object({
+  razorpayPlanId: z.string().trim().min(1),
+  currentPlanId: z.string().trim().min(1).optional(),
+});
+
 export const listPlansQuerySchema = z.object({
   includeInactive: z.coerce.boolean().optional(),
 });

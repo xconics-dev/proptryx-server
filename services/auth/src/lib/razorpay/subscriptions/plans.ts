@@ -10,9 +10,13 @@ import {
   deletePlanBodySchema,
   getPlanByCode,
   getPlanById,
+  getPlanByRazorpayPlanId,
+  getRazorpayErrorMessage,
   getPlanQuerySchema,
   listPlansQuerySchema,
   normalizePlanCode,
+  razorpayPlanLookupQuerySchema,
+  rzClient,
   signedInSessionMiddleware,
   updatePlanBodySchema,
 } from "./shared";
@@ -102,6 +106,81 @@ const getPlanEndpoint = createAuthEndpoint(
     }
 
     return ctx.json({ plan });
+  }
+);
+
+const getRazorpayPlanEndpoint = createAuthEndpoint(
+  "/subscription/razorpay-plan",
+  {
+    method: "GET",
+    query: razorpayPlanLookupQuerySchema,
+    use: [signedInSessionMiddleware],
+    metadata: {
+      openapi: {
+        summary: "Validate a Razorpay plan id",
+        description:
+          "Fetches a Razorpay plan, maps supported fields for subscription plan forms, and reports whether the id is already used by another local plan.",
+        responses: {
+          200: { description: "Razorpay plan details" },
+          404: { description: "Razorpay plan not found" },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const { razorpayPlanId, currentPlanId } = ctx.query;
+
+    let razorpayPlan: any;
+    try {
+      razorpayPlan = await (rzClient.plans.fetch as any)(razorpayPlanId);
+    } catch (error) {
+      throw new APIError("NOT_FOUND", {
+        message: getRazorpayErrorMessage(error, "Razorpay plan not found."),
+      });
+    }
+
+    const mappedPlan = await getPlanByRazorpayPlanId(razorpayPlanId);
+    const isMappedToAnotherPlan = Boolean(mappedPlan && mappedPlan.id !== currentPlanId);
+    const item = razorpayPlan?.item ?? {};
+    const period = typeof razorpayPlan?.period === "string" ? razorpayPlan.period : null;
+    const interval = Number(razorpayPlan?.interval ?? 1);
+    const billingInterval =
+      interval === 1 && (period === "monthly" || period === "yearly") ? period : null;
+
+    return ctx.json({
+      isValid: !isMappedToAnotherPlan,
+      razorpayPlanId,
+      message: isMappedToAnotherPlan
+        ? `This Razorpay plan is already mapped to "${mappedPlan?.name ?? mappedPlan?.code}".`
+        : "Razorpay plan verified.",
+      mappedPlan: mappedPlan
+        ? {
+            id: mappedPlan.id,
+            code: mappedPlan.code,
+            name: mappedPlan.name,
+          }
+        : null,
+      details: {
+        id: razorpayPlan?.id ?? razorpayPlanId,
+        entity: razorpayPlan?.entity ?? null,
+        period,
+        interval: Number.isFinite(interval) ? interval : null,
+        item: {
+          id: item?.id ?? null,
+          name: item?.name ?? null,
+          description: item?.description ?? null,
+          amountInPaise: Number.isFinite(Number(item?.amount)) ? Number(item.amount) : null,
+          currency: item?.currency ?? null,
+        },
+      },
+      formValues: {
+        name: item?.name ?? null,
+        description: item?.description ?? null,
+        amountInPaise: Number.isFinite(Number(item?.amount)) ? Number(item.amount) : null,
+        currency: item?.currency ?? null,
+        billingInterval,
+      },
+    });
   }
 );
 
@@ -342,6 +421,7 @@ export const subscriptionPlansPlugin = {
     listSubscriptionPlans: listPlansEndpoint,
     listActiveSubscriptionPlans: listActivePlansPublicEndpoint,
     getSubscriptionPlan: getPlanEndpoint,
+    getRazorpaySubscriptionPlan: getRazorpayPlanEndpoint,
     createSubscriptionPlan: createPlanEndpoint,
     updateSubscriptionPlan: updatePlanEndpoint,
     deleteSubscriptionPlan: deletePlanEndpoint,
