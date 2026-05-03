@@ -11,19 +11,19 @@ const DEFAULT_ORGANIZATION_ROLES = [
   {
     name: "OWNER",
     slug: "owner",
-    description: "Default company owner role created with organization creation.",
+    description: "Default Creation.",
     panel: "company" as const,
   },
   {
     name: "ADMIN",
     slug: "admin",
-    description: "Default company admin role created with organization creation.",
+    description: "Default Creation.",
     panel: "company" as const,
   },
   {
     name: "EXECUTIVE",
     slug: "executive",
-    description: "Default company executive role created with organization creation.",
+    description: "Default Creation.",
     panel: "company" as const,
   },
 ] as const;
