@@ -15,6 +15,7 @@ import { emailSubject, renderAccountCredEmail, sendEmail } from "@proptryx/notif
 import { logger } from "@/lib/logger";
 import { fetchCompanyList } from "./list";
 import {
+  addNew,
   create,
   get,
   get_gst_info,
@@ -23,16 +24,22 @@ import {
   resendCredentials,
   update,
 } from "./openapi.route";
-import { COMPANY_CREATION_TOTAL_STEPS, type CompanyCreationStep } from "./schema";
+import {
+  ADD_NEW_COMPANY_CREATION_TOTAL_STEPS,
+  COMPANY_CREATION_TOTAL_STEPS,
+  type CompanyCreationStep,
+} from "./schema";
 import {
   createCompanyAuthSeed,
   fetchCompanyGstInfo,
   findCompanyById,
+  findExistingCompanyOwnerByRequest,
   findCompanyOwnerConflicts,
   findNextCompanyId,
   getCompanyOwnerCredentialDeliveryData,
   syncCompanyRazorpayCustomer,
 } from "./utils";
+import { findCompanyRequestById } from "../request/utils";
 
 export const companyMainGroup = new OpenAPIHono<AppBindings>();
 
@@ -255,6 +262,135 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
       },
       completedSteps: stepsCompleted.length,
       totalSteps: COMPANY_CREATION_TOTAL_STEPS,
+      stepsCompleted,
+      stepsFailed,
+    }),
+    201
+  );
+});
+
+registerOpenApiRoute(companyMainGroup, addNew, async (c) => {
+  const body = c.req.valid("json");
+  const { user: currentAuthUser } = getBetterAuthContext(c);
+  const stepsCompleted: CompanyCreationStep[] = [];
+  const stepsFailed: CompanyCreationStep[] = [];
+
+  const [companyRequest, nextOrgId] = await Promise.all([
+    findCompanyRequestById(body.requestId),
+    findNextCompanyId(),
+  ]);
+
+  if (!companyRequest) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No active company request found with id ${body.requestId}`,
+      }),
+      404
+    );
+  }
+
+  if (companyRequest.companyGstNumber !== body.gstNumber) {
+    return c.json(
+      createErrorResponse({
+        error: "Conflict",
+        message: "The company request GST number does not match the submitted company details.",
+      }),
+      409
+    );
+  }
+
+  const existingOwner = await findExistingCompanyOwnerByRequest(
+    companyRequest.ownerEmail,
+    companyRequest.ownerPhoneNumber
+  );
+
+  if (!existingOwner.success) {
+    return c.json(
+      createErrorResponse({
+        error: "Conflict",
+        message: existingOwner.message,
+      }),
+      409
+    );
+  }
+
+  stepsCompleted.push("validate_input");
+  stepsCompleted.push("resolve_existing_user");
+
+  const { userData, orgData, memberData } = await db.transaction(async (tx) => {
+    const [orgData] = await tx
+      .insert(organization)
+      .values({
+        id: nextOrgId,
+        name: body.name,
+        gstNumber: body.gstNumber,
+        slug: body.slug,
+        type: body.type,
+        companyType: body.companyType,
+        industry: body.industry,
+        email: body.email,
+        phoneNumber: body.phoneNumber,
+        isActive: body.isActive ?? true,
+        createdByUser: currentAuthUser?.id ?? null,
+      })
+      .returning();
+    await ensureDefaultOrganizationRoles(tx, orgData.id);
+    stepsCompleted.push("insert_organization");
+
+    const [memberData] = await tx
+      .insert(member)
+      .values({
+        id: generateRandomId(),
+        userId: existingOwner.data.id,
+        organizationId: orgData.id,
+        panel: "company",
+        role: "owner",
+        createdByUser: currentAuthUser?.id ?? null,
+      })
+      .returning();
+    stepsCompleted.push("insert_member");
+
+    await tx
+      .update(company_request)
+      .set({
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedByUser: currentAuthUser?.id ?? null,
+      })
+      .where(and(eq(company_request.id, companyRequest.id), eq(company_request.isDeleted, false)));
+
+    return {
+      userData: existingOwner.data,
+      orgData,
+      memberData,
+    };
+  });
+
+  void syncCompanyRazorpayCustomer({
+    ownerEmail: userData.email,
+    userData,
+    orgData,
+    memberData,
+  });
+
+  const createdCompany = await findCompanyById(orgData.id);
+
+  return c.json(
+    createSuccessResponse({
+      company: createdCompany ?? {
+        ...orgData,
+        roles: [],
+      },
+      owner: {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        emailVerified: userData.emailVerified,
+        phoneNumber: userData.phoneNumber,
+      },
+      completedSteps: stepsCompleted.length,
+      totalSteps: ADD_NEW_COMPANY_CREATION_TOTAL_STEPS,
       stepsCompleted,
       stepsFailed,
     }),

@@ -9,6 +9,7 @@ import {
   IdStringParamSchema,
 } from "@proptryx/utils";
 import {
+  companyAddNewSchema,
   companyCreateResponseSchema,
   companyCreateSchema,
   companyGstInfoSchema,
@@ -91,6 +92,21 @@ export const create = createOpenApiRoute({
   summary: "Create a new company",
   request: {
     body: createApiJsonBody(companyCreateSchema),
+  },
+  responses: {
+    201: createApiSuccessResponse(companyCreateResponseSchema, "Company created successfully"),
+  },
+});
+
+export const addNew = createOpenApiRoute({
+  method: "post",
+  path: "/add-new",
+  operationId: "companyAddNew",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("create")],
+  summary: "Create a new company from an existing company request owner",
+  request: {
+    body: createApiJsonBody(companyAddNewSchema),
   },
   responses: {
     201: createApiSuccessResponse(companyCreateResponseSchema, "Company created successfully"),

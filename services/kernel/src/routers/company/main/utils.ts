@@ -10,7 +10,7 @@ import {
   getRazorpayClient,
   PasswordUtils,
 } from "@proptryx/utils";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { companyGstInfoSchema } from "./schema";
 
 const razorpayClient = getRazorpayClient();
@@ -18,6 +18,9 @@ const razorpayClient = getRazorpayClient();
 type IncludeDeletedOptions = {
   includeDeleted?: boolean;
 };
+
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+const normalizePhoneNumber = (value?: string | null) => value?.replace(/\D/g, "") ?? "";
 
 type RazorpaySyncParams = {
   ownerEmail: string;
@@ -132,6 +135,48 @@ export async function findCompanyOwnerConflicts(email: string, phoneNumber?: str
   return {
     emailExists: Boolean(emailMatch),
     phoneExists: Boolean(phoneMatch),
+  };
+}
+
+export async function findExistingCompanyOwnerByRequest(
+  ownerEmail: string,
+  ownerPhoneNumber?: string | null
+) {
+  const normalizedOwnerEmail = normalizeEmail(ownerEmail);
+  const normalizedOwnerPhoneNumber = normalizePhoneNumber(ownerPhoneNumber);
+
+  const existingUser = await db
+    .select()
+    .from(user)
+    .where(
+      and(sql`lower(trim(${user.email})) = ${normalizedOwnerEmail}`, eq(user.isDeleted, false))
+    )
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  if (!existingUser) {
+    return {
+      success: false as const,
+      message: "No existing user was found for this company request owner.",
+    };
+  }
+
+  const normalizedExistingUserPhoneNumber = normalizePhoneNumber(existingUser.phoneNumber);
+
+  if (
+    normalizedOwnerPhoneNumber &&
+    normalizedExistingUserPhoneNumber &&
+    normalizedOwnerPhoneNumber !== normalizedExistingUserPhoneNumber
+  ) {
+    return {
+      success: false as const,
+      message: "The request owner phone number does not match the existing user record.",
+    };
+  }
+
+  return {
+    success: true as const,
+    data: existingUser,
   };
 }
 

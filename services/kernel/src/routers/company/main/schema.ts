@@ -44,16 +44,44 @@ export const companyCreateSchema = createDbInsertSchema(organization, {
   },
 });
 
+export const companyAddNewSchema = companyCreateSchema
+  .omit({
+    ownerName: true,
+    ownerEmail: true,
+    ownerPhoneNumber: true,
+    ownerZoneId: true,
+  })
+  .extend({
+    requestId: z.string().min(1, "Request id is required"),
+  });
+
 export const COMPANY_CREATION_STEPS = [
+  "validate_input",
+  "insert_user",
+  "insert_credential_account",
+  "resolve_existing_user",
+  "insert_organization",
+  "insert_member",
+] as const;
+
+export const STANDARD_COMPANY_CREATION_STEPS = [
   "validate_input",
   "insert_user",
   "insert_credential_account",
   "insert_organization",
   "insert_member",
-] as const;
+] as const satisfies readonly (typeof COMPANY_CREATION_STEPS)[number][];
+
+export const ADD_NEW_COMPANY_CREATION_STEPS = [
+  "validate_input",
+  "resolve_existing_user",
+  "insert_organization",
+  "insert_member",
+] as const satisfies readonly (typeof COMPANY_CREATION_STEPS)[number][];
 
 export type CompanyCreationStep = (typeof COMPANY_CREATION_STEPS)[number];
-export const COMPANY_CREATION_TOTAL_STEPS = COMPANY_CREATION_STEPS.length;
+export const COMPANY_CREATION_TOTAL_STEPS = STANDARD_COMPANY_CREATION_STEPS.length;
+export const ADD_NEW_COMPANY_CREATION_TOTAL_STEPS = ADD_NEW_COMPANY_CREATION_STEPS.length;
 
 export const companyCreateResponseSchema = z.object({
   company: companySchema,

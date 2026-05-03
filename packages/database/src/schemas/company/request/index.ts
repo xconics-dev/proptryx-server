@@ -31,7 +31,9 @@ export const company_request = pgTable(
     deletedByUser: text("deleted_by_user").references(() => user.id, { onDelete: "set null" }),
   },
   (table) => [
-    uniqueIndex("company_request_gst_number_uidx").on(table.companyGstNumber),
+    uniqueIndex("company_request_gst_number_uidx")
+      .on(table.companyGstNumber)
+      .where(sql`${table.isDeleted} = false`),
     index("company_request_owner_email_idx").on(table.ownerEmail),
     index("company_request_owner_phone_idx").on(table.ownerPhoneNumber),
     index("company_request_isDeleted_createdAt_idx").on(table.isDeleted, table.createdAt),
