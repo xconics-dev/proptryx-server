@@ -19,6 +19,7 @@ import {
   create,
   get,
   get_gst_info,
+  get_settings,
   list,
   remove,
   resendCredentials,
@@ -33,6 +34,7 @@ import {
   createCompanyAuthSeed,
   fetchCompanyGstInfo,
   findCompanyById,
+  findCompanySettingsById,
   findExistingCompanyOwnerByRequest,
   findCompanyOwnerConflicts,
   findNextCompanyId,
@@ -108,6 +110,25 @@ registerOpenApiRoute(companyMainGroup, get_gst_info, async (c) => {
   }
 
   return c.json(createSuccessResponse(gstResult.data), 200);
+});
+
+registerOpenApiRoute(companyMainGroup, get_settings, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user: currentAuthUser } = getBetterAuthContext(c);
+
+  const company = await findCompanySettingsById(id, currentAuthUser?.id);
+
+  if (!company) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  return c.json(createSuccessResponse(company), 200);
 });
 
 // Mutation routes

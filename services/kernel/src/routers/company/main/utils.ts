@@ -10,7 +10,7 @@ import {
   getRazorpayClient,
   PasswordUtils,
 } from "@proptryx/utils";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { companyGstInfoSchema } from "./schema";
 
 const razorpayClient = getRazorpayClient();
@@ -54,6 +54,147 @@ export async function findCompanyById(id: string, options?: IncludeDeletedOption
       },
     },
   });
+}
+
+const getAdminUserSummary = async (userId: string | null) => {
+  if (!userId) {
+    return null;
+  }
+
+  const adminUser = await db.query.user.findFirst({
+    columns: {
+      id: true,
+      name: true,
+      email: true,
+      phoneNumber: true,
+      emailVerified: true,
+    },
+    where: eq(user.id, userId),
+  });
+
+  return adminUser ?? null;
+};
+
+const getOrganizationMemberAuditUserId = async (
+  organizationId: string,
+  auditColumn: typeof member.createdByUser | typeof member.updatedByUser
+) => {
+  const memberAudit = await db
+    .select({
+      userId: auditColumn,
+    })
+    .from(member)
+    .where(and(eq(member.organizationId, organizationId), eq(member.isDeleted, false)))
+    .orderBy(asc(member.createdAt))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  return memberAudit?.userId ?? null;
+};
+
+const getOrganizationMemberSummary = async (organizationId: string, ownerOnly: boolean) => {
+  const memberSummary = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      emailVerified: user.emailVerified,
+    })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(
+      and(
+        eq(member.organizationId, organizationId),
+        ownerOnly ? eq(member.role, "owner") : undefined,
+        eq(member.isDeleted, false),
+        eq(user.isDeleted, false)
+      )
+    )
+    .orderBy(asc(member.createdAt))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  return memberSummary ?? null;
+};
+
+const getOrganizationOwnerSummary = async (organizationId: string) => {
+  const owner = await getOrganizationMemberSummary(organizationId, true);
+
+  if (owner) {
+    return owner;
+  }
+
+  return getOrganizationMemberSummary(organizationId, false);
+};
+
+const getCurrentOrganizationMember = async (organizationId: string, userId?: string | null) => {
+  if (!userId) {
+    return null;
+  }
+
+  const currentMember = await db
+    .select({
+      id: member.id,
+      organizationId: member.organizationId,
+      userId: member.userId,
+      role: member.role,
+      panel: member.panel,
+      createdAt: member.createdAt,
+      updatedAt: member.updatedAt,
+      createdByUser: member.createdByUser,
+      updatedByUser: member.updatedByUser,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        emailVerified: user.emailVerified,
+      },
+    })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(
+      and(
+        eq(member.organizationId, organizationId),
+        eq(member.userId, userId),
+        eq(member.isDeleted, false),
+        eq(user.isDeleted, false)
+      )
+    )
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  return currentMember ?? null;
+};
+
+export async function findCompanySettingsById(id: string, currentUserId?: string | null) {
+  const company = await db.query.organization.findFirst({
+    where: and(eq(organization.id, id), eq(organization.isDeleted, false)),
+  });
+
+  if (!company) {
+    return null;
+  }
+
+  const [memberCreatedByUser, memberUpdatedByUser] = await Promise.all([
+    getOrganizationMemberAuditUserId(company.id, member.createdByUser),
+    getOrganizationMemberAuditUserId(company.id, member.updatedByUser),
+  ]);
+
+  const [createdByUserAdmin, updatedByUserAdmin, ownerAdmin, currentMember] = await Promise.all([
+    getAdminUserSummary(company.createdByUser ?? memberCreatedByUser),
+    getAdminUserSummary(company.updatedByUser ?? memberUpdatedByUser),
+    getOrganizationOwnerSummary(company.id),
+    getCurrentOrganizationMember(company.id, currentUserId),
+  ]);
+
+  return {
+    ...company,
+    createdByUserAdmin: createdByUserAdmin ?? ownerAdmin,
+    updatedByUserAdmin: updatedByUserAdmin ?? createdByUserAdmin ?? ownerAdmin,
+    currentMember,
+  };
 }
 
 export async function fetchCompanyGstInfo(gstNumber: string) {

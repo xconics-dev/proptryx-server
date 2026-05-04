@@ -1,5 +1,6 @@
 import {
   gstInfoResponseSchema,
+  member,
   organization,
   OrganizationType,
   rbacRole,
@@ -20,6 +21,30 @@ export const companySchema = createDbSelectSchema(organization).extend({
       omit: ["createdAt", "updatedAt", "organizationId"],
     })
   ),
+});
+
+const companyUserSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.email(),
+  phoneNumber: z.string().nullable(),
+  emailVerified: z.boolean(),
+});
+
+const companyAdminUserSummarySchema = companyUserSummarySchema.nullable();
+
+const companyCurrentMemberSchema = createDbSelectSchema(member, {
+  omit: ["deletedAt", "isDeleted", "deletedByUser"],
+})
+  .extend({
+    user: companyUserSummarySchema,
+  })
+  .nullable();
+
+export const companySettingsSchema = createDbSelectSchema(organization).extend({
+  createdByUserAdmin: companyAdminUserSummarySchema,
+  updatedByUserAdmin: companyAdminUserSummarySchema,
+  currentMember: companyCurrentMemberSchema,
 });
 
 export const companyCreateSchema = createDbInsertSchema(organization, {

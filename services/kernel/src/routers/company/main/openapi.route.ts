@@ -16,6 +16,7 @@ import {
   companyListQuerySchema,
   companyListResponseSchema,
   companySchema,
+  companySettingsSchema,
   companyUpdateSchema,
 } from "./schema";
 
@@ -79,6 +80,24 @@ export const get_gst_info = createOpenApiRoute({
       description: "Company not found",
     },
     200: createApiSuccessResponse(companyGstInfoSchema, "Company GST info fetched successfully"),
+  },
+});
+
+export const get_settings = createOpenApiRoute({
+  method: "get",
+  path: "/{id}/settings",
+  operationId: "companyGetSettingsById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.get],
+  summary: "Get company settings details by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    404: {
+      description: "Company not found",
+    },
+    200: createApiSuccessResponse(companySettingsSchema, "Company settings fetched successfully"),
   },
 });
 
