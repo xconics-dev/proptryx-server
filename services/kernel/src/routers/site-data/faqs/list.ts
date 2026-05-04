@@ -17,6 +17,7 @@ export const fetchFaqList = createTableListFetcher<
   },
   filterColumns: {
     isArchived: faq.isArchived,
+    propertyId: faq.propertyId,
   },
   sorting: {
     defaultBy: "createdAt",
@@ -24,6 +25,7 @@ export const fetchFaqList = createTableListFetcher<
   },
   sortColumns: {
     id: faq.id,
+    propertyId: faq.propertyId,
     question: faq.question,
     isArchived: faq.isArchived,
     createdAt: faq.createdAt,

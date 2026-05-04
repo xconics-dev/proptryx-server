@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import { boolean, index, jsonb, pgTable, real, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { user } from "../auth/schema";
 import { meeting } from "../meeting/schema";
+import { faq } from "../site-data/faqs/schema";
 import { createAuditRelationNames } from "../utils/audit";
 import {
   AreaType,
@@ -29,7 +30,7 @@ const auditRelations = {
 export const property = pgTable(
   "property",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
+    id: text("id").primaryKey(),
     name: text("name").notNull(),
     description: text("description"),
 
@@ -108,11 +109,14 @@ export const property = pgTable(
   (table) => [
     index("property_name_idx").on(table.name),
     index("property_superOwnerId_idx").on(table.superOwnerId),
+    index("property_createdByUser_idx").on(table.createdByUser),
     index("property_type_idx").on(table.type),
     index("property_status_idx").on(table.status),
     index("property_city_idx").on(table.city),
     index("property_pincode_idx").on(table.pincode),
     index("property_certificateStatus_idx").on(table.certificateStatus),
+    index("property_isDeleted_superOwnerId_idx").on(table.isDeleted, table.superOwnerId),
+    index("property_isDeleted_createdByUser_idx").on(table.isDeleted, table.createdByUser),
     index("property_isDeleted_isPublished_createdAt_idx").on(
       table.isDeleted,
       table.isPublished,
@@ -147,6 +151,7 @@ export const propertyRelations = relations(property, ({ one, many }) => {
     owners: many(propertyOwner),
     mediaItems: many(propertyMedia),
     meetings: many(meeting),
+    faqs: many(faq),
     propertyZones: many(propertyZone, {
       relationName: "propertyZoneMappings",
     }),

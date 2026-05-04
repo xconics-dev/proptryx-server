@@ -1,5 +1,6 @@
 export const DATABASE_RESOURCES = {
   account: "account",
+  broker_request: "broker_request",
   company_request: "company_request",
   faq: "faq",
   invitation: "invitation",

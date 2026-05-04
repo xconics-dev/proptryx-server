@@ -19,6 +19,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
       description:
         "Meeting request and scheduling endpoints, including developer and occupier availability, confirmation, completion, cancellation, rejection, and MOM publishing.",
     },
+    {
+      name: "Roles & Permissions",
+      description: "Company-scoped RBAC role and permission management endpoints.",
+    },
   ],
   "x-tagGroups": [
     {
@@ -28,6 +32,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     {
       name: "Meeting APIs",
       tags: ["Meetings"],
+    },
+    {
+      name: "RBAC APIs",
+      tags: ["Roles & Permissions"],
     },
   ],
   servers: [

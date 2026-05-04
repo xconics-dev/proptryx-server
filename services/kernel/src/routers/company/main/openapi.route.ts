@@ -9,6 +9,7 @@ import {
   IdStringParamSchema,
 } from "@proptryx/utils";
 import {
+  companyAddNewSchema,
   companyCreateResponseSchema,
   companyCreateSchema,
   companyGstInfoSchema,
@@ -97,6 +98,21 @@ export const create = createOpenApiRoute({
   },
 });
 
+export const addNew = createOpenApiRoute({
+  method: "post",
+  path: "/add-new",
+  operationId: "companyAddNew",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("create")],
+  summary: "Create a new company from an existing company request owner",
+  request: {
+    body: createApiJsonBody(companyAddNewSchema),
+  },
+  responses: {
+    201: createApiSuccessResponse(companyCreateResponseSchema, "Company created successfully"),
+  },
+});
+
 export const update = createOpenApiRoute({
   method: "patch",
   path: "/{id}",
@@ -128,12 +144,12 @@ export const remove = createOpenApiRoute({
   },
 });
 
-export const resend_cred = createOpenApiRoute({
+export const resendCredentials = createOpenApiRoute({
   method: "post",
   path: "/{id}/resend-cred",
   operationId: "companyResendMemberCredentials",
   tags,
-  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("activate")],
   summary: "Resend credentials to a company member by member ID",
   request: {
     params: IdStringParamSchema(),

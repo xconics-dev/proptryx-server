@@ -1,45 +1,79 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Better Auth runtime context is runtime-shaped */
 import * as schema from "@proptryx/database";
 import type { SubscriptionPlanFeatures } from "@proptryx/database";
+import { generateRandomId } from "@proptryx/utils";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
   createPlanBodySchema,
-  deactivatePlanBodySchema,
+  deletePlanBodySchema,
   getPlanByCode,
   getPlanById,
+  getPlanByRazorpayPlanId,
+  getRecommendedPlan,
+  getRazorpayErrorMessage,
   getPlanQuerySchema,
+  listPlansQuerySchema,
   normalizePlanCode,
+  razorpayPlanLookupQuerySchema,
+  rzClient,
   signedInSessionMiddleware,
   updatePlanBodySchema,
 } from "./shared";
 import { resolveAuthDatabase } from "../../auth/utils";
-import { generateRandomId } from "@proptryx/utils";
 
 const listPlansEndpoint = createAuthEndpoint(
   "/subscription/plans",
   {
     method: "GET",
+    query: listPlansQuerySchema,
     metadata: {
       openapi: {
-        summary: "List active subscription plans",
-        description: "Returns all active subscription plans ordered by price. Public endpoint.",
+        summary: "List subscription plans",
+        description:
+          "Returns subscription plans ordered by price. Pass includeInactive=true to include inactive plans.",
         responses: {
-          200: { description: "Active plans" },
+          200: { description: "Plans list" },
         },
       },
     },
   },
   async (ctx) => {
     const db = resolveAuthDatabase();
+    const includeInactive = ctx.query.includeInactive ?? false;
+    const whereClause = includeInactive
+      ? eq(schema.subscriptionPlans.isDeleted, false)
+      : and(
+          eq(schema.subscriptionPlans.isDeleted, false),
+          eq(schema.subscriptionPlans.isActive, true)
+        );
+
+    const countRows = await db
+      .select({
+        subscriptionPlanId: schema.organizationSubscription.subscriptionPlanId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(schema.organizationSubscription)
+      .groupBy(schema.organizationSubscription.subscriptionPlanId);
+
+    const countMap = new Map(countRows.map((row) => [row.subscriptionPlanId, Number(row.count)]));
+
     const plans = await db
       .select()
       .from(schema.subscriptionPlans)
-      .where(eq(schema.subscriptionPlans.isActive, true))
-      .orderBy(asc(schema.subscriptionPlans.amountInPaise));
+      .where(whereClause)
+      .orderBy(
+        desc(schema.subscriptionPlans.isRecommended),
+        asc(schema.subscriptionPlans.amountInPaise)
+      );
 
-    return ctx.json({ plans });
+    const plansWithCounts = plans.map((plan) => ({
+      ...plan,
+      subscriptionCount: countMap.get(plan.id) ?? 0,
+    }));
+
+    return ctx.json({ plans: plansWithCounts });
   }
 );
 
@@ -79,6 +113,81 @@ const getPlanEndpoint = createAuthEndpoint(
   }
 );
 
+const getRazorpayPlanEndpoint = createAuthEndpoint(
+  "/subscription/razorpay-plan",
+  {
+    method: "GET",
+    query: razorpayPlanLookupQuerySchema,
+    use: [signedInSessionMiddleware],
+    metadata: {
+      openapi: {
+        summary: "Validate a Razorpay plan id",
+        description:
+          "Fetches a Razorpay plan, maps supported fields for subscription plan forms, and reports whether the id is already used by another local plan.",
+        responses: {
+          200: { description: "Razorpay plan details" },
+          404: { description: "Razorpay plan not found" },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const { razorpayPlanId, currentPlanId } = ctx.query;
+
+    let razorpayPlan: any;
+    try {
+      razorpayPlan = await (rzClient.plans.fetch as any)(razorpayPlanId);
+    } catch (error) {
+      throw new APIError("NOT_FOUND", {
+        message: getRazorpayErrorMessage(error, "Razorpay plan not found."),
+      });
+    }
+
+    const mappedPlan = await getPlanByRazorpayPlanId(razorpayPlanId);
+    const isMappedToAnotherPlan = Boolean(mappedPlan && mappedPlan.id !== currentPlanId);
+    const item = razorpayPlan?.item ?? {};
+    const period = typeof razorpayPlan?.period === "string" ? razorpayPlan.period : null;
+    const interval = Number(razorpayPlan?.interval ?? 1);
+    const billingInterval =
+      interval === 1 && (period === "monthly" || period === "yearly") ? period : null;
+
+    return ctx.json({
+      isValid: !isMappedToAnotherPlan,
+      razorpayPlanId,
+      message: isMappedToAnotherPlan
+        ? `This Razorpay plan is already mapped to "${mappedPlan?.name ?? mappedPlan?.code}".`
+        : "Razorpay plan verified.",
+      mappedPlan: mappedPlan
+        ? {
+            id: mappedPlan.id,
+            code: mappedPlan.code,
+            name: mappedPlan.name,
+          }
+        : null,
+      details: {
+        id: razorpayPlan?.id ?? razorpayPlanId,
+        entity: razorpayPlan?.entity ?? null,
+        period,
+        interval: Number.isFinite(interval) ? interval : null,
+        item: {
+          id: item?.id ?? null,
+          name: item?.name ?? null,
+          description: item?.description ?? null,
+          amountInPaise: Number.isFinite(Number(item?.amount)) ? Number(item.amount) : null,
+          currency: item?.currency ?? null,
+        },
+      },
+      formValues: {
+        name: item?.name ?? null,
+        description: item?.description ?? null,
+        amountInPaise: Number.isFinite(Number(item?.amount)) ? Number(item.amount) : null,
+        currency: item?.currency ?? null,
+        billingInterval,
+      },
+    });
+  }
+);
+
 const createPlanEndpoint = createAuthEndpoint(
   "/subscription/plan",
   {
@@ -103,7 +212,9 @@ const createPlanEndpoint = createAuthEndpoint(
     const [existing] = await db
       .select({ id: schema.subscriptionPlans.id })
       .from(schema.subscriptionPlans)
-      .where(eq(schema.subscriptionPlans.code, code))
+      .where(
+        and(eq(schema.subscriptionPlans.code, code), eq(schema.subscriptionPlans.isDeleted, false))
+      )
       .limit(1);
 
     if (existing) {
@@ -112,7 +223,18 @@ const createPlanEndpoint = createAuthEndpoint(
       });
     }
 
+    if (ctx.body.isRecommended) {
+      const recommendedPlan = await getRecommendedPlan();
+
+      if (recommendedPlan) {
+        throw new APIError("BAD_REQUEST", {
+          message: `"${recommendedPlan.name}" is already marked as the recommended plan.`,
+        });
+      }
+    }
+
     const now = new Date();
+    const session = ctx.context.session as any;
 
     const [plan] = await db
       .insert(schema.subscriptionPlans)
@@ -122,6 +244,8 @@ const createPlanEndpoint = createAuthEndpoint(
         name: ctx.body.name,
         description: ctx.body.description || null,
         amountInPaise: ctx.body.amountInPaise,
+        discountedAmountInPaise: ctx.body.discountedAmountInPaise ?? null,
+        discountAvailableTill: ctx.body.discountAvailableTill ?? null,
         currency: ctx.body.currency,
         billingInterval: ctx.body.billingInterval,
         razorpayPlanId: ctx.body.razorpayPlanId,
@@ -129,9 +253,12 @@ const createPlanEndpoint = createAuthEndpoint(
         quantity: ctx.body.quantity ?? 1,
         trialDays: ctx.body.trialDays ?? 0,
         addonPropertyOneTimeCostInPaise: ctx.body.addonPropertyOneTimeCostInPaise ?? 0,
+        isRecommended: ctx.body.isRecommended,
         isActive: ctx.body.isActive ?? true,
         features: ctx.body.features as SubscriptionPlanFeatures,
         metadata: ctx.body.metadata ?? {},
+        createdByUser: session.user.id,
+        updatedByUser: session.user.id,
         createdAt: now,
         updatedAt: now,
       })
@@ -169,10 +296,27 @@ const updatePlanEndpoint = createAuthEndpoint(
     const updatePayload: Record<string, unknown> = {
       updatedAt: new Date(),
     };
+    const session = ctx.context.session as any;
+
+    if (ctx.body.isRecommended) {
+      const recommendedPlan = await getRecommendedPlan(existing.id);
+
+      if (recommendedPlan) {
+        throw new APIError("BAD_REQUEST", {
+          message: `"${recommendedPlan.name}" is already marked as the recommended plan.`,
+        });
+      }
+    }
 
     if (ctx.body.name !== undefined) updatePayload.name = ctx.body.name;
     if (ctx.body.description !== undefined) updatePayload.description = ctx.body.description;
     if (ctx.body.amountInPaise !== undefined) updatePayload.amountInPaise = ctx.body.amountInPaise;
+    if (ctx.body.discountedAmountInPaise !== undefined) {
+      updatePayload.discountedAmountInPaise = ctx.body.discountedAmountInPaise;
+    }
+    if (ctx.body.discountAvailableTill !== undefined) {
+      updatePayload.discountAvailableTill = ctx.body.discountAvailableTill;
+    }
     if (ctx.body.currency !== undefined) updatePayload.currency = ctx.body.currency;
     if (ctx.body.billingInterval !== undefined) {
       updatePayload.billingInterval = ctx.body.billingInterval;
@@ -186,11 +330,13 @@ const updatePlanEndpoint = createAuthEndpoint(
     if (ctx.body.addonPropertyOneTimeCostInPaise !== undefined) {
       updatePayload.addonPropertyOneTimeCostInPaise = ctx.body.addonPropertyOneTimeCostInPaise;
     }
+    updatePayload.isRecommended = ctx.body.isRecommended;
     if (ctx.body.isActive !== undefined) updatePayload.isActive = ctx.body.isActive;
     if (ctx.body.features !== undefined) {
       updatePayload.features = ctx.body.features as SubscriptionPlanFeatures;
     }
     if (ctx.body.metadata !== undefined) updatePayload.metadata = ctx.body.metadata;
+    updatePayload.updatedByUser = session.user.id;
 
     const [updated] = await db
       .update(schema.subscriptionPlans)
@@ -202,18 +348,18 @@ const updatePlanEndpoint = createAuthEndpoint(
   }
 );
 
-const deactivatePlanEndpoint = createAuthEndpoint(
+const deletePlanEndpoint = createAuthEndpoint(
   "/subscription/plan",
   {
     method: "DELETE",
-    body: deactivatePlanBodySchema,
+    body: deletePlanBodySchema,
     use: [signedInSessionMiddleware],
     metadata: {
       openapi: {
-        summary: "Deactivate a subscription plan",
-        description: "Sets isActive=false on the plan. Does not delete existing subscriptions.",
+        summary: "Soft delete a subscription plan",
+        description: "Soft-deletes a plan and keeps subscription history intact.",
         responses: {
-          200: { description: "Plan deactivated" },
+          200: { description: "Plan deleted" },
           404: { description: "Plan not found" },
         },
       },
@@ -227,13 +373,74 @@ const deactivatePlanEndpoint = createAuthEndpoint(
       throw new APIError("NOT_FOUND", { message: "Subscription plan not found." });
     }
 
-    const [updated] = await db
-      .update(schema.subscriptionPlans)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(schema.subscriptionPlans.id, existing.id))
-      .returning();
+    const [countRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.organizationSubscription)
+      .where(eq(schema.organizationSubscription.subscriptionPlanId, existing.id));
 
-    return ctx.json({ plan: updated });
+    const subscriptionCount = Number(countRow?.count ?? 0);
+
+    if (subscriptionCount > 0) {
+      throw new APIError("BAD_REQUEST", {
+        message: `This plan has ${subscriptionCount} connected subscription(s) and cannot be deleted.`,
+      });
+    }
+
+    const session = ctx.context.session as any;
+    const now = new Date();
+
+    await db
+      .update(schema.subscriptionPlans)
+      .set({
+        isActive: false,
+        isDeleted: true,
+        deletedAt: now,
+        deletedByUser: session.user.id,
+        updatedByUser: session.user.id,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.subscriptionPlans.id, existing.id),
+          eq(schema.subscriptionPlans.isDeleted, false)
+        )
+      );
+
+    return ctx.json({ success: true, id: existing.id });
+  }
+);
+
+const listActivePlansPublicEndpoint = createAuthEndpoint(
+  "/subscription/active-plans",
+  {
+    method: "GET",
+    metadata: {
+      openapi: {
+        summary: "List active subscription plans (public)",
+        description: "Returns only active plans ordered by price. No auth required. No params.",
+        responses: {
+          200: { description: "Active plans" },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const db = resolveAuthDatabase();
+    const plans = await db
+      .select()
+      .from(schema.subscriptionPlans)
+      .where(
+        and(
+          eq(schema.subscriptionPlans.isDeleted, false),
+          eq(schema.subscriptionPlans.isActive, true)
+        )
+      )
+      .orderBy(
+        desc(schema.subscriptionPlans.isRecommended),
+        asc(schema.subscriptionPlans.amountInPaise)
+      );
+
+    return ctx.json({ plans });
   }
 );
 
@@ -241,9 +448,11 @@ export const subscriptionPlansPlugin = {
   id: "subscription-plans",
   endpoints: {
     listSubscriptionPlans: listPlansEndpoint,
+    listActiveSubscriptionPlans: listActivePlansPublicEndpoint,
     getSubscriptionPlan: getPlanEndpoint,
+    getRazorpaySubscriptionPlan: getRazorpayPlanEndpoint,
     createSubscriptionPlan: createPlanEndpoint,
     updateSubscriptionPlan: updatePlanEndpoint,
-    deactivateSubscriptionPlan: deactivatePlanEndpoint,
+    deleteSubscriptionPlan: deletePlanEndpoint,
   },
 } satisfies BetterAuthPlugin;

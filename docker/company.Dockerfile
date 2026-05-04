@@ -6,10 +6,10 @@ WORKDIR /app
 ENV PNPM_HOME="/pnpm"
 ENV PNPM_STORE_DIR="/pnpm/store"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
 
 FROM base AS build-deps
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY .npmrc package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/database/package.json ./packages/database/package.json
 COPY packages/logger/package.json ./packages/logger/package.json
 COPY packages/notification/package.json ./packages/notification/package.json

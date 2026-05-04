@@ -8,6 +8,7 @@ import {
   optionalBooleanQuerySchema,
 } from "@proptryx/utils";
 import type { z } from "@hono/zod-openapi";
+import zod from "zod";
 
 export const testimonialSchema = createDbSelectSchema(testimonial);
 
@@ -39,6 +40,7 @@ export const testimonialUpdateSchema = createDbUpdateSchema(testimonial, {
 
 export const testimonialListSortFields = [
   "id",
+  "propertyId",
   "authorName",
   "designation",
   "ratings",
@@ -51,6 +53,7 @@ export const testimonialListQuerySchema = createListQuerySchema({
   sortFields: testimonialListSortFields,
   extraShape: {
     isArchived: optionalBooleanQuerySchema,
+    propertyId: zod.string().optional(),
   },
 });
 

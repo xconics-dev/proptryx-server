@@ -5,12 +5,14 @@ import { getOrganizationSubscriptionLimits } from "@proptryx/database";
 import { emailSubject, renderCompleteSubscriptionEmail, sendEmail } from "@proptryx/notification";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
-import { eq } from "drizzle-orm";
+import { eq, and, or, gte, lte, ilike, count, asc, desc } from "drizzle-orm";
 import {
   cancelSubscriptionBodySchema,
+  deleteSubscriptionBodySchema,
   createAuthorizedOrganizationMiddleware,
   createRazorpaySubscriptionWithLink,
   createSubscriptionBodySchema,
+  deleteOrganizationSubscriptionRecord,
   ensureOrganizationWithCustomer,
   getCurrentSubscriptionQuerySchema,
   getLimitsQuerySchema,
@@ -21,18 +23,33 @@ import {
   getPlanIncludedProperties,
   getRazorpayErrorMessage,
   isActiveSubscriptionStatus,
+  listSubscriptionsQuerySchema,
   normalizeStringRecord,
   pauseSubscriptionBodySchema,
+  paymentStatusQuerySchema,
   resolveSubscriptionNotifyContacts,
   resumeSubscriptionBodySchema,
   rzClient,
   saveOrganizationSubscriptionRecord,
+  signedInSessionMiddleware,
   SUBSCRIPTION_NOTIFICATION_CONFIG,
   syncSubscriptionBodySchema,
   toNullableNumber,
 } from "./shared";
 import { logger } from "@/lib/logger";
 import { resolveAuthDatabase } from "../../auth/utils";
+
+function getEffectivePlanAmountInPaise(plan: any) {
+  if (
+    plan?.discountedAmountInPaise &&
+    plan.discountedAmountInPaise > 0 &&
+    (!plan.discountAvailableTill || plan.discountAvailableTill >= new Date())
+  ) {
+    return plan.discountedAmountInPaise;
+  }
+
+  return plan?.amountInPaise ?? 0;
+}
 
 const createSubscriptionEndpoint = createAuthEndpoint(
   "/organization/subscription/create",
@@ -71,7 +88,10 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       });
     }
 
-    if (currentSubscription && isActiveSubscriptionStatus(currentSubscription.status)) {
+    // Block only if the subscription has already been authorized/paid.
+    // "created" status means payment was never completed — allow replacing it.
+    const PAID_STATUSES = new Set(["authenticated", "active", "pending", "halted", "paused"]);
+    if (currentSubscription && PAID_STATUSES.has(currentSubscription.status?.toLowerCase() ?? "")) {
       throw new APIError("BAD_REQUEST", {
         message: "Organization already has an active or pending subscription.",
       });
@@ -90,6 +110,7 @@ const createSubscriptionEndpoint = createAuthEndpoint(
     const addonPropertyOneTimeCostInPaise =
       ctx.body.addonPropertyOneTimeCostInPaise ?? plan.addonPropertyOneTimeCostInPaise ?? 0;
     const addonOneTimeTotalInPaise = additionalProperties * addonPropertyOneTimeCostInPaise;
+    const baseAmountInPaise = getEffectivePlanAmountInPaise(plan);
 
     if (additionalProperties > 0 && addonPropertyOneTimeCostInPaise <= 0) {
       throw new APIError("BAD_REQUEST", {
@@ -113,14 +134,16 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       planCode: plan.code,
       requestedRazorpayCustomerId: requestedCustomerId,
       createdByUserId: session.user.id,
-      baseAmountInPaise: String(plan.amountInPaise),
+      baseAmountInPaise: String(baseAmountInPaise),
+      listAmountInPaise: String(plan.amountInPaise),
+      discountedAmountInPaise: String(plan.discountedAmountInPaise ?? ""),
+      discountAvailableTill: plan.discountAvailableTill?.toISOString?.() ?? "",
       additionalProperties: String(additionalProperties),
       addonPropertyOneTimeCostInPaise: String(addonPropertyOneTimeCostInPaise),
       addonOneTimeTotalInPaise: String(addonOneTimeTotalInPaise),
       trialDaysApplied: String(trialDaysApplied),
       customerNotifyRequested: String(customerNotifyRequested),
       notificationMode,
-      applicationNotifyOnly: String(applicationNotifyOnly),
       ...(ctx.body.notes ?? {}),
     };
 
@@ -224,7 +247,7 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       razorpaySubscription,
       plan: { id: plan.id, code: plan.code },
       existing: currentSubscription,
-      baseAmountInPaise: plan.amountInPaise,
+      baseAmountInPaise,
       billingPeriod: plan.billingInterval,
       trialDaysApplied,
       additionalProperties,
@@ -235,6 +258,8 @@ const createSubscriptionEndpoint = createAuthEndpoint(
       metadata: ctx.body.metadata ?? {},
       notes,
       razorpayCustomerId: requestedCustomerId,
+      createdByUserId: session.user.id,
+      updatedByUserId: session.user.id,
     });
 
     const notificationSentByApp = await fallbackEmailPromise;
@@ -279,7 +304,14 @@ const currentSubscriptionEndpoint = createAuthEndpoint(
   },
   async (ctx) => {
     const organizationId = ctx.context.organizationId as string;
-    const subscription = await getOrganizationSubscriptionRecord(organizationId);
+    const raw = await getOrganizationSubscriptionRecord(organizationId);
+
+    // Treat terminal statuses as if no subscription exists so the client
+    // can proceed to /upgrade and create a fresh one.
+    const TERMINAL_STATUSES = new Set(["cancelled", "expired", "completed"]);
+    const subscription =
+      raw && TERMINAL_STATUSES.has(raw.status?.toLowerCase?.() ?? "") ? null : raw;
+
     const plan = await getPlanById(subscription?.subscriptionPlanId ?? null);
 
     return ctx.json({ subscription, plan });
@@ -363,6 +395,7 @@ const syncSubscriptionEndpoint = createAuthEndpoint(
       trialStart: subscription.trialStart,
       trialEnd: subscription.trialEnd,
       razorpayCustomerId: subscription.razorpayCustomerId,
+      updatedByUserId: (ctx.context.session as any)?.user?.id ?? null,
     });
 
     return ctx.json({ subscription: syncedSubscription });
@@ -395,13 +428,15 @@ const cancelSubscriptionEndpoint = createAuthEndpoint(
       });
     }
 
-    const cancelAtCycleEnd = ctx.body.cancelAtCycleEnd ?? true;
+    // "created" subscriptions have no billing cycle — cancel immediately
+    const cancelAtCycleEnd =
+      subscription.status === "created" ? false : (ctx.body.cancelAtCycleEnd ?? true);
     const razorpaySubscription = await rzClient.subscriptions.cancel(
       subscription.razorpaySubscriptionId,
       cancelAtCycleEnd
     );
-    const linkedPlan = await getPlanById(subscription.subscriptionPlanId);
 
+    const linkedPlan = await getPlanById(subscription.subscriptionPlanId);
     const cancelledSubscription = await saveOrganizationSubscriptionRecord({
       organizationId,
       razorpaySubscription,
@@ -419,9 +454,59 @@ const cancelSubscriptionEndpoint = createAuthEndpoint(
       trialStart: subscription.trialStart,
       trialEnd: subscription.trialEnd,
       razorpayCustomerId: subscription.razorpayCustomerId,
+      updatedByUserId: (ctx.context.session as any)?.user?.id ?? null,
     });
 
     return ctx.json({ subscription: cancelledSubscription });
+  }
+);
+
+const deleteSubscriptionEndpoint = createAuthEndpoint(
+  "/organization/subscription/delete",
+  {
+    method: "POST",
+    body: deleteSubscriptionBodySchema,
+    use: [createAuthorizedOrganizationMiddleware((ctx) => ctx.body?.organizationId)],
+    metadata: {
+      openapi: {
+        summary: "Delete cancelled organization subscription record",
+        description:
+          "Soft deletes a cancelled organization subscription record from organization_subscription",
+        responses: {
+          200: { description: "Subscription record deleted" },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const organizationId = ctx.context.organizationId as string;
+    const deletedByUserId = (ctx.context.session as any)?.user?.id ?? null;
+    const subscription = await getOrganizationSubscriptionRecord(organizationId);
+
+    if (!subscription) {
+      throw new APIError("BAD_REQUEST", {
+        message: "No subscription record was found for this organization.",
+      });
+    }
+
+    if (subscription.status !== "cancelled") {
+      throw new APIError("BAD_REQUEST", {
+        message: "Only cancelled subscription records can be deleted.",
+      });
+    }
+
+    const deletedSubscription = await deleteOrganizationSubscriptionRecord(
+      subscription.id,
+      deletedByUserId
+    );
+
+    if (!deletedSubscription) {
+      throw new APIError("BAD_REQUEST", {
+        message: "Failed to delete the subscription record.",
+      });
+    }
+
+    return ctx.json({ subscription: deletedSubscription });
   }
 );
 
@@ -475,6 +560,7 @@ const pauseSubscriptionEndpoint = createAuthEndpoint(
       trialStart: subscription.trialStart,
       trialEnd: subscription.trialEnd,
       razorpayCustomerId: subscription.razorpayCustomerId,
+      updatedByUserId: (ctx.context.session as any)?.user?.id ?? null,
     });
 
     return ctx.json({ subscription: pausedSubscription });
@@ -531,9 +617,240 @@ const resumeSubscriptionEndpoint = createAuthEndpoint(
       trialStart: subscription.trialStart,
       trialEnd: subscription.trialEnd,
       razorpayCustomerId: subscription.razorpayCustomerId,
+      updatedByUserId: (ctx.context.session as any)?.user?.id ?? null,
     });
 
     return ctx.json({ subscription: resumedSubscription });
+  }
+);
+
+const paymentStatusEndpoint = createAuthEndpoint(
+  "/organization/subscription/payment-status",
+  {
+    method: "GET",
+    query: paymentStatusQuerySchema,
+    use: [createAuthorizedOrganizationMiddleware((ctx) => ctx.query?.organizationId)],
+    metadata: {
+      openapi: {
+        operationId: "getOrganizationSubscriptionPaymentStatus",
+        summary: "Poll subscription payment status",
+        description:
+          "Lightweight single-JOIN polling endpoint. Returns payment confirmation state and minimal plan details without any Razorpay API calls. Call on an interval (e.g. every 3 s) after subscription creation to detect when isPaid flips to true.",
+        tags: ["Organization-subscription"],
+        parameters: [
+          {
+            name: "organizationId",
+            in: "query" as const,
+            required: false,
+            schema: { type: "string" },
+            description:
+              "Target organization ID. Falls back to the session activeOrganizationId when omitted.",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Payment status resolved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: [
+                    "status",
+                    "isPaid",
+                    "isActive",
+                    "cancelAtCycleEnd",
+                    "paidCount",
+                    "razorpaySubscriptionId",
+                    "shortUrl",
+                    "plan",
+                  ],
+                  properties: {
+                    status: {
+                      type: "string",
+                      nullable: true,
+                      description:
+                        "Razorpay subscription status or null if no subscription exists.",
+                      enum: [
+                        "created",
+                        "authenticated",
+                        "active",
+                        "pending",
+                        "halted",
+                        "paused",
+                        "cancelled",
+                        "completed",
+                        "expired",
+                        null,
+                      ],
+                    },
+                    isPaid: {
+                      type: "boolean",
+                      description:
+                        "True when paidCount > 0 — at least one billing cycle has been paid.",
+                    },
+                    isActive: {
+                      type: "boolean",
+                      description:
+                        "True when status is one of created | authenticated | active | pending | halted | paused.",
+                    },
+                    cancelAtCycleEnd: {
+                      type: "boolean",
+                      description:
+                        "Whether the subscription will cancel at the end of the current billing cycle.",
+                    },
+                    paidCount: {
+                      type: "integer",
+                      minimum: 0,
+                      description: "Number of billing cycles already paid.",
+                    },
+                    razorpaySubscriptionId: {
+                      type: "string",
+                      nullable: true,
+                      description: "Razorpay subscription ID if one has been created.",
+                    },
+                    shortUrl: {
+                      type: "string",
+                      nullable: true,
+                      description:
+                        "Hosted payment / authentication link from Razorpay. Present until the mandate is authorised.",
+                    },
+                    plan: {
+                      type: "object",
+                      nullable: true,
+                      description: "Minimal plan details. null when no plan is linked.",
+                      required: [
+                        "id",
+                        "code",
+                        "name",
+                        "amountInPaise",
+                        "discountedAmountInPaise",
+                        "discountAvailableTill",
+                        "currency",
+                        "billingInterval",
+                        "trialDays",
+                      ],
+                      properties: {
+                        id: { type: "string" },
+                        code: { type: "string" },
+                        name: { type: "string" },
+                        amountInPaise: {
+                          type: "integer",
+                          description: "Full list price in paise.",
+                        },
+                        discountedAmountInPaise: {
+                          type: "integer",
+                          nullable: true,
+                          description: "Discounted price in paise, if a discount is configured.",
+                        },
+                        discountAvailableTill: {
+                          type: "string",
+                          format: "date-time",
+                          nullable: true,
+                          description: "ISO 8601 UTC datetime until which the discount is valid.",
+                        },
+                        currency: {
+                          type: "string",
+                          example: "INR",
+                        },
+                        billingInterval: {
+                          type: "string",
+                          enum: ["monthly", "yearly"],
+                        },
+                        trialDays: {
+                          type: "integer",
+                          minimum: 0,
+                          description: "Number of trial days on this plan.",
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: "Unauthenticated — valid session required." },
+          403: {
+            description:
+              "Forbidden — the authenticated user is not a member of the requested organization.",
+          },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const organizationId = ctx.context.organizationId as string;
+    const db = resolveAuthDatabase();
+
+    const [row] = await db
+      .select({
+        status: schema.organizationSubscription.status,
+        paidCount: schema.organizationSubscription.paidCount,
+        cancelAtCycleEnd: schema.organizationSubscription.cancelAtCycleEnd,
+        razorpaySubscriptionId: schema.organizationSubscription.razorpaySubscriptionId,
+        shortUrl: schema.organizationSubscription.shortUrl,
+        planId: schema.subscriptionPlans.id,
+        planCode: schema.subscriptionPlans.code,
+        planName: schema.subscriptionPlans.name,
+        amountInPaise: schema.subscriptionPlans.amountInPaise,
+        discountedAmountInPaise: schema.subscriptionPlans.discountedAmountInPaise,
+        discountAvailableTill: schema.subscriptionPlans.discountAvailableTill,
+        currency: schema.subscriptionPlans.currency,
+        billingInterval: schema.subscriptionPlans.billingInterval,
+        trialDays: schema.subscriptionPlans.trialDays,
+      })
+      .from(schema.organizationSubscription)
+      .leftJoin(
+        schema.subscriptionPlans,
+        eq(schema.subscriptionPlans.id, schema.organizationSubscription.subscriptionPlanId)
+      )
+      .where(eq(schema.organizationSubscription.organizationId, organizationId))
+      .limit(1);
+
+    if (!row) {
+      return ctx.json({
+        status: null,
+        isPaid: false,
+        isActive: false,
+        isPaymentAuthorized: false,
+        cancelAtCycleEnd: false,
+        paidCount: 0,
+        razorpaySubscriptionId: null,
+        shortUrl: null,
+        plan: null,
+      });
+    }
+
+    const status = row.status;
+    const isPaid = row.paidCount > 0;
+    const isActive = isActiveSubscriptionStatus(status);
+    // true only when the customer has completed the Razorpay payment/mandate flow.
+    // "created" means the subscription exists but the customer hasn't paid yet.
+    const isPaymentAuthorized = status === "authenticated" || status === "active";
+    // || status === "pending";
+
+    return ctx.json({
+      status,
+      isPaid,
+      isActive,
+      isPaymentAuthorized,
+      cancelAtCycleEnd: row.cancelAtCycleEnd,
+      paidCount: row.paidCount,
+      razorpaySubscriptionId: row.razorpaySubscriptionId,
+      shortUrl: row.shortUrl,
+      plan: row.planId
+        ? {
+            id: row.planId,
+            code: row.planCode,
+            name: row.planName,
+            amountInPaise: row.amountInPaise,
+            discountedAmountInPaise: row.discountedAmountInPaise ?? null,
+            discountAvailableTill: row.discountAvailableTill?.toISOString() ?? null,
+            currency: row.currency,
+            billingInterval: row.billingInterval,
+            trialDays: row.trialDays,
+          }
+        : null,
+    });
   }
 );
 
@@ -657,14 +974,166 @@ const webhookEndpoint = createAuthEndpoint(
   }
 );
 
+const listSubscriptionsEndpoint = createAuthEndpoint(
+  "/organization/subscription/list",
+  {
+    method: "GET",
+    query: listSubscriptionsQuerySchema,
+    use: [signedInSessionMiddleware],
+    metadata: {
+      openapi: {
+        operationId: "listOrganizationSubscriptions",
+        summary: "List all organization subscriptions",
+        description:
+          "Paginated, filtered list of all organization subscriptions with joined plan and organization details. Requires authentication.",
+        tags: ["Organization-subscription"],
+        responses: {
+          200: { description: "Paginated subscription list" },
+          401: { description: "Unauthenticated" },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const db = resolveAuthDatabase();
+    const {
+      page,
+      limit,
+      search,
+      status,
+      organizationId,
+      planCode,
+      billingPeriod,
+      createdFrom,
+      createdTo,
+      sortBy,
+      sortOrder: sortDir,
+    } = ctx.query;
+
+    const offset = (page - 1) * limit;
+
+    const conditions = [
+      eq(schema.organizationSubscription.isDeleted, false),
+      status ? eq(schema.organizationSubscription.status, status) : undefined,
+      organizationId
+        ? eq(schema.organizationSubscription.organizationId, organizationId)
+        : undefined,
+      planCode ? eq(schema.organizationSubscription.planCode, planCode) : undefined,
+      billingPeriod ? eq(schema.organizationSubscription.billingPeriod, billingPeriod) : undefined,
+      createdFrom ? gte(schema.organizationSubscription.createdAt, createdFrom) : undefined,
+      createdTo ? lte(schema.organizationSubscription.createdAt, createdTo) : undefined,
+      search
+        ? or(
+            ilike(schema.organization.name, `%${search}%`),
+            ilike(schema.organizationSubscription.planCode, `%${search}%`),
+            ilike(schema.organizationSubscription.razorpaySubscriptionId, `%${search}%`)
+          )
+        : undefined,
+    ].filter(Boolean) as ReturnType<typeof eq>[];
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const sortColumn =
+      {
+        createdAt: schema.organizationSubscription.createdAt,
+        updatedAt: schema.organizationSubscription.updatedAt,
+        status: schema.organizationSubscription.status,
+        paidCount: schema.organizationSubscription.paidCount,
+      }[sortBy] ?? schema.organizationSubscription.createdAt;
+
+    const orderFn = sortDir === "asc" ? asc : desc;
+
+    const [rows, [countRow]] = await Promise.all([
+      db
+        .select({
+          id: schema.organizationSubscription.id,
+          organizationId: schema.organizationSubscription.organizationId,
+          organizationName: schema.organization.name,
+          organizationSlug: schema.organization.slug,
+          organizationEmail: schema.organization.email,
+          subscriptionPlanId: schema.organizationSubscription.subscriptionPlanId,
+          planCode: schema.organizationSubscription.planCode,
+          planName: schema.subscriptionPlans.name,
+          planBillingInterval: schema.subscriptionPlans.billingInterval,
+          planAmountInPaise: schema.subscriptionPlans.amountInPaise,
+          planCurrency: schema.subscriptionPlans.currency,
+          razorpaySubscriptionId: schema.organizationSubscription.razorpaySubscriptionId,
+          razorpayCustomerId: schema.organizationSubscription.razorpayCustomerId,
+          status: schema.organizationSubscription.status,
+          quantity: schema.organizationSubscription.quantity,
+          totalCount: schema.organizationSubscription.totalCount,
+          paidCount: schema.organizationSubscription.paidCount,
+          remainingCount: schema.organizationSubscription.remainingCount,
+          baseAmountInPaise: schema.organizationSubscription.baseAmountInPaise,
+          billingPeriod: schema.organizationSubscription.billingPeriod,
+          trialDaysApplied: schema.organizationSubscription.trialDaysApplied,
+          additionalProperties: schema.organizationSubscription.additionalProperties,
+          addonOneTimeTotalInPaise: schema.organizationSubscription.addonOneTimeTotalInPaise,
+          currentStart: schema.organizationSubscription.currentStart,
+          currentEnd: schema.organizationSubscription.currentEnd,
+          trialStart: schema.organizationSubscription.trialStart,
+          trialEnd: schema.organizationSubscription.trialEnd,
+          endedAt: schema.organizationSubscription.endedAt,
+          cancelledAt: schema.organizationSubscription.cancelledAt,
+          pausedAt: schema.organizationSubscription.pausedAt,
+          shortUrl: schema.organizationSubscription.shortUrl,
+          cancelAtCycleEnd: schema.organizationSubscription.cancelAtCycleEnd,
+          isDeleted: schema.organizationSubscription.isDeleted,
+          deletedAt: schema.organizationSubscription.deletedAt,
+          deletedByUser: schema.organizationSubscription.deletedByUser,
+          createdByUser: schema.organizationSubscription.createdByUser,
+          updatedByUser: schema.organizationSubscription.updatedByUser,
+          createdAt: schema.organizationSubscription.createdAt,
+          updatedAt: schema.organizationSubscription.updatedAt,
+        })
+        .from(schema.organizationSubscription)
+        .leftJoin(
+          schema.organization,
+          eq(schema.organization.id, schema.organizationSubscription.organizationId)
+        )
+        .leftJoin(
+          schema.subscriptionPlans,
+          eq(schema.subscriptionPlans.id, schema.organizationSubscription.subscriptionPlanId)
+        )
+        .where(where)
+        .orderBy(orderFn(sortColumn))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: count() })
+        .from(schema.organizationSubscription)
+        .leftJoin(
+          schema.organization,
+          eq(schema.organization.id, schema.organizationSubscription.organizationId)
+        )
+        .where(where),
+    ]);
+
+    const totalItems = Number(countRow?.count ?? 0);
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+
+    return ctx.json({
+      items: rows,
+      page,
+      limit,
+      offset,
+      totalItems,
+      totalPages,
+    });
+  }
+);
+
 export const organizationSubscriptionPlugin = {
   id: "organization-subscription",
   endpoints: {
     createOrganizationSubscription: createSubscriptionEndpoint,
     getCurrentOrganizationSubscription: currentSubscriptionEndpoint,
     getOrganizationSubscriptionLimits: limitsEndpoint,
+    getOrganizationSubscriptionPaymentStatus: paymentStatusEndpoint,
+    listOrganizationSubscriptions: listSubscriptionsEndpoint,
     syncOrganizationSubscription: syncSubscriptionEndpoint,
     cancelOrganizationSubscription: cancelSubscriptionEndpoint,
+    deleteOrganizationSubscription: deleteSubscriptionEndpoint,
     pauseOrganizationSubscription: pauseSubscriptionEndpoint,
     resumeOrganizationSubscription: resumeSubscriptionEndpoint,
     organizationSubscriptionWebhook: webhookEndpoint,

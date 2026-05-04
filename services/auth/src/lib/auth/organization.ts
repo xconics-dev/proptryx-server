@@ -1,6 +1,7 @@
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
 import { env } from "@/config/env";
+import { logger } from "@/lib/logger";
 import {
   company_request,
   gstCheckBodySchema,
@@ -13,6 +14,10 @@ import { resolveAuthDatabase } from "./utils";
 const GST_REQUEST_EXISTS_MESSAGE =
   "A company request with this GST number has already been raised.";
 const GST_ORGANIZATION_EXISTS_MESSAGE = "A company with this GST number is already registered.";
+const GST_INVALID_MESSAGE = "GST number is invalid or inactive.";
+const GST_UNAVAILABLE_MESSAGE =
+  "GST verification is temporarily unavailable. Please try again in a moment.";
+const GST_UPSTREAM_TIMEOUT_MS = 8000;
 
 async function findGstConflict(gstNumber: string) {
   const db = resolveAuthDatabase();
@@ -27,7 +32,9 @@ async function findGstConflict(gstNumber: string) {
     db
       .select({ id: company_request.id })
       .from(company_request)
-      .where(eq(company_request.companyGstNumber, gstNumber))
+      .where(
+        and(eq(company_request.companyGstNumber, gstNumber), eq(company_request.isDeleted, false))
+      )
       .limit(1)
       .then((rows) => rows[0]),
   ]);
@@ -68,36 +75,48 @@ const gstCheckEndpoint = createAuthEndpoint(
     // use: [signedInSessionMiddleware],
   },
   async (ctx) => {
-    let payload: unknown;
     const gstNumber = ctx.body.gstNumber;
+    const isExistingCompanyCheck = ctx.body.isExistingCompanyCheck;
     const existingConflict = await findGstConflict(gstNumber);
 
-    if (existingConflict) {
+    if (existingConflict && isExistingCompanyCheck) {
       throw new APIError("BAD_REQUEST", {
         message: existingConflict.message,
       });
     }
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GST_UPSTREAM_TIMEOUT_MS);
+    let payload: unknown;
+
     try {
       const response = await fetch(
-        `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`
+        `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`,
+        { signal: controller.signal }
       );
 
+      payload = await response.json().catch(() => null);
+
       if (!response.ok) {
-        throw new APIError("INTERNAL_SERVER_ERROR", {
-          message: "Failed to fetch GST details from upstream service.",
+        throw new APIError("BAD_REQUEST", {
+          message: GST_INVALID_MESSAGE,
         });
       }
-
-      payload = await response.json();
     } catch (error) {
       if (error instanceof APIError) {
         throw error;
       }
 
-      throw new APIError("INTERNAL_SERVER_ERROR", {
-        message: "Unable to fetch GST information at the moment.",
+      logger.error("[auth.organization.gst] GST upstream verification failed", {
+        gstNumber,
+        error: error instanceof Error ? error.stack : error,
       });
+
+      throw new APIError("INTERNAL_SERVER_ERROR", {
+        message: GST_UNAVAILABLE_MESSAGE,
+      });
+    } finally {
+      clearTimeout(timeout);
     }
 
     const parsedPayload = gstInfoResponseSchema.safeParse(payload);
@@ -108,7 +127,7 @@ const gstCheckEndpoint = createAuthEndpoint(
       parsedPayload.data.data?.sts !== "Active"
     ) {
       throw new APIError("BAD_REQUEST", {
-        message: "GST number is invalid or inactive.",
+        message: GST_INVALID_MESSAGE,
       });
     }
 

@@ -29,7 +29,7 @@ export const meeting = pgTable(
     developerId: text("developer_id").references(() => user.id, {
       onDelete: "set null",
     }),
-    propertyId: uuid("property_id")
+    propertyId: text("property_id")
       .notNull()
       .references(() => property.id, { onDelete: "cascade" }),
     occupierId: text("occupier_id").references(() => user.id, {

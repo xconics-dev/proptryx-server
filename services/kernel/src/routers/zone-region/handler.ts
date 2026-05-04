@@ -24,6 +24,7 @@ import {
 import { fetchRegionList, fetchZoneList } from "./list";
 import {
   attachRegionToZones,
+  attachUserCountsToZones,
   attachZonesToRegions,
   findActiveZoneByRegionId,
   findRegionById,
@@ -179,9 +180,10 @@ registerOpenApiRoute(zoneRegionGroup, removeRegion, async (c) => {
 registerOpenApiRoute(zoneRegionGroup, listZones, async (c) => {
   const query = c.req.valid("query");
   const response = await fetchZoneList(query);
-  const items = await attachRegionToZones(response.items, {
+  const zonesWithRegion = await attachRegionToZones(response.items, {
     includeRegion: query.includeRegion,
   });
+  const items = await attachUserCountsToZones(zonesWithRegion);
 
   return c.json(createSuccessResponse({ ...response, items }), 200);
 });
@@ -201,9 +203,10 @@ registerOpenApiRoute(zoneRegionGroup, getZone, async (c) => {
     );
   }
 
-  const [zoneWithRegion] = await attachRegionToZones([zoneData], {
+  const zonesWithRegion = await attachRegionToZones([zoneData], {
     includeRegion: query.includeRegion,
   });
+  const [zoneWithRegion] = await attachUserCountsToZones(zonesWithRegion);
 
   return c.json(createSuccessResponse(zoneWithRegion), 200);
 });

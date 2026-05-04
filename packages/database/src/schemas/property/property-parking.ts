@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { index, integer, pgTable, real, unique, uuid } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, real, text, unique, uuid } from "drizzle-orm/pg-core";
 import {
   ParkingAccessType,
   ParkingConfiguration,
@@ -13,7 +13,7 @@ export const propertyParking = pgTable(
   "property_parking",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    propertyId: uuid("property_id")
+    propertyId: text("property_id")
       .notNull()
       .references(() => property.id, { onDelete: "cascade" }),
 

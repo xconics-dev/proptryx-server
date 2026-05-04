@@ -13,11 +13,12 @@ export const regionSchema = createDbSelectSchema(region);
 export const zoneSchema = createDbSelectSchema(zone);
 
 export const regionWithZonesSchema = regionSchema.extend({
-  zones: z.array(zoneSchema).optional(),
+  zones: z.array(zoneSchema).default([]),
 });
 
 export const zoneWithRegionSchema = zoneSchema.extend({
   region: regionSchema.optional(),
+  userCount: z.number().int().min(0).default(0),
 });
 
 export const regionCreateSchema = createDbInsertSchema(region, {
@@ -51,14 +52,14 @@ export const regionListSortFields = ["id", "name", "createdAt", "updatedAt"] as 
 export const regionListQuerySchema = createListQuerySchema({
   sortFields: regionListSortFields,
   extraShape: {
-    includeZones: optionalBooleanQuerySchema,
+    includeZones: optionalBooleanQuerySchema.default(true),
   },
 });
 
 export type RegionListQuery = z.infer<typeof regionListQuerySchema>;
 
 export const regionGetQuerySchema = z.object({
-  includeZones: optionalBooleanQuerySchema,
+  includeZones: optionalBooleanQuerySchema.default(true),
 });
 
 export const regionListResponseSchema = createListResponseSchema(regionWithZonesSchema);
@@ -95,14 +96,14 @@ export const zoneListQuerySchema = createListQuerySchema({
   sortFields: zoneListSortFields,
   extraShape: {
     regionId: z.string().optional(),
-    includeRegion: optionalBooleanQuerySchema,
+    includeRegion: optionalBooleanQuerySchema.default(true),
   },
 });
 
 export type ZoneListQuery = z.infer<typeof zoneListQuerySchema>;
 
 export const zoneGetQuerySchema = z.object({
-  includeRegion: optionalBooleanQuerySchema,
+  includeRegion: optionalBooleanQuerySchema.default(true),
 });
 
 export const zoneListResponseSchema = createListResponseSchema(zoneWithRegionSchema);

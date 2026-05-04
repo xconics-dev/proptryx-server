@@ -1,1 +1,13 @@
-pnpm lint-staged
+#!/usr/bin/env sh
+
+# Ensure pnpm is available when hooks run from GUI apps (non-login shells).
+export PATH="$HOME/Library/pnpm:$PATH"
+
+if command -v pnpm >/dev/null 2>&1; then
+	pnpm lint-staged
+elif command -v corepack >/dev/null 2>&1; then
+	corepack pnpm lint-staged
+else
+	echo "pnpm is required for pre-commit hook but was not found in PATH" >&2
+	exit 127
+fi

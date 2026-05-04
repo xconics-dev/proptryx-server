@@ -4,7 +4,7 @@ import type { SubscriptionPlanFeatures } from "@proptryx/database";
 import { generateRandomId, getRazorpayClient } from "@proptryx/utils";
 import { APIError } from "better-auth";
 import { createAuthMiddleware, sessionMiddleware } from "better-auth/api";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { resolveAuthDatabase } from "../../auth/utils";
 
@@ -33,8 +33,8 @@ export type SubscriptionNotificationContactInput = {
 
 export const planFeaturesSchema = z
   .object({
-    maxProperties: z.number().int().min(-1),
-    maxUsers: z.number().int().min(-1),
+    maxProperties: z.number().int().min(-1).default(-1),
+    maxUsers: z.number().int().min(-1).default(-1),
   })
   .catchall(z.union([z.string(), z.number(), z.boolean()]));
 
@@ -43,6 +43,8 @@ export const createPlanBodySchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
   amountInPaise: z.number().int().positive(),
+  discountedAmountInPaise: z.number().int().positive().nullable().optional(),
+  discountAvailableTill: z.coerce.date().nullable().optional(),
   currency: z.string().min(3).default("INR"),
   billingInterval: z.enum(["monthly", "yearly"]).default("monthly"),
   razorpayPlanId: z.string().min(1),
@@ -50,6 +52,7 @@ export const createPlanBodySchema = z.object({
   quantity: z.number().int().positive().optional(),
   trialDays: z.number().int().min(0).optional(),
   addonPropertyOneTimeCostInPaise: z.number().int().min(0).optional(),
+  isRecommended: z.boolean(),
   isActive: z.boolean().optional(),
   features: planFeaturesSchema,
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -60,6 +63,8 @@ export const updatePlanBodySchema = z.object({
   name: z.string().min(2).optional(),
   description: z.string().nullable().optional(),
   amountInPaise: z.number().int().positive().optional(),
+  discountedAmountInPaise: z.number().int().positive().nullable().optional(),
+  discountAvailableTill: z.coerce.date().nullable().optional(),
   currency: z.string().min(3).optional(),
   billingInterval: z.enum(["monthly", "yearly"]).optional(),
   razorpayPlanId: z.string().min(1).optional(),
@@ -67,6 +72,7 @@ export const updatePlanBodySchema = z.object({
   quantity: z.number().int().positive().optional(),
   trialDays: z.number().int().min(0).optional(),
   addonPropertyOneTimeCostInPaise: z.number().int().min(0).optional(),
+  isRecommended: z.boolean(),
   isActive: z.boolean().optional(),
   features: planFeaturesSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -77,7 +83,20 @@ export const getPlanQuerySchema = z.object({
   code: z.string().optional(),
 });
 
+export const razorpayPlanLookupQuerySchema = z.object({
+  razorpayPlanId: z.string().trim().min(1),
+  currentPlanId: z.string().trim().min(1).optional(),
+});
+
+export const listPlansQuerySchema = z.object({
+  includeInactive: z.coerce.boolean().optional(),
+});
+
 export const deactivatePlanBodySchema = z.object({
+  id: z.string().min(1),
+});
+
+export const deletePlanBodySchema = z.object({
   id: z.string().min(1),
 });
 
@@ -102,6 +121,10 @@ export const cancelSubscriptionBodySchema = z.object({
   cancelAtCycleEnd: z.boolean().optional(),
 });
 
+export const deleteSubscriptionBodySchema = z.object({
+  organizationId: z.string().optional(),
+});
+
 export const pauseSubscriptionBodySchema = z.object({
   organizationId: z.string().optional(),
   pauseAt: z.enum(["now"]).optional(),
@@ -117,6 +140,10 @@ export const syncSubscriptionBodySchema = z.object({
 });
 
 export const getCurrentSubscriptionQuerySchema = z.object({
+  organizationId: z.string().optional(),
+});
+
+export const paymentStatusQuerySchema = z.object({
   organizationId: z.string().optional(),
 });
 
@@ -163,7 +190,12 @@ export function createAuthorizedOrganizationMiddleware(
         session,
         resolveExplicitOrganizationId(ctx)
       );
-      await assertOrganizationAccess(session.user.id, organizationId);
+
+      // Proptryx internal users are not organization members but have full access
+      const isInternalUser = session.user.panel === "proptryx";
+      if (!isInternalUser) {
+        await assertOrganizationAccess(session.user.id, organizationId);
+      }
 
       return {
         session,
@@ -319,7 +351,9 @@ export async function getPlanById(planId: string | null | undefined) {
   const [plan] = await db
     .select()
     .from(schema.subscriptionPlans)
-    .where(eq(schema.subscriptionPlans.id, planId))
+    .where(
+      and(eq(schema.subscriptionPlans.id, planId), eq(schema.subscriptionPlans.isDeleted, false))
+    )
     .limit(1);
 
   return plan ?? null;
@@ -330,7 +364,12 @@ export async function getPlanByCode(code: string) {
   const [plan] = await db
     .select()
     .from(schema.subscriptionPlans)
-    .where(eq(schema.subscriptionPlans.code, normalizePlanCode(code)))
+    .where(
+      and(
+        eq(schema.subscriptionPlans.code, normalizePlanCode(code)),
+        eq(schema.subscriptionPlans.isDeleted, false)
+      )
+    )
     .limit(1);
 
   return plan ?? null;
@@ -341,7 +380,32 @@ export async function getPlanByRazorpayPlanId(razorpayPlanId: string) {
   const [plan] = await db
     .select()
     .from(schema.subscriptionPlans)
-    .where(eq(schema.subscriptionPlans.razorpayPlanId, razorpayPlanId))
+    .where(
+      and(
+        eq(schema.subscriptionPlans.razorpayPlanId, razorpayPlanId),
+        eq(schema.subscriptionPlans.isDeleted, false)
+      )
+    )
+    .limit(1);
+
+  return plan ?? null;
+}
+
+export async function getRecommendedPlan(excludePlanId?: string | null) {
+  const db = resolveAuthDatabase();
+  const filters = [
+    eq(schema.subscriptionPlans.isDeleted, false),
+    eq(schema.subscriptionPlans.isRecommended, true),
+  ];
+
+  if (excludePlanId) {
+    filters.push(ne(schema.subscriptionPlans.id, excludePlanId));
+  }
+
+  const [plan] = await db
+    .select()
+    .from(schema.subscriptionPlans)
+    .where(and(...filters))
     .limit(1);
 
   return plan ?? null;
@@ -425,7 +489,12 @@ export async function getOrganizationSubscriptionRecord(organizationId: string) 
   const [subscription] = await db
     .select()
     .from(schema.organizationSubscription)
-    .where(eq(schema.organizationSubscription.organizationId, organizationId))
+    .where(
+      and(
+        eq(schema.organizationSubscription.organizationId, organizationId),
+        eq(schema.organizationSubscription.isDeleted, false)
+      )
+    )
     .limit(1);
 
   return subscription ?? null;
@@ -438,11 +507,30 @@ export async function getOrganizationSubscriptionRecordByRazorpaySubscriptionId(
   const [subscription] = await db
     .select()
     .from(schema.organizationSubscription)
-    .where(eq(schema.organizationSubscription.razorpaySubscriptionId, razorpaySubscriptionId))
+    .where(
+      and(
+        eq(schema.organizationSubscription.razorpaySubscriptionId, razorpaySubscriptionId),
+        eq(schema.organizationSubscription.isDeleted, false)
+      )
+    )
     .limit(1);
 
   return subscription ?? null;
 }
+
+export const listSubscriptionsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().optional(),
+  status: z.string().optional(),
+  organizationId: z.string().optional(),
+  planCode: z.string().optional(),
+  billingPeriod: z.enum(["monthly", "yearly"]).optional(),
+  createdFrom: z.coerce.date().optional(),
+  createdTo: z.coerce.date().optional(),
+  sortBy: z.enum(["createdAt", "updatedAt", "status", "paidCount"]).default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+});
 
 type SaveOrganizationSubscriptionRecordParams = {
   organizationId: string;
@@ -464,6 +552,8 @@ type SaveOrganizationSubscriptionRecordParams = {
   metadata?: Record<string, unknown>;
   notes?: Record<string, string>;
   razorpayCustomerId?: string | null;
+  createdByUserId?: string | null;
+  updatedByUserId?: string | null;
 };
 
 function buildOrganizationSubscriptionRecordValues(
@@ -522,6 +612,10 @@ function buildOrganizationSubscriptionRecordValues(
     cancelAtCycleEnd: Boolean(params.razorpaySubscription.has_scheduled_changes),
     metadata: params.metadata ?? existing?.metadata ?? {},
     notes: params.notes ?? existing?.notes ?? {},
+    updatedByUser:
+      params.updatedByUserId !== undefined
+        ? params.updatedByUserId
+        : (existing?.updatedByUser ?? null),
     updatedAt: new Date(),
   };
 }
@@ -539,6 +633,7 @@ export async function createOrganizationSubscriptionRecord(
       id: generateRandomId(),
       organizationId: params.organizationId,
       ...values,
+      createdByUser: params.createdByUserId ?? null,
       createdAt: now,
       updatedAt: now,
     })
@@ -561,6 +656,27 @@ export async function updateOrganizationSubscriptionRecord(
     .returning();
 
   return updated ?? existing;
+}
+
+export async function deleteOrganizationSubscriptionRecord(
+  id: string,
+  deletedByUserId?: string | null
+) {
+  const db = resolveAuthDatabase();
+  const now = new Date();
+  const [deleted] = await db
+    .update(schema.organizationSubscription)
+    .set({
+      isDeleted: true,
+      deletedAt: now,
+      deletedByUser: deletedByUserId ?? null,
+      updatedByUser: deletedByUserId ?? null,
+      updatedAt: now,
+    })
+    .where(eq(schema.organizationSubscription.id, id))
+    .returning();
+
+  return deleted ?? null;
 }
 
 export async function saveOrganizationSubscriptionRecord(

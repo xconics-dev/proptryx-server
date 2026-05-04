@@ -9,6 +9,7 @@ export const testimonial = pgTable(
   "testimonial",
   {
     id: text("id").primaryKey(),
+    propertyId: text("property_id"),
     image: text("image"),
     authorName: text("author_name").notNull(),
     isArchived: boolean("is_archived").default(false).notNull(),
@@ -34,6 +35,7 @@ export const testimonial = pgTable(
     }),
   },
   (table) => [
+    index("testimonial_property_id_idx").on(table.propertyId),
     index("testimonial_author_name_idx").on(table.authorName),
     index("testimonial_isDeleted_isArchived_createdAt_idx").on(
       table.isDeleted,

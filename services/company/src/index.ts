@@ -15,6 +15,7 @@ import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { membersGroup } from "@/routers/members";
 import { meetingGroup } from "@/routers/meeting";
+import { rolesPermissionGroup } from "@/routers/roles-permission";
 import type { AppBindings } from "@/types/app";
 import { openApiInfo } from "./config/openapi";
 
@@ -38,7 +39,10 @@ app.get(
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
 
-const routes = app.route("/meeting", meetingGroup).route("/member", membersGroup);
+const routes = app
+  .route("/meeting", meetingGroup)
+  .route("/member", membersGroup)
+  .route("/roles-permission", rolesPermissionGroup);
 
 app.doc("/doc", openApiInfo);
 const docsHandler = createOpenApiDocsHandler({

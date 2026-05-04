@@ -17,6 +17,7 @@ export const fetchTestimonialList = createTableListFetcher<
   },
   filterColumns: {
     isArchived: testimonial.isArchived,
+    propertyId: testimonial.propertyId,
   },
   sorting: {
     defaultBy: "createdAt",
@@ -24,6 +25,7 @@ export const fetchTestimonialList = createTableListFetcher<
   },
   sortColumns: {
     id: testimonial.id,
+    propertyId: testimonial.propertyId,
     authorName: testimonial.authorName,
     designation: testimonial.designation,
     ratings: testimonial.ratings,

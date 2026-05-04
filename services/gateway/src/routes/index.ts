@@ -1,5 +1,4 @@
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
-import { proxy } from "hono/proxy";
 import type { Context } from "hono";
 import {
   createFaviconHandler,
@@ -13,6 +12,30 @@ const GATEWAY_TAG = "Gateway";
 const AUTH_PROXY_TAG = "Auth Service (Proxied)";
 const COMPANY_PROXY_TAG = "Company Service (Proxied)";
 const KERNEL_PROXY_TAG = "Kernel Service (Proxied)";
+const HOP_BY_HOP_REQUEST_HEADERS = new Set([
+  "connection",
+  "content-length",
+  "host",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+]);
+const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
+  "connection",
+  "content-encoding",
+  "content-length",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+]);
 
 const gatewayHealthRoute = createRoute({
   method: "get",
@@ -114,24 +137,76 @@ const companyHealthProxyRoute = createRoute({
   },
 });
 
+function sanitizeRequestHeaders(source: Headers) {
+  const headers = new Headers();
+
+  for (const [key, value] of source.entries()) {
+    if (HOP_BY_HOP_REQUEST_HEADERS.has(key.toLowerCase())) {
+      continue;
+    }
+
+    headers.set(key, value);
+  }
+
+  return headers;
+}
+
+function sanitizeResponseHeaders(source: Headers) {
+  const headers = new Headers();
+  const responseHeaders = source as Headers & {
+    getSetCookie?: () => string[];
+  };
+
+  for (const [key, value] of source.entries()) {
+    const normalizedKey = key.toLowerCase();
+
+    if (HOP_BY_HOP_RESPONSE_HEADERS.has(normalizedKey) || normalizedKey === "set-cookie") {
+      continue;
+    }
+
+    headers.set(key, value);
+  }
+
+  if (typeof responseHeaders.getSetCookie === "function") {
+    for (const cookie of responseHeaders.getSetCookie()) {
+      headers.append("set-cookie", cookie);
+    }
+  } else {
+    const setCookie = source.get("set-cookie");
+
+    if (setCookie) {
+      headers.append("set-cookie", setCookie);
+    }
+  }
+
+  return headers;
+}
+
 function createProxyHandler(route: ProxyRoute) {
   return async (c: Context) => {
     try {
       const upstreamUrl = createUpstreamUrl(c.req.url, route);
-      const headers = new Headers(c.req.raw.headers);
+      const headers = sanitizeRequestHeaders(c.req.raw.headers);
       const clientIp =
         resolveClientIpFromHeaderGetter((headerName) => c.req.header(headerName)) ?? "127.0.0.1";
 
       headers.set("host", new URL(route.target).host);
+      headers.set("accept-encoding", "identity");
       headers.set("x-forwarded-host", new URL(c.req.url).host);
       headers.set("x-forwarded-proto", new URL(c.req.url).protocol.replace(":", ""));
       headers.set("x-forwarded-prefix", route.prefix);
       headers.set("x-forwarded-for", clientIp);
       headers.set("x-real-ip", clientIp);
 
-      const response = await proxy(upstreamUrl, {
-        raw: c.req.raw,
+      const requestBody =
+        c.req.method === "GET" || c.req.method === "HEAD" ? undefined : await c.req.arrayBuffer();
+
+      const response = await fetch(upstreamUrl, {
+        method: c.req.method,
         headers,
+        body: requestBody,
+        redirect: "manual",
+        duplex: c.req.method === "GET" || c.req.method === "HEAD" ? undefined : "half",
       });
 
       logger.info("proxied request", {
@@ -142,7 +217,16 @@ function createProxyHandler(route: ProxyRoute) {
         target: route.target,
       });
 
-      return response;
+      const responseBody =
+        c.req.method === "HEAD" || response.status === 204 || response.status === 304
+          ? undefined
+          : await response.arrayBuffer();
+
+      return new Response(responseBody, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: sanitizeResponseHeaders(response.headers),
+      });
     } catch (error) {
       logger.error("upstream request failed", {
         method: c.req.method,

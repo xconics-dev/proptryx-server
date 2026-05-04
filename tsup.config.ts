@@ -16,7 +16,9 @@ export default defineConfig({
   format: ["esm"],
   target: "node20",
   outDir: "dist",
-  clean: true,
+  // Multiple service predev hooks can build shared workspace packages at once.
+  // Disabling tsup's clean step avoids concurrent unlink races in dist/.
+  clean: false,
   sourcemap: true,
   minify: process.env.NODE_ENV === "production",
   tsconfig: "tsconfig.json",

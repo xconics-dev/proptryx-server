@@ -7,7 +7,7 @@ export const propertyRetail = pgTable(
   "property_retail",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    propertyId: uuid("property_id")
+    propertyId: text("property_id")
       .notNull()
       .references(() => property.id, { onDelete: "cascade" }),
 

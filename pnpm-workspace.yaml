@@ -1,13 +1,4 @@
 packages:
-  - apps/*
-  - packages/*
-  - services/*
-
-ignoredBuiltDependencies:
-  - '@prisma/engines'
-  - prisma
-  - sharp
-
-onlyBuiltDependencies:
-  - '@biomejs/biome'
-  - esbuild
+  - "apps/*"
+  - "packages/*"
+  - "services/*"

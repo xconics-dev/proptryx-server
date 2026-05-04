@@ -9,7 +9,7 @@ export const imgesdata = {
 
 export const metadata = {
   mainpageUrl: "https://www.proptryx.app",
-  consoleUrl: "https://console.proptryx.app",
+  consoleUrl: "https://software.proptryx.app",
   privacyPolicyOccupier: "https://www.proptryx.app/privacy-policy-occupier",
   privacyPolicyDeveloper: "https://www.proptryx.app/privacy-policy-developer",
   termsAndConditionsUrl: "https://www.proptryx.app/terms-of-service",
@@ -44,5 +44,13 @@ export const emailSubject: Record<string, EmailSubPrev> = {
   "member-account-cred": {
     subject: "Your Proptryx Account Credentials",
     previewText: "Here are your Proptryx account login credentials.",
+  },
+  "proptryx-account-cred": {
+    subject: "Your Proptryx Account Credentials",
+    previewText: "Here are your Proptryx account login credentials.",
+  },
+  "broker-cred": {
+    subject: "You're now a Broker on Proptryx — Here are your credentials",
+    previewText: "You're now a registered Broker on Proptryx!",
   },
 };

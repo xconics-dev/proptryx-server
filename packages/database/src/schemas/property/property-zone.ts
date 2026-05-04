@@ -13,7 +13,7 @@ export const propertyZone = pgTable(
   "property_zone",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    propertyId: uuid("property_id")
+    propertyId: text("property_id")
       .notNull()
       .references(() => property.id, { onDelete: "cascade" }),
     // Region is derived through zone.regionId, so we only persist the zone link here.

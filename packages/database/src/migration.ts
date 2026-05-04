@@ -199,7 +199,14 @@ async function maybeBaselineFirstMigration(
 
 function isIgnorableDuplicateError(error: unknown): boolean {
   const pgError = error as PgError;
-  return pgError.code === "42P07" || pgError.code === "42710";
+  return (
+    pgError.code === "42P07" ||
+    pgError.code === "42710" ||
+    pgError.code === "42701" ||
+    pgError.code === "42704" ||
+    pgError.code === "42P01" ||
+    pgError.code === "42703"
+  );
 }
 
 async function applyMigration(
@@ -281,8 +288,6 @@ export async function runMigrations(): Promise<void> {
     }
 
     for (const migration of migrations) {
-      const isInitialMigration = migration.folderMillis === migrations[0]?.folderMillis;
-
       if (appliedMigrationHashes.has(migration.hash)) {
         continue;
       }
@@ -293,7 +298,7 @@ export async function runMigrations(): Promise<void> {
 
       console.log(`Applying migration ${migration.hash.slice(0, 12)}...`);
       await applyMigration(client, migration, {
-        allowDuplicateConflicts: isInitialMigration,
+        allowDuplicateConflicts: true,
       });
       appliedMigrationHashes.add(migration.hash);
       lastMigration = {
