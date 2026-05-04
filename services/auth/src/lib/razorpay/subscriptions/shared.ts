@@ -574,13 +574,18 @@ function buildOrganizationSubscriptionRecordValues(
 
   const resolvedStatus = String(params.razorpaySubscription.status || "created").toLowerCase();
   const resolvedEndedAt = toDateFromUnix(params.razorpaySubscription.ended_at);
+  const resolvedCurrentStart =
+    toDateFromUnix(params.razorpaySubscription.current_start) ?? existing?.currentStart ?? null;
+  const resolvedCurrentEnd =
+    toDateFromUnix(params.razorpaySubscription.current_end) ?? existing?.currentEnd ?? null;
 
   return {
     subscriptionPlanId: params.plan?.id ?? existing?.subscriptionPlanId ?? null,
     planCode: params.plan?.code ?? params.fallbackPlanCode ?? existing?.planCode ?? "custom",
     razorpayCustomerId: resolvedCustomerId,
-    razorpaySubscriptionId: params.razorpaySubscription.id,
-    razorpayPlanId: params.razorpaySubscription.plan_id,
+    razorpaySubscriptionId:
+      params.razorpaySubscription.id || existing?.razorpaySubscriptionId || null,
+    razorpayPlanId: params.razorpaySubscription.plan_id || existing?.razorpayPlanId || null,
     status: resolvedStatus,
     quantity: toNullableNumber(params.razorpaySubscription.quantity, existing?.quantity ?? 1) ?? 1,
     totalCount: toNullableNumber(params.razorpaySubscription.total_count, existing?.totalCount),
@@ -598,8 +603,8 @@ function buildOrganizationSubscriptionRecordValues(
       params.addonPropertyOneTimeCostInPaise ?? existing?.addonPropertyOneTimeCostInPaise ?? 0,
     addonOneTimeTotalInPaise:
       params.addonOneTimeTotalInPaise ?? existing?.addonOneTimeTotalInPaise ?? 0,
-    currentStart: toDateFromUnix(params.razorpaySubscription.current_start),
-    currentEnd: toDateFromUnix(params.razorpaySubscription.current_end),
+    currentStart: resolvedCurrentStart,
+    currentEnd: resolvedCurrentEnd,
     trialStart: params.trialStart ?? existing?.trialStart ?? null,
     trialEnd: params.trialEnd ?? existing?.trialEnd ?? null,
     endedAt: resolvedEndedAt,
@@ -609,7 +614,10 @@ function buildOrganizationSubscriptionRecordValues(
         : (existing?.cancelledAt ?? null),
     pausedAt: resolvedStatus === "paused" ? new Date() : (existing?.pausedAt ?? null),
     shortUrl: params.razorpaySubscription.short_url || existing?.shortUrl || null,
-    cancelAtCycleEnd: Boolean(params.razorpaySubscription.has_scheduled_changes),
+    cancelAtCycleEnd:
+      params.razorpaySubscription.has_scheduled_changes !== undefined
+        ? Boolean(params.razorpaySubscription.has_scheduled_changes)
+        : (existing?.cancelAtCycleEnd ?? false),
     metadata: params.metadata ?? existing?.metadata ?? {},
     notes: params.notes ?? existing?.notes ?? {},
     updatedByUser:

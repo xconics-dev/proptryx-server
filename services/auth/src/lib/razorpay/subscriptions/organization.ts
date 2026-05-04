@@ -34,6 +34,7 @@ import {
   signedInSessionMiddleware,
   SUBSCRIPTION_NOTIFICATION_CONFIG,
   syncSubscriptionBodySchema,
+  toDateFromUnix,
   toNullableNumber,
 } from "./shared";
 import { logger } from "@/lib/logger";
@@ -49,6 +50,119 @@ function getEffectivePlanAmountInPaise(plan: any) {
   }
 
   return plan?.amountInPaise ?? 0;
+}
+
+function toNullableIsoDate(value: unknown) {
+  const parsedDate =
+    typeof value === "number" || typeof value === "string" ? toDateFromUnix(value) : null;
+  return parsedDate?.toISOString() ?? null;
+}
+
+function mapRazorpayPayment(payment: any) {
+  return {
+    id: String(payment?.id ?? ""),
+    subscriptionId:
+      payment?.subscription_id && typeof payment.subscription_id === "string"
+        ? payment.subscription_id
+        : null,
+    amount: toNullableNumber(payment?.amount, 0) ?? 0,
+    currency: String(payment?.currency ?? "INR").toUpperCase(),
+    status: payment?.refunded ? "refunded" : payment?.status ? String(payment.status) : null,
+    method: payment?.method ? String(payment.method) : null,
+    email: payment?.email ? String(payment.email) : null,
+    contact: payment?.contact ? String(payment.contact) : null,
+    description: payment?.description ? String(payment.description) : null,
+    invoiceId: payment?.invoice_id ? String(payment.invoice_id) : null,
+    orderId: payment?.order_id ? String(payment.order_id) : null,
+    fee: toNullableNumber(payment?.fee, null),
+    tax: toNullableNumber(payment?.tax, null),
+    refunded: Boolean(payment?.refunded),
+    captured: Boolean(payment?.captured),
+    createdAt: toNullableIsoDate(payment?.created_at),
+  };
+}
+
+function getPaymentLinkedSubscriptionId(
+  payment: any,
+  invoiceSubscriptionMap: Map<string, string | null>
+) {
+  if (typeof payment?.subscription_id === "string" && payment.subscription_id) {
+    return payment.subscription_id;
+  }
+
+  const notes = normalizeStringRecord(payment?.notes);
+
+  if (notes.razorpaySubscriptionId) {
+    return notes.razorpaySubscriptionId;
+  }
+
+  if (notes.razorpay_subscription_id) {
+    return notes.razorpay_subscription_id;
+  }
+
+  if (notes.subscriptionId) {
+    return notes.subscriptionId;
+  }
+
+  if (notes.subscription_id) {
+    return notes.subscription_id;
+  }
+
+  if (typeof payment?.invoice_id === "string" && payment.invoice_id) {
+    return invoiceSubscriptionMap.get(payment.invoice_id) ?? null;
+  }
+
+  return null;
+}
+
+function getDateValue(value: unknown) {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === "string" || typeof value === "number") {
+    const parsedDate = new Date(value);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  }
+
+  return null;
+}
+
+function isTrialAuthorizationPaymentForSubscription(payment: any, subscription: any) {
+  if ((subscription?.trialDaysApplied ?? 0) <= 0) {
+    return false;
+  }
+
+  if (
+    typeof payment?.customer_id === "string" &&
+    payment.customer_id &&
+    payment.customer_id !== subscription.razorpayCustomerId
+  ) {
+    return false;
+  }
+
+  const amount = toNullableNumber(payment?.amount, null);
+  const isRefunded = Boolean(payment?.refunded || payment?.status === "refunded");
+
+  if (amount === null || amount <= 0 || amount > 500 || !isRefunded) {
+    return false;
+  }
+
+  const paymentDate = toDateFromUnix(payment?.created_at);
+  const createdAt = getDateValue(subscription?.createdAt);
+  const trialEnd = getDateValue(subscription?.trialEnd);
+  const currentStart = getDateValue(subscription?.currentStart);
+
+  if (!(paymentDate && createdAt)) {
+    return false;
+  }
+
+  const windowStart = new Date(createdAt.getTime() - 30 * 60 * 1000);
+  const windowBaseEnd =
+    trialEnd ?? currentStart ?? new Date(createdAt.getTime() + 2 * 24 * 60 * 60 * 1000);
+  const windowEnd = new Date(windowBaseEnd.getTime() + 24 * 60 * 60 * 1000);
+
+  return paymentDate >= windowStart && paymentDate <= windowEnd;
 }
 
 const createSubscriptionEndpoint = createAuthEndpoint(
@@ -347,6 +461,303 @@ const limitsEndpoint = createAuthEndpoint(
   }
 );
 
+const billingOverviewEndpoint = createAuthEndpoint(
+  "/organization/subscription/billing-overview",
+  {
+    method: "GET",
+    query: getCurrentSubscriptionQuerySchema,
+    use: [createAuthorizedOrganizationMiddleware((ctx) => ctx.query?.organizationId)],
+    metadata: {
+      openapi: {
+        summary: "Get organization subscription billing overview",
+        description:
+          "Returns linked Razorpay customer details, live Razorpay subscription details, and recent payment history when available.",
+        responses: {
+          200: { description: "Subscription billing overview" },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const organizationId = ctx.context.organizationId as string;
+    const db = resolveAuthDatabase();
+
+    const [subscription, organization] = await Promise.all([
+      getOrganizationSubscriptionRecord(organizationId),
+      db
+        .select({
+          razorpayCustomerId: schema.organization.razorpayCustomerId,
+        })
+        .from(schema.organization)
+        .where(eq(schema.organization.id, organizationId))
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
+    ]);
+
+    const razorpayCustomerId =
+      subscription?.razorpayCustomerId || organization?.razorpayCustomerId || null;
+
+    let customer: {
+      id: string;
+      name: string | null;
+      email: string | null;
+      contact: string | null;
+      gstin: string | null;
+      notes: Record<string, string>;
+      createdAt: string | null;
+    } | null = null;
+    let liveSubscription: {
+      id: string;
+      status: string | null;
+      shortUrl: string | null;
+      remainingCount: number | null;
+      paidCount: number | null;
+      totalCount: number | null;
+      chargeAt: string | null;
+      startAt: string | null;
+      endAt: string | null;
+      currentStart: string | null;
+      currentEnd: string | null;
+      authAttempts: number | null;
+      hasScheduledChanges: boolean;
+    } | null = null;
+    let payments: ReturnType<typeof mapRazorpayPayment>[] = [];
+    let paymentHistoryAvailable = false;
+    let paymentHistoryMessage: string | null = null;
+
+    if (razorpayCustomerId) {
+      try {
+        const rzCustomer: any = await (rzClient.customers.fetch as any)(razorpayCustomerId);
+        customer = {
+          id: String(rzCustomer?.id ?? razorpayCustomerId),
+          name: rzCustomer?.name ? String(rzCustomer.name) : null,
+          email: rzCustomer?.email ? String(rzCustomer.email) : null,
+          contact: rzCustomer?.contact ? String(rzCustomer.contact) : null,
+          gstin: rzCustomer?.gstin ? String(rzCustomer.gstin) : null,
+          notes: normalizeStringRecord(rzCustomer?.notes),
+          createdAt: toNullableIsoDate(rzCustomer?.created_at),
+        };
+      } catch (error) {
+        logger.warn("failed to fetch razorpay customer for subscription billing overview", {
+          organizationId,
+          razorpayCustomerId,
+          message: getRazorpayErrorMessage(error, "Unable to load Razorpay customer."),
+        });
+      }
+    }
+
+    if (subscription?.razorpaySubscriptionId) {
+      try {
+        const rzSubscription: any = await (rzClient.subscriptions.fetch as any)(
+          subscription.razorpaySubscriptionId
+        );
+        liveSubscription = {
+          id: String(rzSubscription?.id ?? subscription.razorpaySubscriptionId),
+          status: rzSubscription?.status ? String(rzSubscription.status) : null,
+          shortUrl: rzSubscription?.short_url ? String(rzSubscription.short_url) : null,
+          remainingCount: toNullableNumber(rzSubscription?.remaining_count, null),
+          paidCount: toNullableNumber(rzSubscription?.paid_count, null),
+          totalCount: toNullableNumber(rzSubscription?.total_count, null),
+          chargeAt: toNullableIsoDate(rzSubscription?.charge_at),
+          startAt: toNullableIsoDate(rzSubscription?.start_at),
+          endAt: toNullableIsoDate(rzSubscription?.end_at),
+          currentStart: toNullableIsoDate(rzSubscription?.current_start),
+          currentEnd: toNullableIsoDate(rzSubscription?.current_end),
+          authAttempts: toNullableNumber(rzSubscription?.auth_attempts, null),
+          hasScheduledChanges: Boolean(rzSubscription?.has_scheduled_changes),
+        };
+      } catch (error) {
+        logger.warn("failed to fetch razorpay subscription for billing overview", {
+          organizationId,
+          razorpaySubscriptionId: subscription.razorpaySubscriptionId,
+          message: getRazorpayErrorMessage(error, "Unable to load Razorpay subscription."),
+        });
+      }
+
+      try {
+        const subscriptionPaymentsResult: any = await (rzClient.payments.all as any)({
+          subscription_id: subscription.razorpaySubscriptionId,
+          count: 20,
+        });
+        const paymentSources: any[] = Array.isArray(subscriptionPaymentsResult?.items)
+          ? subscriptionPaymentsResult.items
+          : [];
+        const invoiceSubscriptionMap = new Map<string, string | null>();
+        const paymentInvoiceMap = new Map<string, string>();
+
+        try {
+          const subscriptionInvoicesResult: any = await (rzClient.invoices.all as any)({
+            subscription_id: subscription.razorpaySubscriptionId,
+            count: 100,
+          });
+          const subscriptionInvoices: any[] = Array.isArray(subscriptionInvoicesResult?.items)
+            ? subscriptionInvoicesResult.items
+            : [];
+
+          await Promise.all(
+            subscriptionInvoices.map(async (invoice) => {
+              const invoiceId = typeof invoice?.id === "string" ? invoice.id : null;
+              const paymentId = typeof invoice?.payment_id === "string" ? invoice.payment_id : null;
+
+              if (invoiceId) {
+                invoiceSubscriptionMap.set(invoiceId, subscription.razorpaySubscriptionId);
+              }
+
+              if (!(invoiceId && paymentId)) {
+                return;
+              }
+
+              paymentInvoiceMap.set(paymentId, invoiceId);
+
+              try {
+                const invoicePayment: any = await (rzClient.payments.fetch as any)(paymentId);
+                paymentSources.push({
+                  ...invoicePayment,
+                  invoice_id: invoicePayment?.invoice_id || invoiceId,
+                  subscription_id:
+                    invoicePayment?.subscription_id || subscription.razorpaySubscriptionId,
+                });
+              } catch (error) {
+                logger.warn("failed to fetch razorpay invoice payment for billing overview", {
+                  organizationId,
+                  invoiceId,
+                  paymentId,
+                  message: getRazorpayErrorMessage(
+                    error,
+                    "Unable to load Razorpay invoice payment."
+                  ),
+                });
+              }
+            })
+          );
+        } catch (error) {
+          logger.warn("failed to fetch razorpay subscription invoices for billing overview", {
+            organizationId,
+            razorpaySubscriptionId: subscription.razorpaySubscriptionId,
+            message: getRazorpayErrorMessage(
+              error,
+              "Unable to load Razorpay subscription invoices."
+            ),
+          });
+        }
+
+        if (razorpayCustomerId) {
+          try {
+            const customerPaymentsResult: any = await (rzClient.payments.all as any)({
+              customer_id: razorpayCustomerId,
+              count: 100,
+            });
+
+            if (Array.isArray(customerPaymentsResult?.items)) {
+              paymentSources.push(...customerPaymentsResult.items);
+            }
+          } catch (error) {
+            logger.warn("failed to fetch razorpay customer payments for billing overview", {
+              organizationId,
+              razorpayCustomerId,
+              message: getRazorpayErrorMessage(error, "Unable to load Razorpay customer payments."),
+            });
+          }
+        }
+
+        const rawPayments: any[] = Array.from(
+          new Map<string, any>(
+            paymentSources
+              .filter((payment: any) => typeof payment?.id === "string" && payment.id)
+              .map((payment: any) => [
+                payment.id,
+                {
+                  ...payment,
+                  invoice_id: payment?.invoice_id || paymentInvoiceMap.get(payment.id) || null,
+                },
+              ])
+          ).values()
+        );
+        const invoiceIds = Array.from(
+          new Set<string>(
+            rawPayments
+              .map((payment: any) =>
+                typeof payment?.invoice_id === "string" && payment.invoice_id
+                  ? payment.invoice_id
+                  : null
+              )
+              .filter((invoiceId): invoiceId is string => Boolean(invoiceId))
+          )
+        );
+        await Promise.all(
+          invoiceIds.map(async (invoiceId) => {
+            if (invoiceSubscriptionMap.has(invoiceId)) {
+              return;
+            }
+
+            try {
+              const invoice: any = await (rzClient.invoices.fetch as any)(invoiceId);
+              invoiceSubscriptionMap.set(
+                invoiceId,
+                typeof invoice?.subscription_id === "string" ? invoice.subscription_id : null
+              );
+            } catch {
+              invoiceSubscriptionMap.set(invoiceId, null);
+            }
+          })
+        );
+
+        payments = rawPayments
+          .filter((payment: any) => {
+            const linkedSubscriptionId = getPaymentLinkedSubscriptionId(
+              payment,
+              invoiceSubscriptionMap
+            );
+
+            return (
+              linkedSubscriptionId === subscription.razorpaySubscriptionId ||
+              isTrialAuthorizationPaymentForSubscription(payment, subscription)
+            );
+          })
+          .map((payment: any) => {
+            const linkedSubscriptionId = getPaymentLinkedSubscriptionId(
+              payment,
+              invoiceSubscriptionMap
+            );
+            const subscriptionId =
+              linkedSubscriptionId === subscription.razorpaySubscriptionId ||
+              isTrialAuthorizationPaymentForSubscription(payment, subscription)
+                ? subscription.razorpaySubscriptionId
+                : linkedSubscriptionId;
+
+            return mapRazorpayPayment({
+              ...payment,
+              subscription_id: subscriptionId,
+            });
+          })
+          .filter((payment: ReturnType<typeof mapRazorpayPayment>) => payment.id);
+        paymentHistoryAvailable = true;
+      } catch (error) {
+        paymentHistoryAvailable = false;
+        paymentHistoryMessage = getRazorpayErrorMessage(
+          error,
+          "Payment history is currently unavailable from Razorpay."
+        );
+        logger.warn("failed to fetch razorpay payment history for billing overview", {
+          organizationId,
+          razorpaySubscriptionId: subscription.razorpaySubscriptionId,
+          message: paymentHistoryMessage,
+        });
+      }
+    } else {
+      paymentHistoryMessage = "No Razorpay subscription is linked with this organization yet.";
+    }
+
+    return ctx.json({
+      customer,
+      liveSubscription,
+      payments,
+      paymentHistoryAvailable,
+      paymentHistoryMessage,
+    });
+  }
+);
+
 const syncSubscriptionEndpoint = createAuthEndpoint(
   "/organization/subscription/sync",
   {
@@ -431,10 +842,18 @@ const cancelSubscriptionEndpoint = createAuthEndpoint(
     // "created" subscriptions have no billing cycle — cancel immediately
     const cancelAtCycleEnd =
       subscription.status === "created" ? false : (ctx.body.cancelAtCycleEnd ?? true);
-    const razorpaySubscription = await rzClient.subscriptions.cancel(
-      subscription.razorpaySubscriptionId,
-      cancelAtCycleEnd
-    );
+    let razorpaySubscription: any;
+
+    try {
+      razorpaySubscription = await rzClient.subscriptions.cancel(
+        subscription.razorpaySubscriptionId,
+        cancelAtCycleEnd
+      );
+    } catch (error) {
+      throw new APIError("BAD_REQUEST", {
+        message: getRazorpayErrorMessage(error, "Failed to cancel Razorpay subscription."),
+      });
+    }
 
     const linkedPlan = await getPlanById(subscription.subscriptionPlanId);
     const cancelledSubscription = await saveOrganizationSubscriptionRecord({
@@ -537,10 +956,18 @@ const pauseSubscriptionEndpoint = createAuthEndpoint(
     }
 
     const pauseAt = ctx.body.pauseAt ?? "now";
-    const razorpaySubscription = await rzClient.subscriptions.pause(
-      subscription.razorpaySubscriptionId,
-      { pause_at: pauseAt }
-    );
+    let razorpaySubscription: any;
+
+    try {
+      razorpaySubscription = await rzClient.subscriptions.pause(
+        subscription.razorpaySubscriptionId,
+        { pause_at: pauseAt }
+      );
+    } catch (error) {
+      throw new APIError("BAD_REQUEST", {
+        message: getRazorpayErrorMessage(error, "Failed to pause Razorpay subscription."),
+      });
+    }
     const linkedPlan = await getPlanById(subscription.subscriptionPlanId);
 
     const pausedSubscription = await saveOrganizationSubscriptionRecord({
@@ -594,10 +1021,18 @@ const resumeSubscriptionEndpoint = createAuthEndpoint(
     }
 
     const resumeAt = ctx.body.resumeAt ?? "now";
-    const razorpaySubscription = await rzClient.subscriptions.resume(
-      subscription.razorpaySubscriptionId,
-      { resume_at: resumeAt }
-    );
+    let razorpaySubscription: any;
+
+    try {
+      razorpaySubscription = await rzClient.subscriptions.resume(
+        subscription.razorpaySubscriptionId,
+        { resume_at: resumeAt }
+      );
+    } catch (error) {
+      throw new APIError("BAD_REQUEST", {
+        message: getRazorpayErrorMessage(error, "Failed to resume Razorpay subscription."),
+      });
+    }
     const linkedPlan = await getPlanById(subscription.subscriptionPlanId);
 
     const resumedSubscription = await saveOrganizationSubscriptionRecord({
@@ -1130,6 +1565,7 @@ export const organizationSubscriptionPlugin = {
     getCurrentOrganizationSubscription: currentSubscriptionEndpoint,
     getOrganizationSubscriptionLimits: limitsEndpoint,
     getOrganizationSubscriptionPaymentStatus: paymentStatusEndpoint,
+    getOrganizationSubscriptionBillingOverview: billingOverviewEndpoint,
     listOrganizationSubscriptions: listSubscriptionsEndpoint,
     syncOrganizationSubscription: syncSubscriptionEndpoint,
     cancelOrganizationSubscription: cancelSubscriptionEndpoint,
