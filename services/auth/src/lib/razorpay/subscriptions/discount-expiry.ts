@@ -1,5 +1,5 @@
 import * as schema from "@proptryx/database";
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { resolveAuthDatabase } from "../../auth/utils";
 
@@ -16,12 +16,12 @@ export async function deactivateExpiredDiscountPlans(now = new Date()) {
     .update(schema.subscriptionPlans)
     .set({
       isActive: false,
-      updatedAt: now,
     })
     .where(
       and(
         eq(schema.subscriptionPlans.isDeleted, false),
         eq(schema.subscriptionPlans.isActive, true),
+        isNotNull(schema.subscriptionPlans.discountAvailableTill),
         lte(schema.subscriptionPlans.discountAvailableTill, now)
       )
     )
