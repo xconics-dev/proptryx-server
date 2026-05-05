@@ -29,7 +29,7 @@ import { organizationSubscriptionPlugin, subscriptionPlansPlugin } from "../razo
 import { organizationControlsPlugin } from "./organization";
 import { generateRandomId, generateUID, PasswordUtils } from "@proptryx/utils";
 import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { createAuthMiddleware } from "better-auth/api";
 
 // ─────────────────────────────────────────────
@@ -150,6 +150,9 @@ async function createAuthInstance() {
       }),
       allowCustomInputFieldsPlugin,
       customSession(async ({ session, user }) => {
+        const sessionWithOrganization = session as typeof session & {
+          activeOrganizationId?: string | null;
+        };
         const sessionUser = user as typeof user & {
           banned?: boolean | null;
           banReason?: string | null;
@@ -217,14 +220,85 @@ async function createAuthInstance() {
         };
 
         const location = await resolveUserZone(userWithTags.zoneId);
+        const activeOrganizationId =
+          typeof sessionWithOrganization.activeOrganizationId === "string"
+            ? sessionWithOrganization.activeOrganizationId
+            : null;
+        const [activeMember] = activeOrganizationId
+          ? await db
+              .select({
+                role: schema.member.role,
+                panel: schema.member.panel,
+                organizationId: schema.member.organizationId,
+              })
+              .from(schema.member)
+              .where(
+                and(
+                  eq(schema.member.userId, sessionUser.id),
+                  eq(schema.member.organizationId, activeOrganizationId)
+                )
+              )
+              .limit(1)
+          : [];
+        const resolvedRole = activeMember?.role ?? userWithTags.role ?? null;
+        const resolvedPanel = activeMember?.panel ?? userWithTags.panel ?? null;
+        const [roleRecord] = resolvedRole
+          ? await db
+              .select({
+                id: schema.rbacRole.id,
+                panel: schema.rbacRole.panel,
+              })
+              .from(schema.rbacRole)
+              .where(
+                activeMember
+                  ? and(
+                      eq(schema.rbacRole.panel, "company"),
+                      eq(schema.rbacRole.slug, resolvedRole),
+                      eq(
+                        schema.rbacRole.organizationId,
+                        activeMember.organizationId ?? activeOrganizationId
+                      )
+                    )
+                  : and(
+                      eq(schema.rbacRole.panel, "proptryx"),
+                      eq(schema.rbacRole.slug, resolvedRole),
+                      isNull(schema.rbacRole.organizationId)
+                    )
+              )
+              .limit(1)
+          : [];
+        const permissionRows = roleRecord
+          ? await db
+              .select({
+                resource: schema.rbacRolePermission.resource,
+                accessLevel: schema.rbacRolePermission.accessLevel,
+                actions: schema.rbacRolePermission.actions,
+              })
+              .from(schema.rbacRolePermission)
+              .where(eq(schema.rbacRolePermission.roleId, roleRecord.id))
+          : [];
 
         return {
-          session,
+          session: sessionWithOrganization,
           user: {
             ...userWithTags,
             zone: location.zone?.name,
             region: location.region?.name,
             updatedAt: new Date(liveUser.updatedAt),
+          },
+          authorization: {
+            panel: roleRecord?.panel ?? resolvedPanel,
+            role: resolvedRole,
+            roleId: roleRecord?.id ?? null,
+            permissions: Object.fromEntries(
+              permissionRows.map((permissionRow) => [
+                permissionRow.resource,
+                {
+                  accessLevel: permissionRow.accessLevel,
+                  actions: permissionRow.actions ?? {},
+                },
+              ])
+            ),
           },
         };
       }),

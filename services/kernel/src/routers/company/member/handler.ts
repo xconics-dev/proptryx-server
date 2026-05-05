@@ -5,6 +5,7 @@ import {
   buildOrganizationLimitDeniedMessage,
   createErrorResponse,
   createSuccessResponse,
+  ensureDefaultOrganizationRoles,
   generateRandomId,
   getBetterAuthContext,
   registerOpenApiRoute,
@@ -129,6 +130,8 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
   );
 
   const memberData = await db.transaction(async (tx) => {
+    await ensureDefaultOrganizationRoles(tx, body.organizationId);
+
     await tx.insert(user).values({
       id: userId,
       name: body.name,
@@ -203,6 +206,8 @@ registerOpenApiRoute(companyMembersGroup, update, async (c) => {
   }
 
   const [updatedMember] = await db.transaction(async (tx) => {
+    await ensureDefaultOrganizationRoles(tx, existingMember.organizationId);
+
     await tx
       .update(user)
       .set({

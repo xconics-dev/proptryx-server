@@ -22,6 +22,17 @@ type RolePreset = {
 
 const COMPANY_SCOPE: RbacResourceScope = "company";
 const COMPANY_RESOURCE_METADATA = getRbacResourceMetadata(COMPANY_SCOPE);
+const DEFAULT_COMPANY_MEMBER_BASE_RESOURCES = [
+  "account",
+  "member",
+  "organization",
+  "rbac_role",
+  "rbac_role_permission",
+  "region",
+  "user",
+  "zone",
+] as const;
+const EXECUTIVE_EXTRA_RESOURCES = ["faq", "meeting", "property", "testimonial"] as const;
 
 const RESOURCE_ACTIONS = Object.freeze(
   Object.fromEntries(COMPANY_RESOURCE_METADATA.map((item) => [item.resource, item.actions]))
@@ -48,9 +59,9 @@ const ROLE_RESOURCE_OVERRIDES: Record<
     defaultActions: fullActions,
   },
   executive: {
-    defaultAccessLevel: "user",
+    defaultAccessLevel: "company",
     defaultActions: fullActions,
-    includeResources: ["account", "property", "meeting", "faq", "testimonial"],
+    includeResources: [...DEFAULT_COMPANY_MEMBER_BASE_RESOURCES, ...EXECUTIVE_EXTRA_RESOURCES],
   },
 };
 
