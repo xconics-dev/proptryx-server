@@ -2,6 +2,7 @@ import { getRbacResourceMetadata, type RbacResourceScope } from "@proptryx/datab
 
 export type OrganizationRoleSlug = "owner" | "admin" | "executive";
 export type RolePermissionAccessLevel = "company" | "user" | "all";
+type ManagedRolePermissionScope = RbacResourceScope;
 
 type PermissionActionMap = Record<string, boolean>;
 type RolePermissionInput = {
@@ -31,6 +32,8 @@ const PROPTRYX_SCOPE: RbacResourceScope = "proptryx";
 const PROPTRYX_RESOURCE_METADATA = getRbacResourceMetadata(PROPTRYX_SCOPE);
 export const MANAGED_ACCOUNT_PERMISSION_RESOURCE = "account";
 export const MANAGED_ACCOUNT_PERMISSION_ACCESS_LEVEL = "user";
+export const MANAGED_USER_PERMISSION_RESOURCE = "user";
+export const MANAGED_USER_PERMISSION_ACCESS_LEVEL = "user";
 const DEFAULT_COMPANY_MEMBER_BASE_RESOURCES = [
   "account",
   "member",
@@ -50,6 +53,31 @@ const PROPTRYX_RESOURCE_ACTIONS = Object.freeze(
   Object.fromEntries(PROPTRYX_RESOURCE_METADATA.map((item) => [item.resource, item.actions]))
 );
 
+const MANAGED_ROLE_PERMISSIONS_BY_SCOPE: Record<
+  ManagedRolePermissionScope,
+  Array<{
+    resource: string;
+    accessLevel: RolePermissionAccessLevel;
+  }>
+> = {
+  company: [
+    {
+      resource: MANAGED_ACCOUNT_PERMISSION_RESOURCE,
+      accessLevel: MANAGED_ACCOUNT_PERMISSION_ACCESS_LEVEL,
+    },
+    {
+      resource: MANAGED_USER_PERMISSION_RESOURCE,
+      accessLevel: MANAGED_USER_PERMISSION_ACCESS_LEVEL,
+    },
+  ],
+  proptryx: [
+    {
+      resource: MANAGED_ACCOUNT_PERMISSION_RESOURCE,
+      accessLevel: MANAGED_ACCOUNT_PERMISSION_ACCESS_LEVEL,
+    },
+  ],
+};
+
 const fullActions = (resource: string): PermissionActionMap =>
   Object.fromEntries((RESOURCE_ACTIONS[resource] ?? []).map((action) => [action, true]));
 const fullActionsByScope = (scope: RbacResourceScope, resource: string): PermissionActionMap =>
@@ -59,40 +87,69 @@ const fullActionsByScope = (scope: RbacResourceScope, resource: string): Permiss
     )
   );
 
-export const isManagedRolePermissionResource = (resource: string) =>
-  resource === MANAGED_ACCOUNT_PERMISSION_RESOURCE;
+const getManagedRolePermissionConfigs = (scope: ManagedRolePermissionScope) =>
+  MANAGED_ROLE_PERMISSIONS_BY_SCOPE[scope];
 
-export const getManagedRolePermission = (
-  scope: RbacResourceScope
+export const isManagedRolePermissionResource = (resource: string) =>
+  Object.values(MANAGED_ROLE_PERMISSIONS_BY_SCOPE).some((permissions) =>
+    permissions.some((permission) => permission.resource === resource)
+  );
+
+const buildManagedRolePermission = (
+  scope: ManagedRolePermissionScope,
+  resource: string,
+  accessLevel: RolePermissionAccessLevel
 ): Required<RolePermissionInput> => ({
-  resource: MANAGED_ACCOUNT_PERMISSION_RESOURCE,
-  accessLevel: MANAGED_ACCOUNT_PERMISSION_ACCESS_LEVEL,
-  actions: fullActionsByScope(scope, MANAGED_ACCOUNT_PERMISSION_RESOURCE),
+  resource,
+  accessLevel,
+  actions: fullActionsByScope(scope, resource),
 });
+
+export const getManagedRolePermission = (scope: RbacResourceScope): Required<RolePermissionInput> =>
+  buildManagedRolePermission(
+    scope,
+    MANAGED_ACCOUNT_PERMISSION_RESOURCE,
+    MANAGED_ACCOUNT_PERMISSION_ACCESS_LEVEL
+  );
+
+export const getManagedRolePermissions = (
+  scope: ManagedRolePermissionScope
+): Required<RolePermissionInput>[] =>
+  getManagedRolePermissionConfigs(scope).map((permission) =>
+    buildManagedRolePermission(scope, permission.resource, permission.accessLevel)
+  );
 
 export const mergeManagedRolePermissions = <T extends RolePermissionInput>(
   permissions: readonly T[] | undefined,
-  scope: RbacResourceScope
+  scope: ManagedRolePermissionScope
 ) => {
-  const managedPermission = getManagedRolePermission(scope);
+  const managedPermissions = getManagedRolePermissions(scope);
   const filteredPermissions = (permissions ?? []).filter(
     (permission) => !isManagedRolePermissionResource(permission.resource)
   );
 
-  return [...filteredPermissions, managedPermission];
+  return [...filteredPermissions, ...managedPermissions];
 };
 
 export const normalizeManagedRolePermission = <T extends RolePermissionInput>(
   permission: T,
-  scope: RbacResourceScope
+  scope: ManagedRolePermissionScope
 ) => {
   if (!isManagedRolePermissionResource(permission.resource)) {
     return permission;
   }
 
+  const managedPermission = getManagedRolePermissions(scope).find(
+    (managedItem) => managedItem.resource === permission.resource
+  );
+
+  if (!managedPermission) {
+    return permission;
+  }
+
   return {
     ...permission,
-    ...getManagedRolePermission(scope),
+    ...managedPermission,
   };
 };
 
@@ -110,6 +167,11 @@ const ROLE_RESOURCE_OVERRIDES: Record<
     defaultActions: fullActions,
     resources: {
       [MANAGED_ACCOUNT_PERMISSION_RESOURCE]: getManagedRolePermission(COMPANY_SCOPE),
+      [MANAGED_USER_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_USER_PERMISSION_RESOURCE,
+        MANAGED_USER_PERMISSION_ACCESS_LEVEL
+      ),
     },
   },
   admin: {
@@ -117,6 +179,11 @@ const ROLE_RESOURCE_OVERRIDES: Record<
     defaultActions: fullActions,
     resources: {
       [MANAGED_ACCOUNT_PERMISSION_RESOURCE]: getManagedRolePermission(COMPANY_SCOPE),
+      [MANAGED_USER_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_USER_PERMISSION_RESOURCE,
+        MANAGED_USER_PERMISSION_ACCESS_LEVEL
+      ),
     },
   },
   executive: {
@@ -125,6 +192,11 @@ const ROLE_RESOURCE_OVERRIDES: Record<
     includeResources: [...DEFAULT_COMPANY_MEMBER_BASE_RESOURCES, ...EXECUTIVE_EXTRA_RESOURCES],
     resources: {
       [MANAGED_ACCOUNT_PERMISSION_RESOURCE]: getManagedRolePermission(COMPANY_SCOPE),
+      [MANAGED_USER_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_USER_PERMISSION_RESOURCE,
+        MANAGED_USER_PERMISSION_ACCESS_LEVEL
+      ),
     },
   },
 };

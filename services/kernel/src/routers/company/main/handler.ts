@@ -9,7 +9,15 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { account, company_request, db, member, organization, user } from "@proptryx/database";
+import {
+  account,
+  company_request,
+  db,
+  member,
+  organization,
+  organizationSubscription,
+  user,
+} from "@proptryx/database";
 import { and, eq, or } from "drizzle-orm";
 import { emailSubject, renderAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { logger } from "@/lib/logger";
@@ -22,6 +30,8 @@ import {
   get_settings,
   list,
   remove,
+  restore,
+  restore_only,
   resendCredentials,
   update,
 } from "./openapi.route";
@@ -39,6 +49,7 @@ import {
   findCompanyOwnerConflicts,
   findNextCompanyId,
   getCompanyOwnerCredentialDeliveryData,
+  restoreCompanyById,
   syncCompanyRazorpayCustomer,
 } from "./utils";
 import { findCompanyRequestById } from "../request/utils";
@@ -483,14 +494,42 @@ registerOpenApiRoute(companyMainGroup, remove, async (c) => {
     );
   }
 
-  await db
-    .update(organization)
-    .set({
-      isDeleted: true,
-      deletedAt: new Date(),
-      deletedByUser: currentAuthUser?.id ?? null,
-    })
-    .where(eq(organization.id, id));
+  const deletedAt = new Date();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(member)
+      .set({
+        isDeleted: true,
+        deletedAt,
+        deletedByUser: currentAuthUser?.id ?? null,
+      })
+      .where(and(eq(member.organizationId, id), eq(member.isDeleted, false)));
+
+    await tx
+      .update(organizationSubscription)
+      .set({
+        isDeleted: true,
+        deletedAt,
+        deletedByUser: currentAuthUser?.id ?? null,
+      })
+      .where(
+        and(
+          eq(organizationSubscription.organizationId, id),
+          eq(organizationSubscription.isDeleted, false)
+        )
+      );
+
+    await tx
+      .update(organization)
+      .set({
+        isActive: false,
+        isDeleted: true,
+        deletedAt,
+        deletedByUser: currentAuthUser?.id ?? null,
+      })
+      .where(eq(organization.id, id));
+  });
 
   const deletedCompany = await findCompanyById(id, { includeDeleted: true });
 
@@ -506,6 +545,72 @@ registerOpenApiRoute(companyMainGroup, remove, async (c) => {
     ),
     200
   );
+});
+
+registerOpenApiRoute(companyMainGroup, restore, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user: currentAuthUser } = getBetterAuthContext(c);
+
+  const existingCompany = await findCompanyById(id, { includeDeleted: true });
+
+  if (!existingCompany) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  const restoredCompany = await restoreCompanyById(id, currentAuthUser?.id ?? null, {
+    restoreRelated: true,
+  });
+
+  if (!restoredCompany) {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: `Failed to restore company with id ${id}`,
+      }),
+      500
+    );
+  }
+
+  return c.json(createSuccessResponse(restoredCompany), 200);
+});
+
+registerOpenApiRoute(companyMainGroup, restore_only, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user: currentAuthUser } = getBetterAuthContext(c);
+
+  const existingCompany = await findCompanyById(id, { includeDeleted: true });
+
+  if (!existingCompany) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  const restoredCompany = await restoreCompanyById(id, currentAuthUser?.id ?? null, {
+    restoreRelated: false,
+  });
+
+  if (!restoredCompany) {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: `Failed to restore company with id ${id}`,
+      }),
+      500
+    );
+  }
+
+  return c.json(createSuccessResponse(restoredCompany), 200);
 });
 
 registerOpenApiRoute(companyMainGroup, resendCredentials, async (c) => {

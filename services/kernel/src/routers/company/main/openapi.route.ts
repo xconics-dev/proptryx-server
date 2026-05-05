@@ -163,6 +163,36 @@ export const remove = createOpenApiRoute({
   },
 });
 
+export const restore = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/restore",
+  operationId: "companyRestoreById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Restore a deleted company with related soft-deleted records",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(companySchema, "Company restored successfully"),
+  },
+});
+
+export const restore_only = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/restore-only",
+  operationId: "companyRestoreOnlyById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Restore only the deleted company record",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(companySchema, "Company restored successfully"),
+  },
+});
+
 export const resendCredentials = createOpenApiRoute({
   method: "post",
   path: "/{id}/resend-cred",

@@ -11,6 +11,8 @@ import {
 } from "@proptryx/utils";
 import {
   memberCreateSchema,
+  memberBanSchema,
+  memberDeleteWithUserResultSchema,
   memberListItemSchema,
   memberListParamsSchema,
   memberListQuerySchema,
@@ -22,7 +24,7 @@ import {
 const tags = ["Company / Members"];
 
 const companyRequestRbac = createResourceRbacGuards({
-  resource: DATABASE_RESOURCES.organization,
+  resource: DATABASE_RESOURCES.member,
   auth: DEFAULT_FAST_RBAC_AUTH_OPTIONS,
 });
 
@@ -104,9 +106,7 @@ export const remove = createOpenApiRoute({
     params: IdStringParamSchema(),
   },
   responses: {
-    204: {
-      description: "Member removed successfully",
-    },
+    200: createApiSuccessResponse(memberSchema, "Member removed successfully"),
   },
 });
 
@@ -121,9 +121,27 @@ export const remove_with_user = createOpenApiRoute({
     params: IdStringParamSchema(),
   },
   responses: {
-    204: {
-      description: "Member with user removed successfully",
-    },
+    200: createApiSuccessResponse(
+      memberDeleteWithUserResultSchema,
+      "Member with user removed successfully"
+    ),
+  },
+});
+
+export const ban = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/ban",
+  operationId: "companyMemberBanById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Ban a company member user account",
+  request: {
+    params: IdStringParamSchema(),
+    body: createApiJsonBody(memberBanSchema),
+  },
+  responses: {
+    200: createApiSuccessResponse(memberListItemSchema, "Member banned successfully"),
+    404: ApiNotFoundOpenApi,
   },
 });
 
@@ -138,9 +156,10 @@ export const resendCredentials = createOpenApiRoute({
     params: IdStringParamSchema(),
   },
   responses: {
-    200: {
-      description: "Credentials resent successfully",
-    },
+    200: createApiSuccessResponse(
+      memberDeleteWithUserResultSchema,
+      "Credentials resent successfully"
+    ),
     404: ApiNotFoundOpenApi,
   },
 });

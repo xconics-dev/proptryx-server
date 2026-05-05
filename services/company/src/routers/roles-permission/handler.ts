@@ -234,8 +234,8 @@ registerOpenApiRoute(rolesPermissionGroup, create_permission, async (c) => {
   }
 
   if (isManagedRolePermissionResource(body.resource)) {
-    const existingManagedPermission = role.permissions.find((permission: { resource: string }) =>
-      isManagedRolePermissionResource(permission.resource)
+    const existingManagedPermission = role.permissions.find(
+      (permission: { resource: string }) => permission.resource === body.resource
     );
 
     if (existingManagedPermission) {
@@ -322,7 +322,7 @@ registerOpenApiRoute(rolesPermissionGroup, remove_permission, async (c) => {
     return c.json(
       createErrorResponse({
         error: "Bad Request",
-        message: "Account permission is managed automatically for every role",
+        message: `${existingPermission.resource} permission is managed automatically for every role`,
       }),
       400
     );

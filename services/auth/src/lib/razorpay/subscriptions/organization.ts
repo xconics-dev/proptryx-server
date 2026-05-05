@@ -955,17 +955,42 @@ const pauseSubscriptionEndpoint = createAuthEndpoint(
       });
     }
 
-    const pauseAt = ctx.body.pauseAt ?? "now";
+    const normalizedStatus = subscription.status.toLowerCase();
+    const shouldOmitPauseAt = ["created", "authenticated"].includes(normalizedStatus);
     let razorpaySubscription: any;
 
     try {
-      razorpaySubscription = await rzClient.subscriptions.pause(
-        subscription.razorpaySubscriptionId,
-        { pause_at: pauseAt }
-      );
+      razorpaySubscription = shouldOmitPauseAt
+        ? await rzClient.subscriptions.pause(subscription.razorpaySubscriptionId)
+        : await rzClient.subscriptions.pause(subscription.razorpaySubscriptionId, {
+            pause_at: "now",
+          });
     } catch (error) {
+      const message = getRazorpayErrorMessage(error, "Failed to pause Razorpay subscription.");
+
+      if (
+        !shouldOmitPauseAt &&
+        message.includes("pause_at is/are not required and should not be sent")
+      ) {
+        try {
+          razorpaySubscription = await rzClient.subscriptions.pause(
+            subscription.razorpaySubscriptionId
+          );
+        } catch (retryError) {
+          throw new APIError("BAD_REQUEST", {
+            message: getRazorpayErrorMessage(retryError, "Failed to pause Razorpay subscription."),
+          });
+        }
+      } else {
+        throw new APIError("BAD_REQUEST", {
+          message,
+        });
+      }
+    }
+
+    if (!razorpaySubscription) {
       throw new APIError("BAD_REQUEST", {
-        message: getRazorpayErrorMessage(error, "Failed to pause Razorpay subscription."),
+        message: "Failed to pause Razorpay subscription.",
       });
     }
     const linkedPlan = await getPlanById(subscription.subscriptionPlanId);
@@ -1020,17 +1045,36 @@ const resumeSubscriptionEndpoint = createAuthEndpoint(
       });
     }
 
-    const resumeAt = ctx.body.resumeAt ?? "now";
     let razorpaySubscription: any;
 
     try {
       razorpaySubscription = await rzClient.subscriptions.resume(
         subscription.razorpaySubscriptionId,
-        { resume_at: resumeAt }
+        { resume_at: "now" }
       );
     } catch (error) {
+      const message = getRazorpayErrorMessage(error, "Failed to resume Razorpay subscription.");
+
+      if (message.includes("resume_at is/are not required and should not be sent")) {
+        try {
+          razorpaySubscription = await rzClient.subscriptions.resume(
+            subscription.razorpaySubscriptionId
+          );
+        } catch (retryError) {
+          throw new APIError("BAD_REQUEST", {
+            message: getRazorpayErrorMessage(retryError, "Failed to resume Razorpay subscription."),
+          });
+        }
+      } else {
+        throw new APIError("BAD_REQUEST", {
+          message,
+        });
+      }
+    }
+
+    if (!razorpaySubscription) {
       throw new APIError("BAD_REQUEST", {
-        message: getRazorpayErrorMessage(error, "Failed to resume Razorpay subscription."),
+        message: "Failed to resume Razorpay subscription.",
       });
     }
     const linkedPlan = await getPlanById(subscription.subscriptionPlanId);

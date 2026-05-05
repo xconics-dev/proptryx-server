@@ -1,6 +1,13 @@
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
-import { account, db, member, organization, user } from "@proptryx/database";
+import {
+  account,
+  db,
+  member,
+  organization,
+  organizationSubscription,
+  user,
+} from "@proptryx/database";
 import {
   decryptPassword,
   encryptPassword,
@@ -170,7 +177,7 @@ const getCurrentOrganizationMember = async (organizationId: string, userId?: str
 
 export async function findCompanySettingsById(id: string, currentUserId?: string | null) {
   const company = await db.query.organization.findFirst({
-    where: and(eq(organization.id, id), eq(organization.isDeleted, false)),
+    where: eq(organization.id, id),
   });
 
   if (!company) {
@@ -195,6 +202,54 @@ export async function findCompanySettingsById(id: string, currentUserId?: string
     updatedByUserAdmin: updatedByUserAdmin ?? createdByUserAdmin ?? ownerAdmin,
     currentMember,
   };
+}
+
+export async function restoreCompanyById(
+  id: string,
+  currentUserId?: string | null,
+  options?: {
+    restoreRelated?: boolean;
+  }
+) {
+  const restoreRelated = options?.restoreRelated ?? false;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(organization)
+      .set({
+        isDeleted: false,
+        deletedAt: null,
+        deletedByUser: null,
+        updatedByUser: currentUserId ?? null,
+      })
+      .where(eq(organization.id, id));
+
+    if (!restoreRelated) {
+      return;
+    }
+
+    await tx
+      .update(member)
+      .set({
+        isDeleted: false,
+        deletedAt: null,
+        deletedByUser: null,
+        updatedByUser: currentUserId ?? null,
+      })
+      .where(eq(member.organizationId, id));
+
+    await tx
+      .update(organizationSubscription)
+      .set({
+        isDeleted: false,
+        deletedAt: null,
+        deletedByUser: null,
+        updatedByUser: currentUserId ?? null,
+      })
+      .where(eq(organizationSubscription.organizationId, id));
+  });
+
+  return findCompanyById(id);
 }
 
 export async function fetchCompanyGstInfo(gstNumber: string) {

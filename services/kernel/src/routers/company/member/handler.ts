@@ -16,6 +16,7 @@ import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx
 import { logger } from "@/lib/logger";
 import { fetchMemberList } from "./list";
 import {
+  ban,
   create,
   get,
   list,
@@ -90,7 +91,7 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
     return c.json(
       createErrorResponse({
         error: "Conflict",
-        message: "Client with this email already exists",
+        message: "Member with this email already exists",
       }),
       409
     );
@@ -185,7 +186,7 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
       });
   }
 
-  return c.json(memberData, 201);
+  return c.json(createSuccessResponse(memberData), 201);
 });
 
 registerOpenApiRoute(companyMembersGroup, update, async (c) => {
@@ -239,7 +240,7 @@ registerOpenApiRoute(companyMembersGroup, update, async (c) => {
     );
   }
 
-  return c.json(updatedMember);
+  return c.json(createSuccessResponse(updatedMember), 200);
 });
 
 registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
@@ -288,12 +289,11 @@ registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
     );
   }
 
-  return c.json(deletedMember);
+  return c.json(createSuccessResponse(deletedMember), 200);
 });
 
 registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
   const { id } = c.req.valid("param");
-  const { user: currentUser } = getBetterAuthContext(c);
 
   const existingMember = await findMemberById(id);
 
@@ -317,27 +317,81 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
     );
   }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(member)
-      .set({
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedByUser: currentUser?.id,
-      })
-      .where(eq(member.id, id));
+  const [deletedUser] = await db.transaction(async (tx) => {
+    await tx.delete(member).where(eq(member.id, id));
 
-    await tx
-      .update(user)
-      .set({
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedByUser: currentUser?.id,
-      })
-      .where(eq(user.id, existingMember.userId));
+    return await tx.delete(user).where(eq(user.id, existingMember.userId)).returning({
+      id: user.id,
+    });
   });
 
-  return c.json(null);
+  if (!deletedUser) {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: "Failed to permanently delete the linked user account",
+      }),
+      500
+    );
+  }
+
+  return c.json(
+    createSuccessResponse({
+      message: "Member and linked user account permanently deleted successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMembersGroup, ban, async (c) => {
+  const { id } = c.req.valid("param");
+  const body = c.req.valid("json");
+  const { user: currentUser } = getBetterAuthContext(c);
+
+  const existingMember = await findMemberById(id);
+
+  if (!existingMember) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  if (existingMember.role === "owner") {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Cannot ban owner member",
+      }),
+      403
+    );
+  }
+
+  await db
+    .update(user)
+    .set({
+      banned: true,
+      banReason: body.reason,
+      updatedByUser: currentUser?.id,
+    })
+    .where(eq(user.id, existingMember.userId));
+
+  const updatedMember = await findMemberDetailsById(id);
+
+  if (!updatedMember) {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: "Failed to ban member",
+      }),
+      500
+    );
+  }
+
+  return c.json(createSuccessResponse(updatedMember), 200);
 });
 
 registerOpenApiRoute(companyMembersGroup, resendCredentials, async (c) => {
