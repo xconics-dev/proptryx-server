@@ -12,6 +12,7 @@ import {
 } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
 import {
+  check_slug,
   create,
   create_permission,
   get,
@@ -29,6 +30,7 @@ import {
   fetchRoleList,
   findPermissionById,
   findRoleDetailsById,
+  findRoleSlugAvailability,
   findRoleSlugConflict,
   normalizePermissionValues,
 } from "./utils";
@@ -44,6 +46,13 @@ registerOpenApiRoute(proptryxRolesPermissionGroup, list, async (c) => {
 
 registerOpenApiRoute(proptryxRolesPermissionGroup, resources, async (c) => {
   return c.json(createSuccessResponse(getRbacResourceMetadata("proptryx")), 200);
+});
+
+registerOpenApiRoute(proptryxRolesPermissionGroup, check_slug, async (c) => {
+  const query = c.req.valid("query");
+  const isAvailable = await findRoleSlugAvailability(query.slug);
+
+  return c.json(createSuccessResponse({ status: isAvailable }), 200);
 });
 
 registerOpenApiRoute(proptryxRolesPermissionGroup, get, async (c) => {

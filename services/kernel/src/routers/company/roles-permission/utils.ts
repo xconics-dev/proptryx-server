@@ -74,6 +74,11 @@ export async function findRoleSlugConflict(
     .then((rows) => rows[0] ?? null);
 }
 
+export async function findRoleSlugAvailability(slug: string, organizationId: string) {
+  const conflict = await findRoleSlugConflict(createRoleSlug(slug), organizationId);
+  return !conflict;
+}
+
 export async function attachPermissions<TRole extends { id: string }>(roles: TRole[]) {
   if (roles.length === 0) {
     return [];

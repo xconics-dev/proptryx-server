@@ -13,6 +13,7 @@ import {
   proptryxUserCreateSchema,
   proptryxUserListQuerySchema,
   proptryxUserListResponseSchema,
+  proptryxUserPermanentDeleteResultSchema,
   proptryxUserSchema,
   proptryxUserUpdateSchema,
   proptryxUserWithLocationSchema,
@@ -104,6 +105,25 @@ export const remove = createOpenApiRoute({
   },
   responses: {
     200: createApiSuccessResponse(proptryxUserSchema, "User deleted successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const removePermanently = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/permanent",
+  operationId: "proptryxUserPermanentDeleteById",
+  tags,
+  middleware: [proptryxUserMethodsRateLimit, proptryxUserRbac.custom("delete")],
+  summary: "Permanently delete a Proptryx user",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      proptryxUserPermanentDeleteResultSchema,
+      "User permanently deleted successfully"
+    ),
     404: ApiNotFoundOpenApi,
   },
 });

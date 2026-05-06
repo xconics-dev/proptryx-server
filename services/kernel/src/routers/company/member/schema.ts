@@ -80,6 +80,10 @@ export const memberDeleteWithUserResultSchema = z.object({
   message: z.string(),
 });
 
+export const memberRemoveResultSchema = z.object({
+  message: z.string(),
+});
+
 export type MemberListQuery = z.infer<typeof memberListQuerySchema>;
 export type ScopedMemberListQuery = MemberListQuery & {
   organizationId?: string;

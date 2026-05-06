@@ -72,7 +72,11 @@ export async function findMemberConflictByEmail(email: string, organizationId: s
 
 export async function findOrganizationSummaryById(id: string) {
   return db
-    .select({ id: organization.id, name: organization.name })
+    .select({
+      id: organization.id,
+      name: organization.name,
+      type: organization.type,
+    })
     .from(organization)
     .where(and(eq(organization.id, id), eq(organization.isDeleted, false)))
     .limit(1)

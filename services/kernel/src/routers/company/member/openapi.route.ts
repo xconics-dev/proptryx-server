@@ -12,6 +12,7 @@ import {
 import {
   memberCreateSchema,
   memberBanSchema,
+  memberRemoveResultSchema,
   memberDeleteWithUserResultSchema,
   memberListItemSchema,
   memberListParamsSchema,
@@ -97,16 +98,31 @@ export const update = createOpenApiRoute({
 
 export const remove = createOpenApiRoute({
   method: "delete",
-  path: "/{id}",
-  operationId: "companyMemberDeleteById",
+  path: "/{id}/remove",
+  operationId: "companyMemberRemoveById",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
-  summary: "Remove a member from the company",
+  summary: "Remove a member from the company and keep the linked user account",
   request: {
     params: IdStringParamSchema(),
   },
   responses: {
-    200: createApiSuccessResponse(memberSchema, "Member removed successfully"),
+    200: createApiSuccessResponse(memberRemoveResultSchema, "Member removed successfully"),
+  },
+});
+
+export const softDelete = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}",
+  operationId: "companyMemberDeleteById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
+  summary: "Soft delete a company member",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(memberSchema, "Member deleted successfully"),
   },
 });
 

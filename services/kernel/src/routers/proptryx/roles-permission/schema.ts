@@ -67,6 +67,14 @@ export const roleUpdateSchema = z
     message: "At least one field is required",
   });
 
+export const roleSlugAvailabilityQuerySchema = z.object({
+  slug: z.string().trim().min(3, "Enter at least 3 characters."),
+});
+
+export const roleSlugAvailabilitySchema = z.object({
+  status: z.boolean(),
+});
+
 export const rolePermissionCreateSchema = z.object({
   resource: z.string().min(1, "Resource is required"),
   accessLevel: z.enum(PermissionAccessLevel.enumValues).optional(),

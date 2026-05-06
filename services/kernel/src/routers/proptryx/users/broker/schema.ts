@@ -83,3 +83,7 @@ export type ScopedProptryxBrokerUserListQuery = ProptryxBrokerUserListQuery & {
 export const proptryxBrokerUserListResponseSchema = createListResponseSchema(
   proptryxBrokerUserWithLocationSchema
 );
+
+export const proptryxBrokerUserPermanentDeleteResultSchema = z.object({
+  message: z.string(),
+});

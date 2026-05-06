@@ -23,6 +23,7 @@ import {
   remove,
   remove_with_user,
   resendCredentials,
+  softDelete,
   update,
 } from "./openapi.route";
 import {
@@ -137,7 +138,7 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
       id: userId,
       name: body.name,
       panel: "company",
-      role: "developer",
+      role: orgData.type.toLowerCase(),
       email: body.email,
       phoneNumber: body.phoneNumber,
       zoneId: body.zoneId,
@@ -244,6 +245,41 @@ registerOpenApiRoute(companyMembersGroup, update, async (c) => {
 });
 
 registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const existingMember = await findMemberById(id);
+
+  if (!existingMember) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  if (existingMember.role === "owner") {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Cannot remove owner member",
+      }),
+      403
+    );
+  }
+
+  await db.delete(member).where(eq(member.id, id));
+
+  return c.json(
+    createSuccessResponse({
+      message: "Member removed successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMembersGroup, softDelete, async (c) => {
   const { id } = c.req.valid("param");
   const { user: currentUser } = getBetterAuthContext(c);
 

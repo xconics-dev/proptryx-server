@@ -13,6 +13,7 @@ import {
   proptryxBrokerUserCreateSchema,
   proptryxBrokerUserListQuerySchema,
   proptryxBrokerUserListResponseSchema,
+  proptryxBrokerUserPermanentDeleteResultSchema,
   proptryxBrokerUserSchema,
   proptryxBrokerUserUpdateSchema,
   proptryxBrokerUserWithLocationSchema,
@@ -110,6 +111,25 @@ export const remove = createOpenApiRoute({
   },
   responses: {
     200: createApiSuccessResponse(proptryxBrokerUserSchema, "Broker user deleted successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const removePermanently = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/permanent",
+  operationId: "proptryxBrokerUserPermanentDeleteById",
+  tags,
+  middleware: [proptryxBrokerUserMethodsRateLimit, proptryxBrokerUserRbac.custom("delete")],
+  summary: "Permanently delete a Proptryx broker user",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      proptryxBrokerUserPermanentDeleteResultSchema,
+      "Broker user permanently deleted successfully"
+    ),
     404: ApiNotFoundOpenApi,
   },
 });
