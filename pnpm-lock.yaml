@@ -187,34 +187,6 @@ importers:
 
   packages/typescript-config: {}
 
-  packages/uploader:
-    dependencies:
-      '@better-upload/server':
-        specifier: ^3.0.17
-        version: 3.0.17
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
-    devDependencies:
-      '@biomejs/biome':
-        specifier: ^2.4.13
-        version: 2.4.13
-      '@proptryx/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^25.6.0
-        version: 25.6.0
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.10)(tsx@4.21.0)(typescript@6.0.3)(yaml@2.8.3)
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-
   packages/utils:
     dependencies:
       '@hono/node-server':
@@ -697,9 +669,6 @@ packages:
 
   '@better-fetch/fetch@1.1.21':
     resolution: {integrity: sha512-/ImESw0sskqlVR94jB+5+Pxjf+xBwDZF/N5+y2/q4EqD7IARUTSpPfIo8uf39SYpCxyOCtbyYpUrZ3F/k0zT4A==}
-
-  '@better-upload/server@3.0.17':
-    resolution: {integrity: sha512-DA9/bNrp7uB9XtYpshM5x/Pk3fV6zKvQHNszT8wsftSHPGV79eozbNV2N5njL74h1A4Z6D5UbknTm1xWa8Y8JQ==}
 
   '@biomejs/biome@2.4.13':
     resolution: {integrity: sha512-gLXOwkOBBg0tr7bDsqlkIh4uFeKuMjxvqsrb1Tukww1iDmHcfr4Uu8MoQxp0Rcte+69+osRNWXwHsu/zxT6XqA==}
@@ -4938,12 +4907,6 @@ snapshots:
 
   '@better-fetch/fetch@1.1.21': {}
 
-  '@better-upload/server@3.0.17':
-    dependencies:
-      aws4fetch: 1.0.20
-      fast-xml-parser: 5.5.10
-      zod: 4.3.6
-
   '@biomejs/biome@2.4.13':
     optionalDependencies:
       '@biomejs/cli-darwin-arm64': 2.4.13
@@ -6247,7 +6210,8 @@ snapshots:
       stubborn-fs: 2.0.0
       when-exit: 2.1.5
 
-  aws4fetch@1.0.20: {}
+  aws4fetch@1.0.20:
+    optional: true
 
   axios@1.13.6:
     dependencies:
