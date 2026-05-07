@@ -1,4 +1,4 @@
-import { account, db, member, organization, user } from "@proptryx/database";
+import { account, db, member, organization, session, user } from "@proptryx/database";
 import {
   decryptPassword,
   encryptPassword,
@@ -6,7 +6,7 @@ import {
   generateUID,
   PasswordUtils,
 } from "@proptryx/utils";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 type IncludeDeletedOptions = {
   includeDeleted?: boolean;
@@ -150,5 +150,24 @@ export async function getMemberCredentialDeliveryData(id: string, secret: string
       organizationName: orgData.name,
       role: memberData.role,
     },
+  };
+}
+
+export async function listMemberSessionsByMemberId(id: string) {
+  const memberData = await findMemberById(id, { includeDeleted: true });
+
+  if (!memberData) {
+    return;
+  }
+
+  const sessions = await db
+    .select()
+    .from(session)
+    .where(eq(session.userId, memberData.userId))
+    .orderBy(desc(session.updatedAt), desc(session.createdAt));
+
+  return {
+    memberData,
+    sessions,
   };
 }

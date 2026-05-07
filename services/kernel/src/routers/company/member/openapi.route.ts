@@ -18,6 +18,9 @@ import {
   memberListParamsSchema,
   memberListQuerySchema,
   memberListResponseSchema,
+  memberSessionListSchema,
+  memberSessionRevokeResultSchema,
+  memberSessionTokenParamsSchema,
   memberSchema,
   memberUpdateSchema,
 } from "./schema";
@@ -175,6 +178,60 @@ export const resendCredentials = createOpenApiRoute({
     200: createApiSuccessResponse(
       memberDeleteWithUserResultSchema,
       "Credentials resent successfully"
+    ),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const listSessions = createOpenApiRoute({
+  method: "get",
+  path: "/{id}/sessions",
+  operationId: "companyMemberSessions",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("get")],
+  summary: "List sessions for a company member",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(memberSessionListSchema, "Member sessions fetched successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const revokeSession = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/sessions/{sessionToken}",
+  operationId: "companyMemberRevokeSession",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Terminate a company member session",
+  request: {
+    params: memberSessionTokenParamsSchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      memberSessionRevokeResultSchema,
+      "Member session terminated successfully"
+    ),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const revokeAllSessions = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/sessions",
+  operationId: "companyMemberRevokeAllSessions",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Terminate all sessions for a company member",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      memberSessionRevokeResultSchema,
+      "Member sessions terminated successfully"
     ),
     404: ApiNotFoundOpenApi,
   },
