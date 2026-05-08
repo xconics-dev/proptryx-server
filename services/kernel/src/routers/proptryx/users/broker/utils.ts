@@ -1,4 +1,4 @@
-import { account, db } from "@proptryx/database";
+import { account, db, region, zone } from "@proptryx/database";
 import { decryptPassword, PasswordUtils } from "@proptryx/utils";
 import { and, eq } from "drizzle-orm";
 import { findProptryxUserById } from "../utils";
@@ -51,12 +51,31 @@ export async function getProptryxBrokerUserCredentialDeliveryData(id: string, se
     })
     .where(eq(account.id, userAccount.id));
 
+  const zoneRow = userData.zoneId
+    ? await db
+        .select()
+        .from(zone)
+        .where(eq(zone.id, userData.zoneId))
+        .limit(1)
+        .then((r) => r[0])
+    : undefined;
+
+  const regionRow = zoneRow?.regionId
+    ? await db
+        .select()
+        .from(region)
+        .where(eq(region.id, zoneRow.regionId))
+        .limit(1)
+        .then((r) => r[0])
+    : undefined;
   return {
     success: true as const,
     data: {
       email: userData.email,
       password,
-      role: "broker",
+      name: userData.name,
+      zone: zoneRow?.name,
+      region: regionRow?.name,
     },
   };
 }

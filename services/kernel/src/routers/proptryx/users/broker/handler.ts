@@ -360,16 +360,18 @@ registerOpenApiRoute(proptryxBrokerUsersGroup, resendCredentials, async (c) => {
     );
   }
 
-  await renderProptryxAccountCredEmail({
+  await renderBrokerCredEmail({
     credEmail: credentialData.data.email,
     credPassword: credentialData.data.password,
-    role: credentialData.data.role,
-    previewText: emailSubject["proptryx-account-cred"].previewText,
+    brokerName: credentialData.data.name,
+    zoneName: credentialData.data.zone,
+    regionName: credentialData.data.region,
+    previewText: emailSubject["broker-cred"].previewText,
   })
     .then((html) =>
       sendEmail({
         to: credentialData.data.email,
-        subject: emailSubject["proptryx-account-cred"].subject,
+        subject: emailSubject["broker-cred"].subject,
         html,
       })
     )
