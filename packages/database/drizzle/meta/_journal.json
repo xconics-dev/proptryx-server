@@ -57,6 +57,13 @@
       "when": 1777806660889,
       "tag": "0007_yellow_killmonger",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778159844024,
+      "tag": "0008_mighty_phantom_reporter",
+      "breakpoints": true
     }
   ]
 }

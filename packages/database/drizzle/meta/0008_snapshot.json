@@ -1,6 +1,6 @@
 {
-  "id": "31ae565b-a455-4c2a-baec-dd8b6662ab26",
-  "prevId": "572c800d-5136-4bdd-972e-cbdb20a812b4",
+  "id": "0c0a20fd-9bbb-41ac-bcf2-1fc16069cf59",
+  "prevId": "671a93bf-233d-4e8b-8eec-f2871c559d81",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2349,6 +2349,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"company_request\".\"is_deleted\" = false",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -3205,6 +3206,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "ownership_type": {
           "name": "ownership_type",
           "type": "property_ownership_type",
@@ -3271,6 +3278,42 @@
           "columns": [
             {
               "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "property_organizationId_idx": {
+          "name": "property_organizationId_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "property_isDeleted_organizationId_idx": {
+          "name": "property_isDeleted_organizationId_idx",
+          "columns": [
+            {
+              "expression": "is_deleted",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "organization_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3457,6 +3500,15 @@
         }
       },
       "foreignKeys": {
+        "property_organization_id_organization_id_fk": {
+          "name": "property_organization_id_organization_id_fk",
+          "tableFrom": "property",
+          "tableTo": "organization",
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "property_super_owner_id_user_id_fk": {
           "name": "property_super_owner_id_user_id_fk",
           "tableFrom": "property",

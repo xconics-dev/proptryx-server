@@ -10,7 +10,7 @@ import {
   user,
 } from "@proptryx/database";
 import { createTableListFetcher } from "@proptryx/utils";
-import { and, count, countDistinct, eq, inArray, or } from "drizzle-orm";
+import { and, count, countDistinct, eq, inArray, or, sql } from "drizzle-orm";
 import type { CompanyListQuery } from "./schema";
 
 const ACTIVE_SUBSCRIPTION_STATUSES = [
@@ -149,7 +149,16 @@ async function attachCompanyListMetrics(items: CompanyListBaseItem[]) {
         property,
         and(
           eq(property.isDeleted, false),
-          or(eq(property.superOwnerId, member.userId), eq(property.createdByUser, member.userId))
+          or(
+            eq(property.organizationId, member.organizationId),
+            and(
+              sql`${property.organizationId} is null`,
+              or(
+                eq(property.superOwnerId, member.userId),
+                eq(property.createdByUser, member.userId)
+              )
+            )
+          )
         )
       )
       .where(and(inArray(member.organizationId, organizationIds), eq(member.isDeleted, false)))

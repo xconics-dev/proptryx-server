@@ -1,6 +1,6 @@
 import { relations } from "drizzle-orm";
 import { boolean, index, jsonb, pgTable, real, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { user } from "../auth/schema";
+import { organization, user } from "../auth/schema";
 import { meeting } from "../meeting/schema";
 import { faq } from "../site-data/faqs/schema";
 import { createAuditRelationNames } from "../utils/audit";
@@ -80,6 +80,9 @@ export const property = pgTable(
     status: PropertyStatus("status").notNull(),
 
     // Ownership
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "set null",
+    }),
     ownershipType: PropertyOwnershipType("ownership_type").default("SINGLE_OWNER").notNull(),
     superOwnerId: text("super_owner_id").references(() => user.id, {
       onDelete: "set null",
@@ -108,6 +111,8 @@ export const property = pgTable(
   },
   (table) => [
     index("property_name_idx").on(table.name),
+    index("property_organizationId_idx").on(table.organizationId),
+    index("property_isDeleted_organizationId_idx").on(table.isDeleted, table.organizationId),
     index("property_superOwnerId_idx").on(table.superOwnerId),
     index("property_createdByUser_idx").on(table.createdByUser),
     index("property_type_idx").on(table.type),
@@ -140,6 +145,11 @@ export const propertyRelations = relations(property, ({ one, many }) => {
     });
 
   return {
+    organization: one(organization, {
+      fields: [property.organizationId],
+      references: [organization.id],
+      relationName: "propertyOrganization",
+    }),
     superOwner: one(user, {
       fields: [property.superOwnerId],
       references: [user.id],
