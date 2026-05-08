@@ -36,11 +36,18 @@ const ACTIONS: Partial<Record<DatabaseResource, readonly string[]>> = {
 };
 
 const COMPANY_RESOURCES = new Set<DatabaseResource>([
+  DATABASE_RESOURCES.account,
+  DATABASE_RESOURCES.faq,
   DATABASE_RESOURCES.meeting,
   DATABASE_RESOURCES.member,
+  DATABASE_RESOURCES.organization,
   DATABASE_RESOURCES.property,
   DATABASE_RESOURCES.rbac_role,
   DATABASE_RESOURCES.rbac_role_permission,
+  DATABASE_RESOURCES.region,
+  DATABASE_RESOURCES.testimonial,
+  DATABASE_RESOURCES.user,
+  DATABASE_RESOURCES.zone,
 ]);
 
 const RESOURCE_TABLES = {

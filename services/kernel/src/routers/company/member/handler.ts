@@ -5,22 +5,28 @@ import {
   buildOrganizationLimitDeniedMessage,
   createErrorResponse,
   createSuccessResponse,
+  ensureDefaultOrganizationRoles,
   generateRandomId,
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { account, checkOrganizationLimit, db, member, user } from "@proptryx/database";
-import { eq } from "drizzle-orm";
+import { account, checkOrganizationLimit, db, member, session, user } from "@proptryx/database";
+import { and, eq } from "drizzle-orm";
 import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { logger } from "@/lib/logger";
 import { fetchMemberList } from "./list";
 import {
+  ban,
   create,
   get,
   list,
+  listSessions,
   remove,
   remove_with_user,
+  revokeAllSessions,
+  revokeSession,
   resendCredentials,
+  softDelete,
   update,
 } from "./openapi.route";
 import {
@@ -30,6 +36,7 @@ import {
   findMemberConflictByEmail,
   findMemberDetailsById,
   findOrganizationSummaryById,
+  listMemberSessionsByMemberId,
 } from "./utils";
 
 export const companyMembersGroup = new OpenAPIHono<AppBindings>();
@@ -63,6 +70,23 @@ registerOpenApiRoute(companyMembersGroup, get, async (c) => {
   return c.json(createSuccessResponse(memberData), 200);
 });
 
+registerOpenApiRoute(companyMembersGroup, listSessions, async (c) => {
+  const { id } = c.req.valid("param");
+  const result = await listMemberSessionsByMemberId(id);
+
+  if (!result) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  return c.json(createSuccessResponse(result.sessions), 200);
+});
+
 registerOpenApiRoute(companyMembersGroup, create, async (c) => {
   const body = c.req.valid("json");
   const { user: currentUser } = getBetterAuthContext(c);
@@ -89,7 +113,7 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
     return c.json(
       createErrorResponse({
         error: "Conflict",
-        message: "Client with this email already exists",
+        message: "Member with this email already exists",
       }),
       409
     );
@@ -129,11 +153,13 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
   );
 
   const memberData = await db.transaction(async (tx) => {
+    await ensureDefaultOrganizationRoles(tx, body.organizationId);
+
     await tx.insert(user).values({
       id: userId,
       name: body.name,
       panel: "company",
-      role: "developer",
+      role: orgData.type.toLowerCase(),
       email: body.email,
       phoneNumber: body.phoneNumber,
       zoneId: body.zoneId,
@@ -182,7 +208,7 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
       });
   }
 
-  return c.json(memberData, 201);
+  return c.json(createSuccessResponse(memberData), 201);
 });
 
 registerOpenApiRoute(companyMembersGroup, update, async (c) => {
@@ -203,6 +229,8 @@ registerOpenApiRoute(companyMembersGroup, update, async (c) => {
   }
 
   const [updatedMember] = await db.transaction(async (tx) => {
+    await ensureDefaultOrganizationRoles(tx, existingMember.organizationId);
+
     await tx
       .update(user)
       .set({
@@ -234,10 +262,45 @@ registerOpenApiRoute(companyMembersGroup, update, async (c) => {
     );
   }
 
-  return c.json(updatedMember);
+  return c.json(createSuccessResponse(updatedMember), 200);
 });
 
 registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const existingMember = await findMemberById(id);
+
+  if (!existingMember) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  if (existingMember.role === "owner") {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Cannot remove owner member",
+      }),
+      403
+    );
+  }
+
+  await db.delete(member).where(eq(member.id, id));
+
+  return c.json(
+    createSuccessResponse({
+      message: "Member removed successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMembersGroup, softDelete, async (c) => {
   const { id } = c.req.valid("param");
   const { user: currentUser } = getBetterAuthContext(c);
 
@@ -283,12 +346,11 @@ registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
     );
   }
 
-  return c.json(deletedMember);
+  return c.json(createSuccessResponse(deletedMember), 200);
 });
 
 registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
   const { id } = c.req.valid("param");
-  const { user: currentUser } = getBetterAuthContext(c);
 
   const existingMember = await findMemberById(id);
 
@@ -312,27 +374,81 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
     );
   }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(member)
-      .set({
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedByUser: currentUser?.id,
-      })
-      .where(eq(member.id, id));
+  const [deletedUser] = await db.transaction(async (tx) => {
+    await tx.delete(member).where(eq(member.id, id));
 
-    await tx
-      .update(user)
-      .set({
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedByUser: currentUser?.id,
-      })
-      .where(eq(user.id, existingMember.userId));
+    return await tx.delete(user).where(eq(user.id, existingMember.userId)).returning({
+      id: user.id,
+    });
   });
 
-  return c.json(null);
+  if (!deletedUser) {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: "Failed to permanently delete the linked user account",
+      }),
+      500
+    );
+  }
+
+  return c.json(
+    createSuccessResponse({
+      message: "Member and linked user account permanently deleted successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMembersGroup, ban, async (c) => {
+  const { id } = c.req.valid("param");
+  const body = c.req.valid("json");
+  const { user: currentUser } = getBetterAuthContext(c);
+
+  const existingMember = await findMemberById(id);
+
+  if (!existingMember) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  if (existingMember.role === "owner") {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Cannot ban owner member",
+      }),
+      403
+    );
+  }
+
+  await db
+    .update(user)
+    .set({
+      banned: body.banned,
+      banReason: body.banned ? (body.reason ?? null) : null,
+      updatedByUser: currentUser?.id,
+    })
+    .where(eq(user.id, existingMember.userId));
+
+  const updatedMember = await findMemberDetailsById(id);
+
+  if (!updatedMember) {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: "Failed to ban member",
+      }),
+      500
+    );
+  }
+
+  return c.json(createSuccessResponse(updatedMember), 200);
 });
 
 registerOpenApiRoute(companyMembersGroup, resendCredentials, async (c) => {
@@ -371,6 +487,67 @@ registerOpenApiRoute(companyMembersGroup, resendCredentials, async (c) => {
   return c.json(
     createSuccessResponse({
       message: "Credentials resent successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMembersGroup, revokeSession, async (c) => {
+  const { id, sessionToken } = c.req.valid("param");
+  const result = await listMemberSessionsByMemberId(id);
+
+  if (!result) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  const [deletedSession] = await db
+    .delete(session)
+    .where(and(eq(session.userId, result.memberData.userId), eq(session.token, sessionToken)))
+    .returning({ token: session.token });
+
+  if (!deletedSession) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member session not found",
+      }),
+      404
+    );
+  }
+
+  return c.json(
+    createSuccessResponse({
+      message: "Session terminated successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMembersGroup, revokeAllSessions, async (c) => {
+  const { id } = c.req.valid("param");
+  const result = await listMemberSessionsByMemberId(id);
+
+  if (!result) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  await db.delete(session).where(eq(session.userId, result.memberData.userId));
+
+  return c.json(
+    createSuccessResponse({
+      message: "All sessions terminated successfully",
     }),
     200
   );

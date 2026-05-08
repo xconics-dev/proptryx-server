@@ -35,7 +35,6 @@ proptryx-server/
 │   ├── utils/         # Shared utilities (list fetcher, RBAC, rate limit, crypto, Razorpay)
 │   ├── notification/  # Email templates + send helper (React Email + Resend)
 │   ├── logger/        # Structured logger factory
-│   ├── uploader/      # File upload helpers
 │   ├── static/        # Static assets
 │   └── typescript-config/ # Shared tsconfig
 ├── env/               # Shared .env file (consumed by all services via --env-file)

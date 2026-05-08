@@ -13,6 +13,11 @@ import {
   proptryxBrokerUserCreateSchema,
   proptryxBrokerUserListQuerySchema,
   proptryxBrokerUserListResponseSchema,
+  proptryxBrokerUserPermanentDeleteResultSchema,
+  proptryxBrokerUserSessionListSchema,
+  proptryxBrokerUserSessionParamsSchema,
+  proptryxBrokerUserSessionRevokeResultSchema,
+  proptryxBrokerUserSessionTokenParamsSchema,
   proptryxBrokerUserSchema,
   proptryxBrokerUserUpdateSchema,
   proptryxBrokerUserWithLocationSchema,
@@ -114,6 +119,25 @@ export const remove = createOpenApiRoute({
   },
 });
 
+export const removePermanently = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/permanent",
+  operationId: "proptryxBrokerUserPermanentDeleteById",
+  tags,
+  middleware: [proptryxBrokerUserMethodsRateLimit, proptryxBrokerUserRbac.custom("delete")],
+  summary: "Permanently delete a Proptryx broker user",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      proptryxBrokerUserPermanentDeleteResultSchema,
+      "Broker user permanently deleted successfully"
+    ),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
 export const resendCredentials = createOpenApiRoute({
   method: "post",
   path: "/{id}/resend-cred",
@@ -128,6 +152,63 @@ export const resendCredentials = createOpenApiRoute({
     200: {
       description: "Credentials resent successfully",
     },
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const listSessions = createOpenApiRoute({
+  method: "get",
+  path: "/{id}/sessions",
+  operationId: "proptryxBrokerUserSessions",
+  tags,
+  middleware: [proptryxBrokerUserMethodsRateLimit, proptryxBrokerUserRbac.custom("get")],
+  summary: "List sessions for a Proptryx broker user",
+  request: {
+    params: proptryxBrokerUserSessionParamsSchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      proptryxBrokerUserSessionListSchema,
+      "Broker sessions fetched successfully"
+    ),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const revokeSession = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/sessions/{sessionToken}",
+  operationId: "proptryxBrokerUserRevokeSession",
+  tags,
+  middleware: [proptryxBrokerUserMethodsRateLimit, proptryxBrokerUserRbac.custom("update")],
+  summary: "Terminate a Proptryx broker user session",
+  request: {
+    params: proptryxBrokerUserSessionTokenParamsSchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      proptryxBrokerUserSessionRevokeResultSchema,
+      "Broker session terminated successfully"
+    ),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const revokeAllSessions = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/sessions",
+  operationId: "proptryxBrokerUserRevokeAllSessions",
+  tags,
+  middleware: [proptryxBrokerUserMethodsRateLimit, proptryxBrokerUserRbac.custom("update")],
+  summary: "Terminate all sessions for a Proptryx broker user",
+  request: {
+    params: proptryxBrokerUserSessionParamsSchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      proptryxBrokerUserSessionRevokeResultSchema,
+      "Broker sessions terminated successfully"
+    ),
     404: ApiNotFoundOpenApi,
   },
 });

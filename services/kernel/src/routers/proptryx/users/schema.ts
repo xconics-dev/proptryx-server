@@ -88,3 +88,7 @@ export type ScopedProptryxUserListQuery = ProptryxUserListQuery & {
 export const proptryxUserListResponseSchema = createListResponseSchema(
   proptryxUserWithLocationSchema
 );
+
+export const proptryxUserPermanentDeleteResultSchema = z.object({
+  message: z.string(),
+});

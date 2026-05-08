@@ -5,10 +5,14 @@ import {
   createErrorResponse,
   createSuccessResponse,
   generateRandomId,
+  isManagedRolePermissionResource,
+  mergeManagedRolePermissions,
+  normalizeManagedRolePermission,
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
 import {
+  check_slug,
   create,
   create_permission,
   get,
@@ -26,6 +30,7 @@ import {
   fetchRoleList,
   findPermissionById,
   findRoleDetailsById,
+  findRoleSlugAvailability,
   findRoleSlugConflict,
   normalizePermissionValues,
 } from "./utils";
@@ -41,6 +46,13 @@ registerOpenApiRoute(proptryxRolesPermissionGroup, list, async (c) => {
 
 registerOpenApiRoute(proptryxRolesPermissionGroup, resources, async (c) => {
   return c.json(createSuccessResponse(getRbacResourceMetadata("proptryx")), 200);
+});
+
+registerOpenApiRoute(proptryxRolesPermissionGroup, check_slug, async (c) => {
+  const query = c.req.valid("query");
+  const isAvailable = await findRoleSlugAvailability(query.slug);
+
+  return c.json(createSuccessResponse({ status: isAvailable }), 200);
 });
 
 registerOpenApiRoute(proptryxRolesPermissionGroup, get, async (c) => {
@@ -84,11 +96,13 @@ registerOpenApiRoute(proptryxRolesPermissionGroup, create, async (c) => {
       })
       .returning();
 
-    if (body.permissions?.length) {
+    const permissions = mergeManagedRolePermissions(body.permissions, "proptryx");
+
+    if (permissions.length > 0) {
       await tx
         .insert(rbacRolePermission)
         .values(
-          body.permissions.map((permission) => createPermissionValues(insertedRole.id, permission))
+          permissions.map((permission) => createPermissionValues(insertedRole.id, permission))
         );
     }
 
@@ -162,9 +176,21 @@ registerOpenApiRoute(proptryxRolesPermissionGroup, create_permission, async (c) 
     return c.json(createErrorResponse({ error: "Not Found", message: "Role not found" }), 404);
   }
 
+  if (isManagedRolePermissionResource(body.resource)) {
+    const existingManagedPermission = role.permissions.find((permission: { resource: string }) =>
+      isManagedRolePermissionResource(permission.resource)
+    );
+
+    if (existingManagedPermission) {
+      return c.json(createSuccessResponse(existingManagedPermission), 200);
+    }
+  }
+
+  const permissionInput = normalizeManagedRolePermission(body, "proptryx");
+
   const [permission] = await db
     .insert(rbacRolePermission)
-    .values(createPermissionValues(id, body))
+    .values(createPermissionValues(id, permissionInput))
     .returning();
 
   return c.json(createSuccessResponse(permission), 201);
@@ -182,14 +208,21 @@ registerOpenApiRoute(proptryxRolesPermissionGroup, update_permission, async (c) 
     );
   }
 
+  const resource = existingPermission.resource;
+  const permissionInput = normalizeManagedRolePermission(
+    {
+      resource,
+      accessLevel: body.accessLevel ?? existingPermission.accessLevel,
+      actions: body.actions ?? existingPermission.actions,
+    },
+    "proptryx"
+  );
+
   const [permission] = await db
     .update(rbacRolePermission)
     .set({
-      resource: body.resource,
-      ...normalizePermissionValues({
-        accessLevel: body.accessLevel ?? existingPermission.accessLevel,
-        actions: body.actions ?? existingPermission.actions,
-      }),
+      resource: permissionInput.resource,
+      ...normalizePermissionValues(permissionInput),
     })
     .where(eq(rbacRolePermission.id, permissionId))
     .returning();
@@ -205,6 +238,16 @@ registerOpenApiRoute(proptryxRolesPermissionGroup, remove_permission, async (c) 
     return c.json(
       createErrorResponse({ error: "Not Found", message: "Permission not found" }),
       404
+    );
+  }
+
+  if (isManagedRolePermissionResource(existingPermission.resource)) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: "Account permission is managed automatically for every role",
+      }),
+      400
     );
   }
 

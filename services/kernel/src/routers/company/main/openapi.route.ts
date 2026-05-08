@@ -16,6 +16,7 @@ import {
   companyListQuerySchema,
   companyListResponseSchema,
   companySchema,
+  companySettingsSchema,
   companyUpdateSchema,
 } from "./schema";
 
@@ -82,6 +83,24 @@ export const get_gst_info = createOpenApiRoute({
   },
 });
 
+export const get_settings = createOpenApiRoute({
+  method: "get",
+  path: "/{id}/settings",
+  operationId: "companyGetSettingsById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.get],
+  summary: "Get company settings details by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    404: {
+      description: "Company not found",
+    },
+    200: createApiSuccessResponse(companySettingsSchema, "Company settings fetched successfully"),
+  },
+});
+
 // Mutation routes
 export const create = createOpenApiRoute({
   method: "post",
@@ -141,6 +160,36 @@ export const remove = createOpenApiRoute({
   },
   responses: {
     200: createApiSuccessResponse(companySchema, "Company deleted successfully"),
+  },
+});
+
+export const restore = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/restore",
+  operationId: "companyRestoreById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Restore a deleted company with related soft-deleted records",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(companySchema, "Company restored successfully"),
+  },
+});
+
+export const restore_only = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/restore-only",
+  operationId: "companyRestoreOnlyById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Restore only the deleted company record",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(companySchema, "Company restored successfully"),
   },
 });
 

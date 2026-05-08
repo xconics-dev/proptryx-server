@@ -13,7 +13,15 @@ import {
 } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
 import { fetchProptryxUserList } from "./list";
-import { create, get, list, remove, resendCredentials, update } from "./openapi.route";
+import {
+  create,
+  get,
+  list,
+  remove,
+  removePermanently,
+  resendCredentials,
+  update,
+} from "./openapi.route";
 import { proptryxBrokerUsersGroup } from "./broker/handler";
 import {
   createProptryxUserAuthSeed,
@@ -214,6 +222,44 @@ registerOpenApiRoute(proptryxUsersGroup, remove, async (c) => {
   }
 
   return c.json(createSuccessResponse(deletedUser), 200);
+});
+
+registerOpenApiRoute(proptryxUsersGroup, removePermanently, async (c) => {
+  const { id } = c.req.valid("param");
+  const existingUser = await findProptryxUserById(id, { includeDeleted: true });
+
+  if (!existingUser) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Proptryx user not found",
+      }),
+      404
+    );
+  }
+
+  const [deletedUser] = await db.transaction(async (tx) => {
+    return await tx.delete(user).where(eq(user.id, id)).returning({
+      id: user.id,
+    });
+  });
+
+  if (!deletedUser) {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: "Failed to permanently delete Proptryx user",
+      }),
+      500
+    );
+  }
+
+  return c.json(
+    createSuccessResponse({
+      message: "User permanently deleted successfully",
+    }),
+    200
+  );
 });
 
 registerOpenApiRoute(proptryxUsersGroup, resendCredentials, async (c) => {

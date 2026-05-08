@@ -11,10 +11,16 @@ import {
 } from "@proptryx/utils";
 import {
   memberCreateSchema,
+  memberBanSchema,
+  memberRemoveResultSchema,
+  memberDeleteWithUserResultSchema,
   memberListItemSchema,
   memberListParamsSchema,
   memberListQuerySchema,
   memberListResponseSchema,
+  memberSessionListSchema,
+  memberSessionRevokeResultSchema,
+  memberSessionTokenParamsSchema,
   memberSchema,
   memberUpdateSchema,
 } from "./schema";
@@ -22,7 +28,7 @@ import {
 const tags = ["Company / Members"];
 
 const companyRequestRbac = createResourceRbacGuards({
-  resource: DATABASE_RESOURCES.organization,
+  resource: DATABASE_RESOURCES.member,
   auth: DEFAULT_FAST_RBAC_AUTH_OPTIONS,
 });
 
@@ -95,18 +101,31 @@ export const update = createOpenApiRoute({
 
 export const remove = createOpenApiRoute({
   method: "delete",
-  path: "/{id}",
-  operationId: "companyMemberDeleteById",
+  path: "/{id}/remove",
+  operationId: "companyMemberRemoveById",
   tags,
   middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
-  summary: "Remove a member from the company",
+  summary: "Remove a member from the company and keep the linked user account",
   request: {
     params: IdStringParamSchema(),
   },
   responses: {
-    204: {
-      description: "Member removed successfully",
-    },
+    200: createApiSuccessResponse(memberRemoveResultSchema, "Member removed successfully"),
+  },
+});
+
+export const softDelete = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}",
+  operationId: "companyMemberDeleteById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
+  summary: "Soft delete a company member",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(memberSchema, "Member deleted successfully"),
   },
 });
 
@@ -121,9 +140,27 @@ export const remove_with_user = createOpenApiRoute({
     params: IdStringParamSchema(),
   },
   responses: {
-    204: {
-      description: "Member with user removed successfully",
-    },
+    200: createApiSuccessResponse(
+      memberDeleteWithUserResultSchema,
+      "Member with user removed successfully"
+    ),
+  },
+});
+
+export const ban = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/ban",
+  operationId: "companyMemberBanById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Ban a company member user account",
+  request: {
+    params: IdStringParamSchema(),
+    body: createApiJsonBody(memberBanSchema),
+  },
+  responses: {
+    200: createApiSuccessResponse(memberListItemSchema, "Member banned successfully"),
+    404: ApiNotFoundOpenApi,
   },
 });
 
@@ -138,9 +175,64 @@ export const resendCredentials = createOpenApiRoute({
     params: IdStringParamSchema(),
   },
   responses: {
-    200: {
-      description: "Credentials resent successfully",
-    },
+    200: createApiSuccessResponse(
+      memberDeleteWithUserResultSchema,
+      "Credentials resent successfully"
+    ),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const listSessions = createOpenApiRoute({
+  method: "get",
+  path: "/{id}/sessions",
+  operationId: "companyMemberSessions",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("get")],
+  summary: "List sessions for a company member",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(memberSessionListSchema, "Member sessions fetched successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const revokeSession = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/sessions/{sessionToken}",
+  operationId: "companyMemberRevokeSession",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Terminate a company member session",
+  request: {
+    params: memberSessionTokenParamsSchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      memberSessionRevokeResultSchema,
+      "Member session terminated successfully"
+    ),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const revokeAllSessions = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/sessions",
+  operationId: "companyMemberRevokeAllSessions",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Terminate all sessions for a company member",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      memberSessionRevokeResultSchema,
+      "Member sessions terminated successfully"
+    ),
     404: ApiNotFoundOpenApi,
   },
 });

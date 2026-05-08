@@ -363,25 +363,25 @@ registerOpenApiRoute(membersGroup, remove_with_user, async (c) => {
     );
   }
 
-  await db.transaction(async (tx) => {
+  const [deletedUser] = await db.transaction(async (tx) => {
     await tx
-      .update(member)
-      .set({
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedByUser: scopedOrganization.user?.id,
-      })
+      .delete(member)
       .where(and(eq(member.id, id), eq(member.organizationId, scopedOrganization.organizationId)));
 
-    await tx
-      .update(user)
-      .set({
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedByUser: scopedOrganization.user?.id,
-      })
-      .where(eq(user.id, existingMember.userId));
+    return await tx.delete(user).where(eq(user.id, existingMember.userId)).returning({
+      id: user.id,
+    });
   });
+
+  if (!deletedUser) {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: "Failed to permanently delete the linked user account",
+      }),
+      500
+    );
+  }
 
   return c.json(null);
 });

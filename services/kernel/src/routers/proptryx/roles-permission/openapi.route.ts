@@ -17,6 +17,8 @@ import {
   rolePermissionCreateSchema,
   rolePermissionSchema,
   rolePermissionUpdateSchema,
+  roleSlugAvailabilityQuerySchema,
+  roleSlugAvailabilitySchema,
   resourceMetadataListSchema,
   roleUpdateSchema,
   roleWithPermissionsSchema,
@@ -82,6 +84,19 @@ export const get = createOpenApiRoute({
   responses: {
     200: createApiSuccessResponse(roleWithPermissionsSchema, "Role fetched successfully"),
     404: ApiNotFoundOpenApi,
+  },
+});
+
+export const check_slug = createOpenApiRoute({
+  method: "get",
+  path: "/check-slug",
+  operationId: "proptryxRoleCheckSlugAvailability",
+  tags,
+  middleware: [rateLimit, roleRbac.custom("create")],
+  summary: "Check Proptryx role slug availability",
+  request: { query: roleSlugAvailabilityQuerySchema },
+  responses: {
+    200: createApiSuccessResponse(roleSlugAvailabilitySchema, "Role slug checked successfully"),
   },
 });
 

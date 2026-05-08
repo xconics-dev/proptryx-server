@@ -1,0 +1,1 @@
+export { companyPropertyGroup } from "./handler";
