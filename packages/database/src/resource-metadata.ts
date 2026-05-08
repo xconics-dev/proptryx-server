@@ -45,6 +45,7 @@ const COMPANY_RESOURCES = new Set<DatabaseResource>([
   DATABASE_RESOURCES.rbac_role,
   DATABASE_RESOURCES.rbac_role_permission,
   DATABASE_RESOURCES.region,
+  DATABASE_RESOURCES.session,
   DATABASE_RESOURCES.testimonial,
   DATABASE_RESOURCES.user,
   DATABASE_RESOURCES.zone,

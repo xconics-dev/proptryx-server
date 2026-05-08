@@ -41,6 +41,10 @@ import {
 
 export const companyMembersGroup = new OpenAPIHono<AppBindings>();
 
+const OWNER_ROLE_SLUG = "owner";
+const isOwnerRole = (role: string | null | undefined) =>
+  role?.trim().toLowerCase() === OWNER_ROLE_SLUG;
+
 registerOpenApiRoute(companyMembersGroup, list, async (c) => {
   const { companyId } = c.req.valid("param");
   const query = c.req.valid("query");
@@ -90,6 +94,16 @@ registerOpenApiRoute(companyMembersGroup, listSessions, async (c) => {
 registerOpenApiRoute(companyMembersGroup, create, async (c) => {
   const body = c.req.valid("json");
   const { user: currentUser } = getBetterAuthContext(c);
+
+  if (isOwnerRole(body.role)) {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Owner role cannot be assigned to a member",
+      }),
+      403
+    );
+  }
 
   const [existingUserWithMember, orgData] = await Promise.all([
     findMemberConflictByEmail(body.email, body.organizationId),
@@ -228,6 +242,16 @@ registerOpenApiRoute(companyMembersGroup, update, async (c) => {
     );
   }
 
+  if (!isOwnerRole(existingMember.role) && isOwnerRole(body.role)) {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Owner role cannot be assigned to a member",
+      }),
+      403
+    );
+  }
+
   const [updatedMember] = await db.transaction(async (tx) => {
     await ensureDefaultOrganizationRoles(tx, existingMember.organizationId);
 
@@ -280,7 +304,7 @@ registerOpenApiRoute(companyMembersGroup, remove, async (c) => {
     );
   }
 
-  if (existingMember.role === "owner") {
+  if (isOwnerRole(existingMember.role)) {
     return c.json(
       createErrorResponse({
         error: "Forbidden",
@@ -316,7 +340,7 @@ registerOpenApiRoute(companyMembersGroup, softDelete, async (c) => {
     );
   }
 
-  if (existingMember.role === "owner") {
+  if (isOwnerRole(existingMember.role)) {
     return c.json(
       createErrorResponse({
         error: "Forbidden",
@@ -364,7 +388,7 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
     );
   }
 
-  if (existingMember.role === "owner") {
+  if (isOwnerRole(existingMember.role)) {
     return c.json(
       createErrorResponse({
         error: "Forbidden",
@@ -417,7 +441,7 @@ registerOpenApiRoute(companyMembersGroup, ban, async (c) => {
     );
   }
 
-  if (existingMember.role === "owner") {
+  if (isOwnerRole(existingMember.role)) {
     return c.json(
       createErrorResponse({
         error: "Forbidden",
