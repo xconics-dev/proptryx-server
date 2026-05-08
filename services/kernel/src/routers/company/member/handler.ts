@@ -10,8 +10,8 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { account, checkOrganizationLimit, db, member, user } from "@proptryx/database";
-import { eq } from "drizzle-orm";
+import { account, checkOrganizationLimit, db, member, session, user } from "@proptryx/database";
+import { and, eq } from "drizzle-orm";
 import { emailSubject, renderMemberAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { logger } from "@/lib/logger";
 import { fetchMemberList } from "./list";
@@ -20,8 +20,11 @@ import {
   create,
   get,
   list,
+  listSessions,
   remove,
   remove_with_user,
+  revokeAllSessions,
+  revokeSession,
   resendCredentials,
   softDelete,
   update,
@@ -33,6 +36,7 @@ import {
   findMemberConflictByEmail,
   findMemberDetailsById,
   findOrganizationSummaryById,
+  listMemberSessionsByMemberId,
 } from "./utils";
 
 export const companyMembersGroup = new OpenAPIHono<AppBindings>();
@@ -64,6 +68,23 @@ registerOpenApiRoute(companyMembersGroup, get, async (c) => {
   }
 
   return c.json(createSuccessResponse(memberData), 200);
+});
+
+registerOpenApiRoute(companyMembersGroup, listSessions, async (c) => {
+  const { id } = c.req.valid("param");
+  const result = await listMemberSessionsByMemberId(id);
+
+  if (!result) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  return c.json(createSuccessResponse(result.sessions), 200);
 });
 
 registerOpenApiRoute(companyMembersGroup, create, async (c) => {
@@ -409,8 +430,8 @@ registerOpenApiRoute(companyMembersGroup, ban, async (c) => {
   await db
     .update(user)
     .set({
-      banned: true,
-      banReason: body.reason,
+      banned: body.banned,
+      banReason: body.banned ? (body.reason ?? null) : null,
       updatedByUser: currentUser?.id,
     })
     .where(eq(user.id, existingMember.userId));
@@ -466,6 +487,67 @@ registerOpenApiRoute(companyMembersGroup, resendCredentials, async (c) => {
   return c.json(
     createSuccessResponse({
       message: "Credentials resent successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMembersGroup, revokeSession, async (c) => {
+  const { id, sessionToken } = c.req.valid("param");
+  const result = await listMemberSessionsByMemberId(id);
+
+  if (!result) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  const [deletedSession] = await db
+    .delete(session)
+    .where(and(eq(session.userId, result.memberData.userId), eq(session.token, sessionToken)))
+    .returning({ token: session.token });
+
+  if (!deletedSession) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member session not found",
+      }),
+      404
+    );
+  }
+
+  return c.json(
+    createSuccessResponse({
+      message: "Session terminated successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMembersGroup, revokeAllSessions, async (c) => {
+  const { id } = c.req.valid("param");
+  const result = await listMemberSessionsByMemberId(id);
+
+  if (!result) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
+      }),
+      404
+    );
+  }
+
+  await db.delete(session).where(eq(session.userId, result.memberData.userId));
+
+  return c.json(
+    createSuccessResponse({
+      message: "All sessions terminated successfully",
     }),
     200
   );

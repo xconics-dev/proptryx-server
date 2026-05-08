@@ -1,12 +1,15 @@
 import { user } from "@proptryx/database";
 import {
   createDbInsertSchema,
+  createDbSelectSchema,
   createDbUpdateSchema,
   createListQuerySchema,
   createListResponseSchema,
+  IdStringParamSchema,
 } from "@proptryx/utils";
 import z from "zod";
 import { proptryxUserSchema, proptryxUserWithLocationSchema } from "../schema";
+import { session } from "@proptryx/database";
 
 export const proptryxBrokerUserSchema = proptryxUserSchema;
 
@@ -85,5 +88,20 @@ export const proptryxBrokerUserListResponseSchema = createListResponseSchema(
 );
 
 export const proptryxBrokerUserPermanentDeleteResultSchema = z.object({
+  message: z.string(),
+});
+
+export const proptryxBrokerUserSessionSchema = createDbSelectSchema(session);
+
+export const proptryxBrokerUserSessionListSchema = z.array(proptryxBrokerUserSessionSchema);
+
+export const proptryxBrokerUserSessionParamsSchema = IdStringParamSchema();
+
+export const proptryxBrokerUserSessionTokenParamsSchema = z.object({
+  id: z.string().min(1),
+  sessionToken: z.string().min(1),
+});
+
+export const proptryxBrokerUserSessionRevokeResultSchema = z.object({
   message: z.string(),
 });

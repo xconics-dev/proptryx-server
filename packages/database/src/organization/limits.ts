@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, or } from "drizzle-orm";
+import { and, count, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   member,
@@ -182,23 +182,28 @@ export async function getOrganizationSubscriptionLimits(
 
   let usedProperties = 0;
 
-  if (memberUserIds.length > 0) {
-    // Property rows do not carry organizationId, so we scope usage through active org members.
-    const propertyRows = await db
-      .selectDistinct({ id: property.id })
-      .from(property)
-      .where(
-        and(
-          eq(property.isDeleted, false),
-          or(
-            inArray(property.superOwnerId, memberUserIds),
-            inArray(property.createdByUser, memberUserIds)
-          )
-        )
-      );
+  const propertyRows = await db
+    .selectDistinct({ id: property.id })
+    .from(property)
+    .where(
+      and(
+        eq(property.isDeleted, false),
+        memberUserIds.length > 0
+          ? or(
+              eq(property.organizationId, organizationId),
+              and(
+                sql`${property.organizationId} is null`,
+                or(
+                  inArray(property.superOwnerId, memberUserIds),
+                  inArray(property.createdByUser, memberUserIds)
+                )
+              )
+            )
+          : eq(property.organizationId, organizationId)
+      )
+    );
 
-    usedProperties = propertyRows.length;
-  }
+  usedProperties = propertyRows.length;
 
   const maxUsers = features?.maxUsers ?? null;
   const baseMaxProperties = features?.maxProperties ?? null;

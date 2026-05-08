@@ -2,7 +2,7 @@ import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { account, broker_request, db, region, user, zone } from "@proptryx/database";
+import { account, broker_request, db, region, session, user, zone } from "@proptryx/database";
 import {
   emailSubject,
   renderBrokerCredEmail,
@@ -22,12 +22,19 @@ import {
   create,
   get,
   list,
+  listSessions,
   remove,
   removePermanently,
+  revokeAllSessions,
+  revokeSession,
   resendCredentials,
   update,
 } from "./openapi.route";
-import { findProptryxBrokerUserById, getProptryxBrokerUserCredentialDeliveryData } from "./utils";
+import {
+  findProptryxBrokerUserById,
+  getProptryxBrokerUserCredentialDeliveryData,
+  listProptryxBrokerUserSessions,
+} from "./utils";
 import {
   createProptryxUserAuthSeed,
   findProptryxUserConflictByEmail,
@@ -65,6 +72,24 @@ registerOpenApiRoute(proptryxBrokerUsersGroup, get, async (c) => {
   }
 
   return c.json(createSuccessResponse(userData), 200);
+});
+
+registerOpenApiRoute(proptryxBrokerUsersGroup, listSessions, async (c) => {
+  const { id } = c.req.valid("param");
+  const userData = await findProptryxBrokerUserById(id);
+
+  if (!userData) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Proptryx broker user not found",
+      }),
+      404
+    );
+  }
+
+  const sessions = await listProptryxBrokerUserSessions(id);
+  return c.json(createSuccessResponse(sessions), 200);
 });
 
 registerOpenApiRoute(proptryxBrokerUsersGroup, create, async (c) => {
@@ -382,6 +407,67 @@ registerOpenApiRoute(proptryxBrokerUsersGroup, resendCredentials, async (c) => {
   return c.json(
     createSuccessResponse({
       message: "Credentials resent successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(proptryxBrokerUsersGroup, revokeSession, async (c) => {
+  const { id, sessionToken } = c.req.valid("param");
+  const userData = await findProptryxBrokerUserById(id);
+
+  if (!userData) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Proptryx broker user not found",
+      }),
+      404
+    );
+  }
+
+  const [deletedSession] = await db
+    .delete(session)
+    .where(and(eq(session.userId, id), eq(session.token, sessionToken)))
+    .returning({ token: session.token });
+
+  if (!deletedSession) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Broker session not found",
+      }),
+      404
+    );
+  }
+
+  return c.json(
+    createSuccessResponse({
+      message: "Session terminated successfully",
+    }),
+    200
+  );
+});
+
+registerOpenApiRoute(proptryxBrokerUsersGroup, revokeAllSessions, async (c) => {
+  const { id } = c.req.valid("param");
+  const userData = await findProptryxBrokerUserById(id);
+
+  if (!userData) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Proptryx broker user not found",
+      }),
+      404
+    );
+  }
+
+  await db.delete(session).where(eq(session.userId, id));
+
+  return c.json(
+    createSuccessResponse({
+      message: "All sessions terminated successfully",
     }),
     200
   );

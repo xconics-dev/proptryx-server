@@ -1,6 +1,6 @@
-import { account, db, region, zone } from "@proptryx/database";
+import { account, broker_request, db, region, session, zone } from "@proptryx/database";
 import { decryptPassword, PasswordUtils } from "@proptryx/utils";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { findProptryxUserById } from "../utils";
 
 type IncludeDeletedOptions = {
@@ -14,7 +14,29 @@ export async function findProptryxBrokerUserById(id: string, options?: IncludeDe
     return;
   }
 
-  return userData;
+  const matchingBrokerRequest = await db
+    .select({
+      pincode: broker_request.pincode,
+      address: broker_request.address,
+    })
+    .from(broker_request)
+    .where(
+      and(
+        sql`lower(trim(${broker_request.email})) = lower(trim(${userData.email}))`,
+        userData.phoneNumber
+          ? sql`regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g') = ${userData.phoneNumber.replace(/\D/g, "")}`
+          : undefined
+      )
+    )
+    .orderBy(desc(broker_request.updatedAt), desc(broker_request.createdAt))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  return {
+    ...userData,
+    pincode: matchingBrokerRequest?.pincode ?? null,
+    address: matchingBrokerRequest?.address ?? null,
+  };
 }
 
 export async function getProptryxBrokerUserCredentialDeliveryData(id: string, secret: string) {
@@ -78,4 +100,12 @@ export async function getProptryxBrokerUserCredentialDeliveryData(id: string, se
       region: regionRow?.name,
     },
   };
+}
+
+export async function listProptryxBrokerUserSessions(id: string) {
+  return db
+    .select()
+    .from(session)
+    .where(eq(session.userId, id))
+    .orderBy(desc(session.updatedAt), desc(session.createdAt));
 }
