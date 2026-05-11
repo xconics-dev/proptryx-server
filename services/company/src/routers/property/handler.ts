@@ -10,7 +10,7 @@ import {
   registerOpenApiRoute,
   resolveCurrentOrganizationAccess,
 } from "@proptryx/utils";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { create, get, list, remove, update } from "./openapi.route";
 import { fetchPropertyList } from "./list";
 import {
@@ -203,7 +203,9 @@ registerOpenApiRoute(propertyGroup, update, async (c) => {
         updatedByUser: scopedOrganization.user?.id ?? null,
       })
     )
-    .where(eq(property.id, id));
+    .where(
+      and(eq(property.id, id), eq(property.organizationId, scopedOrganization.organizationId))
+    );
 
   const propertyData = await findPropertyByIdWithRelations(id, {
     organizationId: scopedOrganization.organizationId,
@@ -254,7 +256,9 @@ registerOpenApiRoute(propertyGroup, remove, async (c) => {
       deletedByUser: scopedOrganization.user?.id ?? null,
       updatedByUser: scopedOrganization.user?.id ?? null,
     })
-    .where(eq(property.id, id));
+    .where(
+      and(eq(property.id, id), eq(property.organizationId, scopedOrganization.organizationId))
+    );
 
   const propertyData = await findPropertyByIdWithRelations(id, {
     organizationId: scopedOrganization.organizationId,

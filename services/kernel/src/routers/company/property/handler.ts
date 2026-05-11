@@ -5,6 +5,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   generateRandomId,
+  getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
@@ -19,9 +20,9 @@ import {
   validateKernelPropertyReferences,
 } from "./utils";
 
-export const companyPropertyGroup = new OpenAPIHono<AppBindings>();
+export const kernelCompanyPropertyGroup = new OpenAPIHono<AppBindings>();
 
-registerOpenApiRoute(companyPropertyGroup, list, async (c) => {
+registerOpenApiRoute(kernelCompanyPropertyGroup, list, async (c) => {
   const query = c.req.valid("query");
   const response = await fetchPropertyList(query);
 
@@ -34,7 +35,7 @@ registerOpenApiRoute(companyPropertyGroup, list, async (c) => {
   );
 });
 
-registerOpenApiRoute(companyPropertyGroup, get, async (c) => {
+registerOpenApiRoute(kernelCompanyPropertyGroup, get, async (c) => {
   const { id } = c.req.valid("param");
   const query = c.req.valid("query");
   const propertyData = await findPropertyByIdWithRelations(id, {
@@ -54,8 +55,9 @@ registerOpenApiRoute(companyPropertyGroup, get, async (c) => {
   return c.json(createSuccessResponse(propertyData), 200);
 });
 
-registerOpenApiRoute(companyPropertyGroup, create, async (c) => {
+registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
   const body = c.req.valid("json");
+  const { user: currentUser } = getBetterAuthContext(c);
   const referenceValidation = await validateKernelPropertyReferences({
     organizationId: body.organizationId,
     superOwnerId: body.superOwnerId,
@@ -80,6 +82,7 @@ registerOpenApiRoute(companyPropertyGroup, create, async (c) => {
       id: generateRandomId(),
       ...body,
       ...derivedFields,
+      createdByUser: currentUser?.id ?? null,
     })
     .returning();
 
@@ -90,9 +93,10 @@ registerOpenApiRoute(companyPropertyGroup, create, async (c) => {
   return c.json(createSuccessResponse(propertyData ?? createdProperty), 201);
 });
 
-registerOpenApiRoute(companyPropertyGroup, update, async (c) => {
+registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
+  const { user: currentUser } = getBetterAuthContext(c);
   const existingProperty = await findPropertyById(id);
 
   if (!existingProperty) {
@@ -130,6 +134,7 @@ registerOpenApiRoute(companyPropertyGroup, update, async (c) => {
       stripUndefinedFields({
         ...body,
         ...getDerivedPropertyFields(body, existingProperty),
+        updatedByUser: currentUser?.id ?? null,
       })
     )
     .where(eq(property.id, id));
@@ -141,8 +146,9 @@ registerOpenApiRoute(companyPropertyGroup, update, async (c) => {
   return c.json(createSuccessResponse(propertyData ?? existingProperty), 200);
 });
 
-registerOpenApiRoute(companyPropertyGroup, remove, async (c) => {
+registerOpenApiRoute(kernelCompanyPropertyGroup, remove, async (c) => {
   const { id } = c.req.valid("param");
+  const { user: currentUser } = getBetterAuthContext(c);
   const existingProperty = await findPropertyById(id, {
     includeDeleted: true,
   });
@@ -172,6 +178,8 @@ registerOpenApiRoute(companyPropertyGroup, remove, async (c) => {
     .set({
       isDeleted: true,
       deletedAt: new Date(),
+      deletedByUser: currentUser?.id ?? null,
+      updatedByUser: currentUser?.id ?? null,
     })
     .where(eq(property.id, id));
 
