@@ -16,6 +16,7 @@ import {
   propertyGetQuerySchema,
   propertyListQuerySchema,
   propertyListResponseSchema,
+  propertyPermanentDeleteResultSchema,
   propertyUpdateSchema,
 } from "./schema";
 
@@ -109,6 +110,41 @@ export const remove = createOpenApiRoute({
   responses: {
     200: createApiSuccessResponse(propertyDetailSchema, "Property deleted successfully"),
     400: ApiBadRequestOpenApi,
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const restore = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/restore",
+  operationId: "kernelCompanyPropertyRestoreById",
+  tags,
+  middleware: [propertyMethodsRateLimit, propertyRbac.custom("update")],
+  summary: "Restore property by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(propertyDetailSchema, "Property restored successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const removePermanently = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/permanent",
+  operationId: "kernelCompanyPropertyPermanentDeleteById",
+  tags,
+  middleware: [propertyMethodsRateLimit, propertyRbac.custom("delete")],
+  summary: "Permanently delete property by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      propertyPermanentDeleteResultSchema,
+      "Property permanently deleted successfully"
+    ),
     404: ApiNotFoundOpenApi,
   },
 });

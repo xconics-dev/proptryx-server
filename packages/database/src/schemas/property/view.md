@@ -184,7 +184,7 @@ Extension table required fields:
 - Search metadata: `locationMetadata`
 - Operational: `isVerified`, `isPublished`, `isOperational`
 - Certificate: `certificateType`, `certificateStatus`, `certificateEtaDate`, `certificateReceivedAt`
-- Area and pricing: `totalAreaSqft`, `roadWidthFt`, `areaType`, `transactionType`, `priceUnit`, `priceNegotiable`
+- Area and pricing: `totalAreaSqft`, `roadWidthFt`, `areaType`, owner-level `handoverType`, `priceUnit`, `priceNegotiable`
 - Classification: `type`, `status`, `ownershipType`
 - Ownership and audit: `superOwnerId`, `createdByUser`, `updatedByUser`, `createdAt`, `updatedAt`, `isDeleted`, `deletedAt`, `deletedByUser`
 - Media: `property_media`

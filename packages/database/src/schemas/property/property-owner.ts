@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import { boolean, index, pgTable, real, text, unique, uuid } from "drizzle-orm/pg-core";
 import { user } from "../auth/schema";
-import { PriceUnit } from "./enums";
+import { HandoverType, PriceUnit } from "./enums";
 import { property } from "./property";
 
 export const propertyOwner = pgTable(
@@ -21,8 +21,9 @@ export const propertyOwner = pgTable(
     /** Free-form label for the split segment, e.g. "North wing, floors 3–5" */
     areaDescription: text("area_description"),
 
-    // Per-owner pricing — overrides the property-level price for this floor/area segment.
-    // Null = inherit from the parent property pricing setup.
+    // Per-owner commercial terms for split ownership.
+    // Null = inherit from the parent property defaults.
+    handoverType: HandoverType("handover_type"),
     pricePerUnit: real("price_per_unit"),
     priceUnit: PriceUnit("price_unit"),
     priceNegotiable: boolean("price_negotiable"),

@@ -1,5 +1,14 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, jsonb, pgTable, real, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  real,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { organization, user } from "../auth/schema";
 import { meeting } from "../meeting/schema";
 import { faq } from "../site-data/faqs/schema";
@@ -8,11 +17,11 @@ import {
   AreaType,
   CertificateStatus,
   CertificateType,
+  HandoverType,
   PriceUnit,
   PropertyOwnershipType,
   PropertyStatus,
   PropertyType,
-  TransactionType,
 } from "./enums";
 import { propertyMedia } from "./property-media";
 import { propertyOffice } from "./property-office";
@@ -67,13 +76,14 @@ export const property = pgTable(
     // Area Details
     totalAreaSqft: real("total_area_sqft"),
     roadWidthFt: real("road_width_ft"),
+    totalFloors: integer("total_floors"),
     /** SINGLE = one unit; SPLIT = divided floor/area-wise across multiple owners */
     areaType: AreaType("area_type").default("SINGLE").notNull(),
-
-    // Pricing
-    transactionType: TransactionType("transaction_type"),
+    /** Parent commercial defaults inherited by owner split terms when their values are null. */
+    transactionType: HandoverType("transaction_type"),
+    pricePerUnit: real("price_per_unit"),
     priceUnit: PriceUnit("price_unit"),
-    priceNegotiable: boolean("price_negotiable").default(true).notNull(),
+    priceNegotiable: boolean("price_negotiable").default(false).notNull(),
 
     // Enums
     type: PropertyType("type").notNull(),

@@ -1,7 +1,7 @@
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
-import { db, property } from "@proptryx/database";
+import { db, property, propertyOwner } from "@proptryx/database";
 import {
   checkCurrentOrganizationLimit,
   createErrorResponse,
@@ -17,7 +17,11 @@ import {
   attachPropertyRelations,
   findPropertyById,
   findPropertyByIdWithRelations,
+  getValidatedCoOwnerIdsFromOwnerTerms,
   getDerivedPropertyFields,
+  normalizePropertyOwnerTerms,
+  replacePropertyMediaItems,
+  replacePropertyTypeDetails,
   stripUndefinedFields,
   validateCompanyPropertyReferences,
 } from "./utils";
@@ -100,6 +104,24 @@ registerOpenApiRoute(propertyGroup, get, async (c) => {
 
 registerOpenApiRoute(propertyGroup, create, async (c) => {
   const body = c.req.valid("json");
+  const {
+    coOwnerIds,
+    ownerTerms,
+    mediaItems,
+    retailDetails,
+    officeDetails,
+    warehouseDetails,
+    parkingDetails,
+    ...propertyBody
+  } = body as typeof body & {
+    coOwnerIds?: string[];
+    ownerTerms?: import("./utils").PropertyOwnerTermsInput[];
+    mediaItems?: import("./utils").PropertyMediaInput[];
+    retailDetails?: import("./utils").PropertyTypeDetailsInput["retailDetails"];
+    officeDetails?: import("./utils").PropertyTypeDetailsInput["officeDetails"];
+    warehouseDetails?: import("./utils").PropertyTypeDetailsInput["warehouseDetails"];
+    parkingDetails?: import("./utils").PropertyTypeDetailsInput["parkingDetails"];
+  };
   const scopedOrganization = resolveCurrentOrganizationContext(c);
 
   if (scopedOrganization.errorResponse) {
@@ -118,9 +140,18 @@ registerOpenApiRoute(propertyGroup, create, async (c) => {
     );
   }
 
+  const normalizedOwnerTerms = normalizePropertyOwnerTerms({
+    superOwnerId: propertyBody.superOwnerId,
+    coOwnerIds,
+    ownerTerms,
+  });
   const referenceValidation = await validateCompanyPropertyReferences({
     organizationId: scopedOrganization.organizationId,
-    superOwnerId: body.superOwnerId,
+    superOwnerId: propertyBody.superOwnerId,
+    coOwnerIds: getValidatedCoOwnerIdsFromOwnerTerms(
+      normalizedOwnerTerms,
+      propertyBody.superOwnerId
+    ),
   });
 
   if (!referenceValidation.valid) {
@@ -134,18 +165,51 @@ registerOpenApiRoute(propertyGroup, create, async (c) => {
     );
   }
 
-  const derivedFields = getDerivedPropertyFields(body);
+  const derivedFields = getDerivedPropertyFields(propertyBody);
 
-  const [createdProperty] = await db
-    .insert(property)
-    .values({
-      id: generateRandomId(),
-      ...body,
-      ...derivedFields,
-      organizationId: scopedOrganization.organizationId,
-      createdByUser: scopedOrganization.user?.id ?? null,
-    })
-    .returning();
+  const [createdProperty] = await db.transaction(async (tx) => {
+    const [insertedProperty] = await tx
+      .insert(property)
+      .values({
+        id: generateRandomId(),
+        ...propertyBody,
+        ...derivedFields,
+        organizationId: scopedOrganization.organizationId,
+        createdByUser: scopedOrganization.user?.id ?? null,
+      })
+      .returning();
+
+    if (normalizedOwnerTerms.length > 0) {
+      await tx.insert(propertyOwner).values(
+        normalizedOwnerTerms.map((ownerTerm) => ({
+          propertyId: insertedProperty.id,
+          userId: ownerTerm.userId,
+          floorNumber: ownerTerm.floorNumber ?? null,
+          allocatedAreaSqft: ownerTerm.allocatedAreaSqft ?? null,
+          areaDescription: ownerTerm.areaDescription ?? null,
+          handoverType: ownerTerm.handoverType ?? null,
+          pricePerUnit: ownerTerm.pricePerUnit ?? null,
+          priceUnit: ownerTerm.priceUnit ?? null,
+          priceNegotiable: ownerTerm.priceNegotiable ?? null,
+        }))
+      );
+    }
+
+    await replacePropertyMediaItems({
+      tx,
+      propertyId: insertedProperty.id,
+      mediaItems,
+      userId: scopedOrganization.user?.id ?? null,
+    });
+    await replacePropertyTypeDetails({
+      tx,
+      propertyId: insertedProperty.id,
+      type: insertedProperty.type,
+      details: { retailDetails, officeDetails, warehouseDetails, parkingDetails },
+    });
+
+    return [insertedProperty];
+  });
 
   const propertyData = await findPropertyByIdWithRelations(createdProperty.id, {
     organizationId: scopedOrganization.organizationId,
@@ -158,6 +222,24 @@ registerOpenApiRoute(propertyGroup, create, async (c) => {
 registerOpenApiRoute(propertyGroup, update, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
+  const {
+    coOwnerIds,
+    ownerTerms,
+    mediaItems,
+    retailDetails,
+    officeDetails,
+    warehouseDetails,
+    parkingDetails,
+    ...propertyBody
+  } = body as typeof body & {
+    coOwnerIds?: string[];
+    ownerTerms?: import("./utils").PropertyOwnerTermsInput[];
+    mediaItems?: import("./utils").PropertyMediaInput[];
+    retailDetails?: import("./utils").PropertyTypeDetailsInput["retailDetails"];
+    officeDetails?: import("./utils").PropertyTypeDetailsInput["officeDetails"];
+    warehouseDetails?: import("./utils").PropertyTypeDetailsInput["warehouseDetails"];
+    parkingDetails?: import("./utils").PropertyTypeDetailsInput["parkingDetails"];
+  };
   const scopedOrganization = resolveCurrentOrganizationContext(c);
 
   if (scopedOrganization.errorResponse) {
@@ -178,9 +260,18 @@ registerOpenApiRoute(propertyGroup, update, async (c) => {
     );
   }
 
+  const normalizedOwnerTerms = normalizePropertyOwnerTerms({
+    superOwnerId: propertyBody.superOwnerId ?? existingProperty.superOwnerId,
+    coOwnerIds,
+    ownerTerms,
+  });
   const referenceValidation = await validateCompanyPropertyReferences({
     organizationId: scopedOrganization.organizationId,
-    superOwnerId: body.superOwnerId,
+    superOwnerId: propertyBody.superOwnerId,
+    coOwnerIds: getValidatedCoOwnerIdsFromOwnerTerms(
+      normalizedOwnerTerms,
+      propertyBody.superOwnerId ?? existingProperty.superOwnerId
+    ),
   });
 
   if (!referenceValidation.valid) {
@@ -194,18 +285,62 @@ registerOpenApiRoute(propertyGroup, update, async (c) => {
     );
   }
 
-  await db
-    .update(property)
-    .set(
-      stripUndefinedFields({
-        ...body,
-        ...getDerivedPropertyFields(body, existingProperty),
-        updatedByUser: scopedOrganization.user?.id ?? null,
-      })
-    )
-    .where(
-      and(eq(property.id, id), eq(property.organizationId, scopedOrganization.organizationId))
-    );
+  await db.transaction(async (tx) => {
+    await tx
+      .update(property)
+      .set(
+        stripUndefinedFields({
+          ...propertyBody,
+          ...getDerivedPropertyFields(propertyBody, existingProperty),
+          updatedByUser: scopedOrganization.user?.id ?? null,
+        })
+      )
+      .where(
+        and(eq(property.id, id), eq(property.organizationId, scopedOrganization.organizationId))
+      );
+
+    if (coOwnerIds !== undefined || ownerTerms !== undefined) {
+      await tx.delete(propertyOwner).where(eq(propertyOwner.propertyId, id));
+
+      if (normalizedOwnerTerms.length > 0) {
+        await tx.insert(propertyOwner).values(
+          normalizedOwnerTerms.map((ownerTerm) => ({
+            propertyId: id,
+            userId: ownerTerm.userId,
+            floorNumber: ownerTerm.floorNumber ?? null,
+            allocatedAreaSqft: ownerTerm.allocatedAreaSqft ?? null,
+            areaDescription: ownerTerm.areaDescription ?? null,
+            handoverType: ownerTerm.handoverType ?? null,
+            pricePerUnit: ownerTerm.pricePerUnit ?? null,
+            priceUnit: ownerTerm.priceUnit ?? null,
+            priceNegotiable: ownerTerm.priceNegotiable ?? null,
+          }))
+        );
+      }
+    }
+
+    await replacePropertyMediaItems({
+      tx,
+      propertyId: id,
+      mediaItems,
+      userId: scopedOrganization.user?.id ?? null,
+    });
+
+    if (
+      propertyBody.type !== undefined ||
+      retailDetails !== undefined ||
+      officeDetails !== undefined ||
+      warehouseDetails !== undefined ||
+      parkingDetails !== undefined
+    ) {
+      await replacePropertyTypeDetails({
+        tx,
+        propertyId: id,
+        type: propertyBody.type ?? existingProperty.type,
+        details: { retailDetails, officeDetails, warehouseDetails, parkingDetails },
+      });
+    }
+  });
 
   const propertyData = await findPropertyByIdWithRelations(id, {
     organizationId: scopedOrganization.organizationId,

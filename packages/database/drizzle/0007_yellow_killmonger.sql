@@ -1,2 +1,0 @@
-DROP INDEX "company_request_gst_number_uidx";--> statement-breakpoint
-CREATE UNIQUE INDEX "company_request_gst_number_uidx" ON "company_request" USING btree ("company_gst_number") WHERE "company_request"."is_deleted" = false;
