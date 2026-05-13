@@ -23,9 +23,9 @@
     "clean": "rm -rf dist .turbo"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.13",
+    "@biomejs/biome": "^2.4.15",
     "@proptryx/typescript-config": "workspace:*",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.7.0",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
