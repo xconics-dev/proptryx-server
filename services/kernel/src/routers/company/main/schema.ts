@@ -123,6 +123,10 @@ export const companyCreateResponseSchema = z.object({
   stepsFailed: z.array(z.enum(COMPANY_CREATION_STEPS)),
 });
 
+export const companyPermanentDeleteResultSchema = z.object({
+  message: z.string(),
+});
+
 export const companyUpdateSchema = createDbUpdateSchema(organization, {
   omit: [
     "id",

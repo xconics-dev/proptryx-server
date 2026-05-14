@@ -26,6 +26,12 @@ const DEFAULT_ORGANIZATION_ROLES = [
     description: "Default Creation.",
     panel: "company" as const,
   },
+  {
+    name: "PROPERTY OWNER",
+    slug: "property_owner",
+    description: "Default Creation.",
+    panel: "company" as const,
+  },
 ] as const;
 
 type OrganizationRolesDb = Pick<DB, "select" | "insert" | "update" | "delete">;

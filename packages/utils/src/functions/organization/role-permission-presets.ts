@@ -1,6 +1,6 @@
 import { getRbacResourceMetadata, type RbacResourceScope } from "@proptryx/database";
 
-export type OrganizationRoleSlug = "owner" | "admin" | "executive";
+export type OrganizationRoleSlug = "owner" | "admin" | "executive" | "property_owner";
 export type RolePermissionAccessLevel = "company" | "user" | "all";
 type ManagedRolePermissionScope = RbacResourceScope;
 
@@ -36,6 +36,10 @@ export const MANAGED_SESSION_PERMISSION_RESOURCE = "session";
 export const MANAGED_SESSION_PERMISSION_ACCESS_LEVEL = "user";
 export const MANAGED_USER_PERMISSION_RESOURCE = "user";
 export const MANAGED_USER_PERMISSION_ACCESS_LEVEL = "user";
+export const MANAGED_MEMBER_PERMISSION_RESOURCE = "member";
+export const MANAGED_MEMBER_PERMISSION_ACCESS_LEVEL = "user";
+const PROPERTY_PERMISSION_RESOURCE = "property";
+const PROPERTY_PERMISSION_ACCESS_LEVEL = "user";
 
 const RESOURCE_ACTIONS = Object.freeze(
   Object.fromEntries(COMPANY_RESOURCE_METADATA.map((item) => [item.resource, item.actions]))
@@ -216,6 +220,31 @@ const ROLE_RESOURCE_OVERRIDES: Record<
         MANAGED_USER_PERMISSION_RESOURCE,
         MANAGED_USER_PERMISSION_ACCESS_LEVEL
       ),
+    },
+  },
+  property_owner: {
+    defaultAccessLevel: "user",
+    defaultActions: fullActions,
+    resources: {
+      [MANAGED_ACCOUNT_PERMISSION_RESOURCE]: getManagedRolePermission(COMPANY_SCOPE),
+      [MANAGED_SESSION_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_SESSION_PERMISSION_RESOURCE,
+        MANAGED_SESSION_PERMISSION_ACCESS_LEVEL
+      ),
+      [MANAGED_USER_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_USER_PERMISSION_RESOURCE,
+        MANAGED_USER_PERMISSION_ACCESS_LEVEL
+      ),
+      [MANAGED_MEMBER_PERMISSION_RESOURCE]: {
+        accessLevel: MANAGED_MEMBER_PERMISSION_ACCESS_LEVEL,
+        actions: fullActions(MANAGED_MEMBER_PERMISSION_RESOURCE),
+      },
+      [PROPERTY_PERMISSION_RESOURCE]: {
+        accessLevel: PROPERTY_PERMISSION_ACCESS_LEVEL,
+        actions: fullActions(PROPERTY_PERMISSION_RESOURCE),
+      },
     },
   },
 };

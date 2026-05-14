@@ -116,6 +116,34 @@ const validatePropertyMediaLimits = (
   }
 };
 
+const validateOwnerAllocatedArea = (
+  {
+    ownerTerms,
+    totalAreaSqft,
+  }: {
+    ownerTerms?: z.infer<typeof propertyOwnerTermsSchema>[];
+    totalAreaSqft?: number | null;
+  },
+  ctx: z.RefinementCtx
+) => {
+  if (!(totalAreaSqft && totalAreaSqft > 0 && ownerTerms?.length)) {
+    return;
+  }
+
+  const allocatedAreaSqft = ownerTerms.reduce(
+    (total, term) => total + (term.allocatedAreaSqft ?? 0),
+    0
+  );
+
+  if (allocatedAreaSqft > totalAreaSqft) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Owner allocations cannot exceed total area sqft (${totalAreaSqft}).`,
+      path: ["ownerTerms"],
+    });
+  }
+};
+
 const propertyMediaDetailSchema = propertyMediaInputSchema.extend({
   id: z.string().uuid(),
   visibility: z.enum(PropertyMediaVisibility.enumValues),
@@ -205,6 +233,7 @@ export const propertyCreateSchema = createDbInsertSchema(property, {
   })
   .superRefine((value, ctx) => {
     validatePropertyMediaLimits(value.mediaItems, ctx);
+    validateOwnerAllocatedArea(value, ctx);
   });
 
 export const propertyUpdateSchema = createDbUpdateSchema(property, {
@@ -230,6 +259,7 @@ export const propertyUpdateSchema = createDbUpdateSchema(property, {
   })
   .superRefine((value, ctx) => {
     validatePropertyMediaLimits(value.mediaItems, ctx);
+    validateOwnerAllocatedArea(value, ctx);
   });
 
 export const propertyListSortFields = [

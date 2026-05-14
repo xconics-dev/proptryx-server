@@ -16,9 +16,10 @@ import {
   member,
   organization,
   organizationSubscription,
+  property,
   user,
 } from "@proptryx/database";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray, ne, or } from "drizzle-orm";
 import { emailSubject, renderAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { logger } from "@/lib/logger";
 import { fetchCompanyList } from "./list";
@@ -30,6 +31,7 @@ import {
   get_settings,
   list,
   remove,
+  remove_permanently,
   restore,
   restore_only,
   resendCredentials,
@@ -543,6 +545,54 @@ registerOpenApiRoute(companyMainGroup, remove, async (c) => {
         roles: [],
       }
     ),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMainGroup, remove_permanently, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const existingCompany = await findCompanyById(id, { includeDeleted: true });
+
+  if (!existingCompany) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  const linkedMembers = await db
+    .select({ userId: member.userId })
+    .from(member)
+    .where(eq(member.organizationId, id));
+  const linkedUserIds = Array.from(new Set(linkedMembers.map((row) => row.userId)));
+  const otherMembershipUserIds =
+    linkedUserIds.length > 0
+      ? await db
+          .select({ userId: member.userId })
+          .from(member)
+          .where(and(inArray(member.userId, linkedUserIds), ne(member.organizationId, id)))
+      : [];
+  const sharedUserIds = new Set(otherMembershipUserIds.map((row) => row.userId));
+  const deletableUserIds = linkedUserIds.filter((userId) => !sharedUserIds.has(userId));
+
+  await db.transaction(async (tx) => {
+    await tx.delete(property).where(eq(property.organizationId, id));
+    await tx.delete(organization).where(eq(organization.id, id));
+
+    if (deletableUserIds.length > 0) {
+      await tx.delete(user).where(inArray(user.id, deletableUserIds));
+    }
+  });
+
+  return c.json(
+    createSuccessResponse({
+      message:
+        "Company, related properties, and organization-only users permanently deleted successfully",
+    }),
     200
   );
 });
