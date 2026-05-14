@@ -1,6 +1,16 @@
 import type { AppBindings } from "@/types/app";
+import { logger } from "@/lib/logger";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { db, property, propertyMedia, propertyOwner, propertyZone } from "@proptryx/database";
+import {
+  db,
+  member,
+  property,
+  propertyMedia,
+  propertyOwner,
+  propertyZone,
+  user,
+} from "@proptryx/database";
+import { sendPropertyPublishedNotificationEmails } from "@proptryx/notification";
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -8,7 +18,7 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { create, get, list, remove, removePermanently, restore, update } from "./openapi.route";
 import { fetchPropertyList } from "./list";
 import {
@@ -17,6 +27,7 @@ import {
   findPropertyByIdWithRelations,
   getValidatedCoOwnerIdsFromOwnerTerms,
   getDerivedPropertyFields,
+  mergePropertyOwnerTermsWithExisting,
   normalizePropertyOwnerTerms,
   replacePropertyMediaItems,
   replacePropertyTypeDetails,
@@ -25,6 +36,51 @@ import {
 } from "./utils";
 
 export const kernelCompanyPropertyGroup = new OpenAPIHono<AppBindings>();
+
+async function getOrganizationOwnerRecipients(organizationId: string) {
+  return db
+    .select({
+      name: user.name,
+      email: user.email,
+    })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(
+      and(
+        eq(member.organizationId, organizationId),
+        eq(member.role, "owner"),
+        eq(member.isDeleted, false),
+        eq(user.isDeleted, false)
+      )
+    );
+}
+
+async function notifyPropertyPublished(
+  propertyData: Awaited<ReturnType<typeof findPropertyByIdWithRelations>>,
+  logContext: string
+) {
+  if (!propertyData?.isPublished || !propertyData.organizationId) {
+    return;
+  }
+
+  const organizationOwners = await getOrganizationOwnerRecipients(propertyData.organizationId);
+
+  await sendPropertyPublishedNotificationEmails({
+    propertyId: propertyData.id,
+    propertyName: propertyData.name,
+    organizationName: propertyData.organization?.name ?? "Proptryx",
+    propertyOwner: propertyData.superOwner
+      ? {
+          name: propertyData.superOwner.name,
+          email: propertyData.superOwner.email,
+        }
+      : null,
+    organizationOwners,
+    publishedAt: propertyData.updatedAt ?? propertyData.createdAt,
+  }).catch((err) => {
+    logger.error(`[${logContext}] Property published email send failed:`, { error: err });
+  });
+}
 
 registerOpenApiRoute(kernelCompanyPropertyGroup, list, async (c) => {
   const query = c.req.valid("query");
@@ -154,6 +210,10 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
     includeDeleted: true,
   });
 
+  if (propertyData?.isPublished) {
+    await notifyPropertyPublished(propertyData, "kernel.company.property.create");
+  }
+
   return c.json(createSuccessResponse(propertyData ?? createdProperty), 201);
 });
 
@@ -199,10 +259,18 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
     coOwnerIds,
     ownerTerms,
   });
+  const existingOwnerTerms =
+    coOwnerIds !== undefined || ownerTerms !== undefined
+      ? ((await findPropertyByIdWithRelations(id, { includeDeleted: true }))?.ownerTerms ?? [])
+      : [];
+  const mergedOwnerTerms =
+    existingOwnerTerms.length > 0
+      ? mergePropertyOwnerTermsWithExisting(normalizedOwnerTerms, existingOwnerTerms)
+      : normalizedOwnerTerms;
   const referenceValidation = await validateKernelPropertyReferences({
     organizationId: effectiveOrganizationId,
     superOwnerId: effectiveSuperOwnerId,
-    coOwnerIds: getValidatedCoOwnerIdsFromOwnerTerms(normalizedOwnerTerms, effectiveSuperOwnerId),
+    coOwnerIds: getValidatedCoOwnerIdsFromOwnerTerms(mergedOwnerTerms, effectiveSuperOwnerId),
   });
 
   if (!referenceValidation.valid) {
@@ -231,9 +299,9 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
     if (coOwnerIds !== undefined || ownerTerms !== undefined) {
       await tx.delete(propertyOwner).where(eq(propertyOwner.propertyId, id));
 
-      if (normalizedOwnerTerms.length > 0) {
+      if (mergedOwnerTerms.length > 0) {
         await tx.insert(propertyOwner).values(
-          normalizedOwnerTerms.map((ownerTerm) => ({
+          mergedOwnerTerms.map((ownerTerm) => ({
             propertyId: id,
             userId: ownerTerm.userId,
             floorNumber: ownerTerm.floorNumber ?? null,
@@ -274,6 +342,10 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
   const propertyData = await findPropertyByIdWithRelations(id, {
     includeDeleted: true,
   });
+
+  if (propertyData?.isPublished && !existingProperty.isPublished) {
+    await notifyPropertyPublished(propertyData, "kernel.company.property.update");
+  }
 
   return c.json(createSuccessResponse(propertyData ?? existingProperty), 200);
 });

@@ -393,6 +393,51 @@ export function normalizePropertyOwnerTerms(input: {
   return Array.from(ownerTermByUserId.values());
 }
 
+export function mergePropertyOwnerTermsWithExisting(
+  ownerTerms: PropertyOwnerTermsInput[],
+  existingOwnerTerms: PropertyOwnerTermsInput[]
+) {
+  const existingByUserId = new Map(
+    existingOwnerTerms.map((ownerTerm) => [ownerTerm.userId, ownerTerm])
+  );
+
+  return ownerTerms.map((ownerTerm) => {
+    const existingOwnerTerm = existingByUserId.get(ownerTerm.userId);
+
+    if (!existingOwnerTerm) {
+      return ownerTerm;
+    }
+
+    return {
+      ...ownerTerm,
+      floorNumber:
+        ownerTerm.floorNumber === undefined ? existingOwnerTerm.floorNumber : ownerTerm.floorNumber,
+      allocatedAreaSqft:
+        ownerTerm.allocatedAreaSqft === undefined
+          ? existingOwnerTerm.allocatedAreaSqft
+          : ownerTerm.allocatedAreaSqft,
+      areaDescription:
+        ownerTerm.areaDescription === undefined
+          ? existingOwnerTerm.areaDescription
+          : ownerTerm.areaDescription,
+      handoverType:
+        ownerTerm.handoverType === undefined
+          ? existingOwnerTerm.handoverType
+          : ownerTerm.handoverType,
+      pricePerUnit:
+        ownerTerm.pricePerUnit === undefined
+          ? existingOwnerTerm.pricePerUnit
+          : ownerTerm.pricePerUnit,
+      priceUnit:
+        ownerTerm.priceUnit === undefined ? existingOwnerTerm.priceUnit : ownerTerm.priceUnit,
+      priceNegotiable:
+        ownerTerm.priceNegotiable === undefined
+          ? existingOwnerTerm.priceNegotiable
+          : ownerTerm.priceNegotiable,
+    };
+  });
+}
+
 export function getValidatedCoOwnerIdsFromOwnerTerms(
   ownerTerms: PropertyOwnerTermsInput[],
   superOwnerId?: string | null

@@ -25,6 +25,7 @@ type EmailSubPrev = {
 };
 
 export const emailSubject: Record<string, EmailSubPrev> = {
+  // transactional emails
   "sign-in": {
     subject: "Your Proptryx Sign-In Code",
     previewText: "Use this code to sign in to your Proptryx account. It expires in 10 minutes.",
@@ -37,6 +38,8 @@ export const emailSubject: Record<string, EmailSubPrev> = {
     subject: "Complete Your Proptryx Subscription Purchase",
     previewText: "Confirm purchase to activate your Proptryx Account",
   },
+
+  // credentials emails
   "account-credentials": {
     subject: "Your Proptryx Account Credentials",
     previewText: "Here are your Proptryx account login credentials.",
@@ -52,5 +55,16 @@ export const emailSubject: Record<string, EmailSubPrev> = {
   "broker-cred": {
     subject: "You're now a Broker on Proptryx — Here are your credentials",
     previewText: "You're now a registered Broker on Proptryx!",
+  },
+
+  // notification emails
+
+  "property-published-to-owner": {
+    subject: "Your Property is Now Live on Proptryx!",
+    previewText: "Congratulations! Your property has been published on Proptryx.",
+  },
+  "property-published-to-org-owner": {
+    subject: "A New Property is Now Live on Proptryx!",
+    previewText: "A new property has been published on Proptryx.",
   },
 };

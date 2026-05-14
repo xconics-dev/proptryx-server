@@ -151,12 +151,22 @@ const propertyMediaDetailSchema = propertyMediaInputSchema.extend({
   isThumbnail: z.boolean(),
 });
 
+const stringArrayWithoutBlankItemsSchema = z.preprocess(
+  (value) =>
+    Array.isArray(value)
+      ? value
+          .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+          .map((item) => item.trim())
+      : [],
+  z.array(z.string().min(1)).default([])
+);
+
 const propertyRetailDetailsSchema = z.object({
-  propertyType: z.enum(RetailPropertyType.enumValues),
-  storeType: z.enum(RetailStoreType.enumValues),
+  propertyType: z.enum(RetailPropertyType.enumValues).default("MALL"),
+  storeType: z.enum(RetailStoreType.enumValues).default("VANILLA"),
   frontageWidthFt: z.number().nullable().optional(),
   beamBottomHeightFt: z.number().nullable().optional(),
-  neighbouringBrands: z.array(z.string().trim().min(1)).optional(),
+  neighbouringBrands: stringArrayWithoutBlankItemsSchema.optional(),
   brandCategories: z.array(z.enum(RetailBrandCategory.enumValues)).optional(),
 });
 
@@ -176,8 +186,8 @@ const propertyWarehouseDetailsSchema = z.object({
 });
 
 const propertyParkingDetailsSchema = z.object({
-  parkingType: z.enum(ParkingType.enumValues),
-  parkingConfiguration: z.enum(ParkingConfiguration.enumValues),
+  parkingType: z.enum(ParkingType.enumValues).default("BASEMENT"),
+  parkingConfiguration: z.enum(ParkingConfiguration.enumValues).default("BASE_PARKING"),
   totalCapacity: z.number().int().nullable().optional(),
   accessType: z.enum(ParkingAccessType.enumValues).nullable().optional(),
   securityControl: z.array(z.enum(ParkingSecurityControl.enumValues)).optional(),
