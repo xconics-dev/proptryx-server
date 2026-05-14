@@ -54,7 +54,7 @@ import {
   restoreCompanyById,
   syncCompanyRazorpayCustomer,
 } from "./utils";
-import { findCompanyRequestById } from "../request/utils";
+import { findCompanyRequestById, findCompanyRequestGstConflict } from "../request/utils";
 
 export const companyMainGroup = new OpenAPIHono<AppBindings>();
 
@@ -150,6 +150,21 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
   const { user: currentAuthUser } = getBetterAuthContext(c);
   const stepsCompleted: CompanyCreationStep[] = [];
   const stepsFailed: CompanyCreationStep[] = [];
+
+  const gstConflict = body.gstNumber ? await findCompanyRequestGstConflict(body.gstNumber) : null;
+
+  if (gstConflict) {
+    return c.json(
+      createErrorResponse({
+        error: "Conflict",
+        message: gstConflict.message,
+        details: {
+          code: gstConflict.code,
+        },
+      }),
+      409
+    );
+  }
 
   const [{ userId, password, hashedPassword, accountId }, nextOrgId, ownerConflicts] =
     await Promise.all([

@@ -87,6 +87,12 @@ export { getRazorpayClient, initializeRazorpayClient, resetRazorpayClient } from
 // Functions
 export { generateUID, generateRandomId, generateNextCompanyId } from "./functions/gen-id";
 export {
+  DEFAULT_GST_UPSTREAM_TIMEOUT_MS,
+  fetchGstInfoFromUpstream,
+  GST_INVALID_MESSAGE,
+  GST_UNAVAILABLE_MESSAGE,
+} from "./functions/gst";
+export {
   buildColumnSort,
   buildColumnSorts,
   buildEqualsFilter,

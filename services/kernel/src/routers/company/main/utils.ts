@@ -11,6 +11,7 @@ import {
 import {
   decryptPassword,
   encryptPassword,
+  fetchGstInfoFromUpstream,
   generateNextCompanyId,
   generateRandomPassword,
   generateUID,
@@ -253,34 +254,30 @@ export async function restoreCompanyById(
 }
 
 export async function fetchCompanyGstInfo(gstNumber: string) {
-  const gstResponse = await fetch(
-    `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`
-  );
+  const gstResult = await fetchGstInfoFromUpstream({
+    apiKey: env.GST_API_KEY,
+    gstNumber,
+  });
 
-  if (!gstResponse.ok) {
+  if (!gstResult.success) {
+    if (gstResult.status === 503) {
+      logger.error("[company.main.gst] GST upstream verification failed", {
+        gstNumber,
+        error: gstResult.cause instanceof Error ? gstResult.cause.stack : gstResult.cause,
+      });
+    }
+
     return {
       success: false as const,
-      status: 400 as const,
-      error: "Invalid GST" as const,
-      message: "GST number is invalid or inactive.",
-    };
-  }
-
-  const gstPayload = await gstResponse.json();
-  const gstParsedPayload = companyGstInfoSchema.safeParse(gstPayload);
-
-  if (!gstParsedPayload.success) {
-    return {
-      success: false as const,
-      status: 400 as const,
-      error: "Invalid GST" as const,
-      message: "GST number is invalid or inactive.",
+      status: gstResult.status,
+      error: gstResult.error,
+      message: gstResult.message,
     };
   }
 
   return {
     success: true as const,
-    data: gstParsedPayload.data,
+    data: companyGstInfoSchema.parse(gstResult.data),
   };
 }
 

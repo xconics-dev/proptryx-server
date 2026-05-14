@@ -1,6 +1,7 @@
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
-import { company_request, db, gstInfoResponseSchema, organization } from "@proptryx/database";
+import { company_request, db, organization } from "@proptryx/database";
+import { fetchGstInfoFromUpstream, GST_INVALID_MESSAGE } from "@proptryx/utils";
 import { and, eq } from "drizzle-orm";
 
 type IncludeDeletedOptions = {
@@ -11,11 +12,7 @@ export const GST_REQUEST_EXISTS_MESSAGE =
   "A company request with this GST number has already been raised.";
 export const GST_ORGANIZATION_EXISTS_MESSAGE =
   "A company with this GST number is already registered.";
-const GST_INVALID_MESSAGE = "GST number is invalid or inactive.";
 const GST_INACTIVE_MESSAGE = "GST number is inactive.";
-const GST_UNAVAILABLE_MESSAGE =
-  "GST verification is temporarily unavailable. Please try again in a moment.";
-const GST_UPSTREAM_TIMEOUT_MS = 8000;
 
 export async function findCompanyRequestById(id: string, options?: IncludeDeletedOptions) {
   const whereClause = options?.includeDeleted
@@ -31,55 +28,40 @@ export async function findCompanyRequestById(id: string, options?: IncludeDelete
 }
 
 export async function fetchActiveGstInfo(gstNumber: string) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), GST_UPSTREAM_TIMEOUT_MS);
+  const gstResult = await fetchGstInfoFromUpstream({
+    apiKey: env.GST_API_KEY,
+    gstNumber,
+  });
 
-  try {
-    const normalizedGstNumber = gstNumber.trim().toUpperCase();
-    const gstResponse = await fetch(
-      `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(normalizedGstNumber)}`,
-      { signal: controller.signal }
-    );
-    const gstPayload = await gstResponse.json().catch(() => null);
-    const gstParsedPayload = gstInfoResponseSchema.safeParse(gstPayload);
-
-    if (!gstResponse.ok || !gstParsedPayload.success) {
-      return {
-        success: false as const,
-        status: 400 as const,
-        error: "Invalid GST" as const,
-        message: GST_INVALID_MESSAGE,
-      };
+  if (!gstResult.success) {
+    if (gstResult.status === 503) {
+      logger.error("[company.request.gst] GST upstream verification failed", {
+        gstNumber,
+        error: gstResult.cause instanceof Error ? gstResult.cause.stack : gstResult.cause,
+      });
     }
-
-    if (!gstParsedPayload.data.flag || gstParsedPayload.data.data?.sts !== "Active") {
-      return {
-        success: false as const,
-        status: 400 as const,
-        error: "Inactive GST" as const,
-        message: gstParsedPayload.data.data?.sts ? GST_INACTIVE_MESSAGE : GST_INVALID_MESSAGE,
-      };
-    }
-
-    return {
-      success: true as const,
-      data: gstParsedPayload.data,
-    };
-  } catch (error) {
-    logger.error("[company.request.gst] GST upstream verification failed", {
-      gstNumber,
-      error: error instanceof Error ? error.stack : error,
-    });
 
     return {
       success: false as const,
-      status: 503 as const,
-      error: "GST Verification Unavailable" as const,
-      message: GST_UNAVAILABLE_MESSAGE,
+      status: gstResult.status,
+      error: gstResult.error,
+      message: gstResult.message,
     };
-  } finally {
-    clearTimeout(timeout);
   }
+
+  if (!gstResult.data.flag || gstResult.data.data?.sts !== "Active") {
+    return {
+      success: false as const,
+      status: 400 as const,
+      error: "Inactive GST" as const,
+      message: gstResult.data.data?.sts ? GST_INACTIVE_MESSAGE : GST_INVALID_MESSAGE,
+    };
+  }
+
+  return {
+    success: true as const,
+    data: gstResult.data,
+  };
 }
 
 export async function findCompanyRequestGstConflict(gstNumber: string) {
