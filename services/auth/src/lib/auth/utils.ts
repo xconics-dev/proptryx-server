@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { type OrgFields, orgFields } from "./fields/org";
 
 const AUTH_USER_STATUS_REDIS_PREFIX = "proptryx-auth-user-status:";
-const AUTH_USER_STATUS_REDIS_TTL_SECONDS = 30;
+const AUTH_USER_STATUS_REDIS_TTL_SECONDS = 1;
 
 export type CachedAuthUserStatus = {
   id: string;
