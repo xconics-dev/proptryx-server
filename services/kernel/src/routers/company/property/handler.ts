@@ -1,5 +1,6 @@
 import type { AppBindings } from "@/types/app";
 import { logger } from "@/lib/logger";
+import { deleteUploadObjects } from "@/lib/object-storage";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
   db,
@@ -476,6 +477,10 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, removePermanently, async (c) =>
     );
   }
 
+  const mediaObjects = await db
+    .select({ storageKey: propertyMedia.storageKey })
+    .from(propertyMedia)
+    .where(eq(propertyMedia.propertyId, id));
   const [deletedProperty] = await db
     .delete(property)
     .where(eq(property.id, id))
@@ -490,6 +495,8 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, removePermanently, async (c) =>
       500
     );
   }
+
+  await deleteUploadObjects(mediaObjects.map((media) => media.storageKey));
 
   return c.json(
     createSuccessResponse({

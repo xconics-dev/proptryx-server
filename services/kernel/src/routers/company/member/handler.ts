@@ -1,5 +1,6 @@
 import type { AppBindings } from "@/types/app";
 import { env } from "@/config/env";
+import { deleteUploadObjects } from "@/lib/object-storage";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
   buildOrganizationLimitDeniedMessage,
@@ -398,6 +399,10 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
     );
   }
 
+  const linkedUser = await db.query.user.findFirst({
+    columns: { image: true },
+    where: eq(user.id, existingMember.userId),
+  });
   const [deletedUser] = await db.transaction(async (tx) => {
     await tx.delete(member).where(eq(member.id, id));
 
@@ -415,6 +420,8 @@ registerOpenApiRoute(companyMembersGroup, remove_with_user, async (c) => {
       500
     );
   }
+
+  await deleteUploadObjects([linkedUser?.image]);
 
   return c.json(
     createSuccessResponse({

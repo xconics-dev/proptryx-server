@@ -6,6 +6,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   generateRandomId,
+  invalidateAuthMiddlewareCache,
   isManagedRolePermissionResource,
   mergeManagedRolePermissions,
   normalizeManagedRolePermission,
@@ -147,6 +148,7 @@ registerOpenApiRoute(rolesPermissionGroup, create, async (c) => {
 
     return insertedRole;
   });
+  await invalidateAuthMiddlewareCache();
 
   const [roleWithPermissions] = await attachPermissions([role]);
 
@@ -193,6 +195,7 @@ registerOpenApiRoute(rolesPermissionGroup, update, async (c) => {
       isActive: body.isActive,
     })
     .where(eq(rbacRole.id, id));
+  await invalidateAuthMiddlewareCache();
 
   const updatedRole = await findRoleDetailsById(id, scopedOrganization.organizationId);
 
@@ -214,6 +217,7 @@ registerOpenApiRoute(rolesPermissionGroup, remove, async (c) => {
   }
 
   await db.delete(rbacRole).where(eq(rbacRole.id, id));
+  await invalidateAuthMiddlewareCache();
 
   return c.json(createSuccessResponse(existingRole), 200);
 });
@@ -249,6 +253,7 @@ registerOpenApiRoute(rolesPermissionGroup, create_permission, async (c) => {
     .insert(rbacRolePermission)
     .values(createPermissionValues(id, permissionInput))
     .returning();
+  await invalidateAuthMiddlewareCache();
 
   return c.json(createSuccessResponse(permission), 201);
 });
@@ -293,6 +298,7 @@ registerOpenApiRoute(rolesPermissionGroup, update_permission, async (c) => {
     })
     .where(eq(rbacRolePermission.id, permissionId))
     .returning();
+  await invalidateAuthMiddlewareCache();
 
   return c.json(createSuccessResponse(permission), 200);
 });
@@ -329,6 +335,7 @@ registerOpenApiRoute(rolesPermissionGroup, remove_permission, async (c) => {
   }
 
   await db.delete(rbacRolePermission).where(eq(rbacRolePermission.id, permissionId));
+  await invalidateAuthMiddlewareCache();
 
   return c.json(createSuccessResponse(existingPermission), 200);
 });

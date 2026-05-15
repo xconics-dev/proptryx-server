@@ -12,6 +12,7 @@ import {
 import {
   companyRequestListQuerySchema,
   companyRequestListResponseSchema,
+  companyRequestPermanentDeleteResultSchema,
   companyRequestBaseSchema,
   companyRequestCreateSchema,
   companyRequestSchema,
@@ -92,5 +93,43 @@ export const remove = createOpenApiRoute({
       description: "Company request deleted successfully",
     },
     404: ApiNotFoundOpenApi,
+  },
+});
+
+export const restore = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/restore",
+  operationId: "companyRequestRestoreById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("update")],
+  summary: "Restore a deleted company request by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    404: ApiNotFoundOpenApi,
+    200: createApiSuccessResponse(
+      companyRequestBaseSchema,
+      "Company request restored successfully"
+    ),
+  },
+});
+
+export const removePermanently = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/permanent",
+  operationId: "companyRequestPermanentDeleteById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.delete],
+  summary: "Permanently delete a company request by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    404: ApiNotFoundOpenApi,
+    200: createApiSuccessResponse(
+      companyRequestPermanentDeleteResultSchema,
+      "Company request permanently deleted successfully"
+    ),
   },
 });

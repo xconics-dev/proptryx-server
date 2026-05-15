@@ -60,6 +60,7 @@ export const faqListSortFields = [
 export const faqListQuerySchema = createListQuerySchema({
   sortFields: faqListSortFields,
   extraShape: {
+    includeDeleted: optionalBooleanQuerySchema,
     isArchived: optionalBooleanQuerySchema,
     propertyId: zod.string("Invalid propertyId").optional(),
   },
@@ -68,3 +69,7 @@ export const faqListQuerySchema = createListQuerySchema({
 export type FaqListQuery = z.infer<typeof faqListQuerySchema>;
 
 export const faqListResponseSchema = createListResponseSchema(faqSchema);
+
+export const faqPermanentDeleteResultSchema = zod.object({
+  message: zod.string(),
+});

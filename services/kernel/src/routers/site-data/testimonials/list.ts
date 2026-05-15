@@ -10,7 +10,7 @@ export const fetchTestimonialList = createTableListFetcher<
 >({
   db: getDB,
   table: testimonial,
-  where: eq(testimonial.isDeleted, false),
+  where: ({ params }) => (params.includeDeleted ? undefined : eq(testimonial.isDeleted, false)),
   search: {
     exact: [testimonial.id],
     contains: [testimonial.authorName, testimonial.designation, testimonial.description],

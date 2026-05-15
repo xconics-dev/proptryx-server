@@ -14,7 +14,7 @@ import {
   fetchBrokerRequestListWithoutFuzzySearch,
   isPgTrgmUnavailableError,
 } from "./list";
-import { create, get, list, remove } from "./openapi.route";
+import { create, get, list, remove, removePermanently, restore } from "./openapi.route";
 import { findBrokerRequestById } from "./utils";
 
 export const companyBrokerRequestGroup: OpenAPIHono<AppBindings> = new OpenAPIHono<AppBindings>();
@@ -99,4 +99,69 @@ registerOpenApiRoute(companyBrokerRequestGroup, remove, async (c) => {
     .where(eq(broker_request.id, id));
 
   return c.json(null, 200);
+});
+
+registerOpenApiRoute(companyBrokerRequestGroup, restore, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user } = getBetterAuthContext(c);
+
+  const existingRequest = await findBrokerRequestById(id, { includeDeleted: true });
+
+  if (!existingRequest) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No broker request found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!existingRequest.isDeleted) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Deleted",
+        message: `Broker request with id ${id} is not deleted.`,
+      }),
+      400
+    );
+  }
+
+  const [restoredRequest] = await db
+    .update(broker_request)
+    .set({
+      isDeleted: false,
+      deletedAt: null,
+      deletedByUser: null,
+      updatedByUser: user?.id || null,
+    })
+    .where(eq(broker_request.id, id))
+    .returning();
+
+  return c.json(createSuccessResponse(restoredRequest), 200);
+});
+
+registerOpenApiRoute(companyBrokerRequestGroup, removePermanently, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const existingRequest = await findBrokerRequestById(id, { includeDeleted: true });
+
+  if (!existingRequest) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No broker request found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  await db.delete(broker_request).where(eq(broker_request.id, id));
+
+  return c.json(
+    createSuccessResponse({
+      message: "Broker request permanently deleted successfully",
+    }),
+    200
+  );
 });

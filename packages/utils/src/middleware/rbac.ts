@@ -97,10 +97,9 @@ export const DEFAULT_FAST_RBAC_AUTH_OPTIONS = {
     organization: false,
     hasOrganization: true,
   },
-  // Keep recent auth context available a bit longer so short auth-service
-  // restarts do not immediately turn protected read routes into 503s.
-  cacheTtlMs: 60_000,
-  redisCacheTtlSeconds: 60,
+  // Keep this short so role-permission edits affect active users quickly.
+  cacheTtlMs: 1_000,
+  redisCacheTtlSeconds: 1,
 } as const satisfies NonNullable<CreateRbacMiddlewareOptions["auth"]>;
 
 function normalizePermissionMap(

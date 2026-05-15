@@ -34,6 +34,7 @@ export {
   AUTH_CONTEXT_KEY,
   createBetterAuthSessionMiddleware,
   createRequiredAuthSessionMiddleware,
+  invalidateAuthMiddlewareCache,
   type BetterAuthContextEntityOptions,
   getBetterAuthContext,
   type BetterAuthAuthorizationContext,

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { user } from "../../auth/schema";
 import { property } from "../../property/schema";
 import { createAuditRelationNames } from "../../utils/audit";
@@ -9,7 +9,7 @@ const auditRelations = createAuditRelationNames("faq");
 export const faq = pgTable(
   "faq",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
+    id: text("id").primaryKey(),
     propertyId: text("property_id").references(() => property.id, {
       onDelete: "set null",
     }),

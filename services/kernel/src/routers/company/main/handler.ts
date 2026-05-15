@@ -1,6 +1,7 @@
 import type { AppBindings } from "@/types/app";
 import { env } from "@/config/env";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { deleteUploadObjects } from "@/lib/object-storage";
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -17,6 +18,7 @@ import {
   organization,
   organizationSubscription,
   property,
+  propertyMedia,
   user,
 } from "@proptryx/database";
 import { and, eq, inArray, ne, or } from "drizzle-orm";
@@ -593,6 +595,15 @@ registerOpenApiRoute(companyMainGroup, remove_permanently, async (c) => {
       : [];
   const sharedUserIds = new Set(otherMembershipUserIds.map((row) => row.userId));
   const deletableUserIds = linkedUserIds.filter((userId) => !sharedUserIds.has(userId));
+  const propertyMediaObjects = await db
+    .select({ storageKey: propertyMedia.storageKey })
+    .from(propertyMedia)
+    .innerJoin(property, eq(propertyMedia.propertyId, property.id))
+    .where(eq(property.organizationId, id));
+  const userImages =
+    deletableUserIds.length > 0
+      ? await db.select({ image: user.image }).from(user).where(inArray(user.id, deletableUserIds))
+      : [];
 
   await db.transaction(async (tx) => {
     await tx.delete(property).where(eq(property.organizationId, id));
@@ -602,6 +613,12 @@ registerOpenApiRoute(companyMainGroup, remove_permanently, async (c) => {
       await tx.delete(user).where(inArray(user.id, deletableUserIds));
     }
   });
+
+  await deleteUploadObjects([
+    existingCompany.logo,
+    ...propertyMediaObjects.map((media) => media.storageKey),
+    ...userImages.map((row) => row.image),
+  ]);
 
   return c.json(
     createSuccessResponse({

@@ -4,7 +4,9 @@ import {
   createDbSelectSchema,
   createListQuerySchema,
   createListResponseSchema,
+  optionalBooleanQuerySchema,
 } from "@proptryx/utils";
+import { z } from "@hono/zod-openapi";
 
 export const brokerRequestBaseSchema = createDbSelectSchema(broker_request);
 
@@ -35,6 +37,9 @@ export const brokerRequestListSortFields = [
 
 export const brokerRequestListQuerySchema = createListQuerySchema({
   sortFields: brokerRequestListSortFields,
+  extraShape: {
+    includeDeleted: optionalBooleanQuerySchema,
+  },
 });
 
 export type BrokerRequestListQuery = typeof brokerRequestListQuerySchema._output;
@@ -42,3 +47,7 @@ export type BrokerRequestListQuery = typeof brokerRequestListQuerySchema._output
 export const brokerRequestListResponseSchema = createListResponseSchema(
   brokerRequestListItemSchema
 );
+
+export const brokerRequestPermanentDeleteResultSchema = z.object({
+  message: z.string(),
+});

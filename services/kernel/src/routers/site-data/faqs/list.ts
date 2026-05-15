@@ -10,7 +10,7 @@ export const fetchFaqList = createTableListFetcher<
 >({
   db: getDB,
   table: faq,
-  where: eq(faq.isDeleted, false),
+  where: ({ params }) => (params.includeDeleted ? undefined : eq(faq.isDeleted, false)),
   search: {
     exact: [faq.id],
     contains: [faq.question, faq.answer],

@@ -52,6 +52,7 @@ export const testimonialListSortFields = [
 export const testimonialListQuerySchema = createListQuerySchema({
   sortFields: testimonialListSortFields,
   extraShape: {
+    includeDeleted: optionalBooleanQuerySchema,
     isArchived: optionalBooleanQuerySchema,
     propertyId: zod.string().optional(),
   },
@@ -60,3 +61,7 @@ export const testimonialListQuerySchema = createListQuerySchema({
 export type TestimonialListQuery = z.infer<typeof testimonialListQuerySchema>;
 
 export const testimonialListResponseSchema = createListResponseSchema(testimonialSchema);
+
+export const testimonialPermanentDeleteResultSchema = zod.object({
+  message: zod.string(),
+});

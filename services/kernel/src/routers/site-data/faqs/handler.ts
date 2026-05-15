@@ -4,11 +4,12 @@ import { db, faq } from "@proptryx/database";
 import {
   createErrorResponse,
   createSuccessResponse,
+  generateRandomId,
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
-import { create, get, list, remove, update } from "./openapi.route";
+import { create, get, list, remove, removePermanently, restore, update } from "./openapi.route";
 import { fetchFaqList } from "./list";
 import { findActivePropertyById, findFaqById } from "./utils";
 
@@ -60,6 +61,7 @@ registerOpenApiRoute(faqsGroup, create, async (c) => {
     .insert(faq)
     .values({
       ...body,
+      id: generateRandomId(),
       createdByUser: user?.id ?? null,
     })
     .returning();
@@ -147,4 +149,67 @@ registerOpenApiRoute(faqsGroup, remove, async (c) => {
     .returning();
 
   return c.json(createSuccessResponse(deletedFaq), 200);
+});
+
+registerOpenApiRoute(faqsGroup, restore, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user } = getBetterAuthContext(c);
+  const existingFaq = await findFaqById(id, { includeDeleted: true });
+
+  if (!existingFaq) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No FAQ found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!existingFaq.isDeleted) {
+    return c.json(
+      createErrorResponse({
+        error: "Conflict",
+        message: `FAQ with id ${id} is already active.`,
+      }),
+      409
+    );
+  }
+
+  const [restoredFaq] = await db
+    .update(faq)
+    .set({
+      isDeleted: false,
+      deletedAt: null,
+      deletedByUser: null,
+      updatedByUser: user?.id ?? null,
+    })
+    .where(eq(faq.id, id))
+    .returning();
+
+  return c.json(createSuccessResponse(restoredFaq), 200);
+});
+
+registerOpenApiRoute(faqsGroup, removePermanently, async (c) => {
+  const { id } = c.req.valid("param");
+  const existingFaq = await findFaqById(id, { includeDeleted: true });
+
+  if (!existingFaq) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No FAQ found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  await db.delete(faq).where(eq(faq.id, id));
+
+  return c.json(
+    createSuccessResponse({
+      message: "FAQ permanently deleted successfully",
+    }),
+    200
+  );
 });

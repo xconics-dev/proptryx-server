@@ -13,6 +13,7 @@ import {
   testimonialCreateSchema,
   testimonialListQuerySchema,
   testimonialListResponseSchema,
+  testimonialPermanentDeleteResultSchema,
   testimonialSchema,
   testimonialUpdateSchema,
 } from "./schema";
@@ -106,6 +107,41 @@ export const remove = createOpenApiRoute({
   },
   responses: {
     200: createApiSuccessResponse(testimonialSchema, "Testimonial deleted successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const restore = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/restore",
+  operationId: "testimonialRestoreById",
+  tags,
+  middleware: [testimonialMethodsRateLimit, testimonialRbac.custom("update")],
+  summary: "Restore a testimonial by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(testimonialSchema, "Testimonial restored successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const removePermanently = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/permanent",
+  operationId: "testimonialPermanentDeleteById",
+  tags,
+  middleware: [testimonialMethodsRateLimit, testimonialRbac.custom("delete")],
+  summary: "Permanently delete a testimonial by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      testimonialPermanentDeleteResultSchema,
+      "Testimonial permanently deleted successfully"
+    ),
     404: ApiNotFoundOpenApi,
   },
 });

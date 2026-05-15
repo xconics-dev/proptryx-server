@@ -13,6 +13,7 @@ import {
   faqCreateSchema,
   faqListQuerySchema,
   faqListResponseSchema,
+  faqPermanentDeleteResultSchema,
   faqSchema,
   faqUpdateSchema,
 } from "./schema";
@@ -103,6 +104,41 @@ export const remove = createOpenApiRoute({
   },
   responses: {
     200: createApiSuccessResponse(faqSchema, "FAQ deleted successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const restore = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/restore",
+  operationId: "faqRestoreById",
+  tags,
+  middleware: [faqMethodsRateLimit, faqRbac.custom("update")],
+  summary: "Restore an FAQ by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(faqSchema, "FAQ restored successfully"),
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const removePermanently = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/permanent",
+  operationId: "faqPermanentDeleteById",
+  tags,
+  middleware: [faqMethodsRateLimit, faqRbac.custom("delete")],
+  summary: "Permanently delete an FAQ by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      faqPermanentDeleteResultSchema,
+      "FAQ permanently deleted successfully"
+    ),
     404: ApiNotFoundOpenApi,
   },
 });

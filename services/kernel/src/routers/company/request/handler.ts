@@ -14,7 +14,7 @@ import {
   fetchCompanyRequestListWithoutFuzzySearch,
   isPgTrgmUnavailableError,
 } from "./list";
-import { create, get, list, remove } from "./openapi.route";
+import { create, get, list, remove, removePermanently, restore } from "./openapi.route";
 import {
   fetchActiveGstInfo,
   findCompanyRequestById,
@@ -166,4 +166,69 @@ registerOpenApiRoute(companyRequestGroup, remove, async (c) => {
     .where(eq(company_request.id, id));
 
   return c.json(null, 200);
+});
+
+registerOpenApiRoute(companyRequestGroup, restore, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user } = getBetterAuthContext(c);
+
+  const existingRequest = await findCompanyRequestById(id, { includeDeleted: true });
+
+  if (!existingRequest) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company request found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!existingRequest.isDeleted) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Deleted",
+        message: `Company request with id ${id} is not deleted.`,
+      }),
+      400
+    );
+  }
+
+  const [restoredRequest] = await db
+    .update(company_request)
+    .set({
+      isDeleted: false,
+      deletedAt: null,
+      deletedByUser: null,
+      updatedByUser: user?.id || null,
+    })
+    .where(eq(company_request.id, id))
+    .returning();
+
+  return c.json(createSuccessResponse(restoredRequest), 200);
+});
+
+registerOpenApiRoute(companyRequestGroup, removePermanently, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const existingRequest = await findCompanyRequestById(id, { includeDeleted: true });
+
+  if (!existingRequest) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company request found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  await db.delete(company_request).where(eq(company_request.id, id));
+
+  return c.json(
+    createSuccessResponse({
+      message: "Company request permanently deleted successfully",
+    }),
+    200
+  );
 });

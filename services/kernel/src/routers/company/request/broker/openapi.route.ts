@@ -14,6 +14,7 @@ import {
   brokerRequestCreateSchema,
   brokerRequestListQuerySchema,
   brokerRequestListResponseSchema,
+  brokerRequestPermanentDeleteResultSchema,
 } from "./schema";
 
 const tags = ["Company / Requests / Broker"];
@@ -91,5 +92,40 @@ export const remove = createOpenApiRoute({
       description: "Broker request deleted successfully",
     },
     404: ApiNotFoundOpenApi,
+  },
+});
+
+export const restore = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/restore",
+  operationId: "brokerRequestRestoreById",
+  tags,
+  middleware: [brokerMethodsRateLimit, brokerRequestRbac.custom("update")],
+  summary: "Restore a deleted broker request by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    404: ApiNotFoundOpenApi,
+    200: createApiSuccessResponse(brokerRequestBaseSchema, "Broker request restored successfully"),
+  },
+});
+
+export const removePermanently = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/permanent",
+  operationId: "brokerRequestPermanentDeleteById",
+  tags,
+  middleware: [brokerMethodsRateLimit, brokerRequestRbac.delete],
+  summary: "Permanently delete a broker request by ID",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    404: ApiNotFoundOpenApi,
+    200: createApiSuccessResponse(
+      brokerRequestPermanentDeleteResultSchema,
+      "Broker request permanently deleted successfully"
+    ),
   },
 });
