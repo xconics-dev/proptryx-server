@@ -31,12 +31,41 @@ import {
   mergePropertyOwnerTermsWithExisting,
   normalizePropertyOwnerTerms,
   replacePropertyMediaItems,
+  replacePropertyTemporaryOwnerTerms,
   replacePropertyTypeDetails,
   stripUndefinedFields,
   validateKernelPropertyReferences,
 } from "./utils";
 
 export const kernelCompanyPropertyGroup = new OpenAPIHono<AppBindings>();
+const E_MANDATE_MEDIA_ALT_TEXT = "E_MANDATE";
+const E_MANDATE_MEDIA_NAME = "E-Mandate";
+
+function getCompanyPanelOrganizationId(c: Parameters<typeof getBetterAuthContext>[0]) {
+  const authContext = getBetterAuthContext(c);
+  const panel = authContext.authorization.panel ?? authContext.user?.panel ?? null;
+
+  return panel === "company" ? (authContext.session?.activeOrganizationId ?? null) : null;
+}
+
+function isProptryxBrokerUser(c: Parameters<typeof getBetterAuthContext>[0]) {
+  const authContext = getBetterAuthContext(c);
+  const role = authContext.authorization.role ?? authContext.user?.role ?? null;
+  const panel = authContext.authorization.panel ?? authContext.user?.panel ?? null;
+
+  return panel === "proptryx" && role?.trim().toLowerCase() === "broker";
+}
+
+function hasEMandateMedia(mediaItems?: import("./utils").PropertyMediaInput[]) {
+  return (mediaItems ?? []).some(
+    (mediaItem) =>
+      mediaItem.mediaType === "DOCUMENT" &&
+      mediaItem.mimeType === "application/pdf" &&
+      (mediaItem.altText === E_MANDATE_MEDIA_ALT_TEXT ||
+        mediaItem.name.trim().toLowerCase() === E_MANDATE_MEDIA_NAME.toLowerCase() ||
+        mediaItem.storageKey.includes("/e-mandate/"))
+  );
+}
 
 async function getOrganizationOwnerRecipients(organizationId: string) {
   return db
@@ -85,7 +114,14 @@ async function notifyPropertyPublished(
 
 registerOpenApiRoute(kernelCompanyPropertyGroup, list, async (c) => {
   const query = c.req.valid("query");
-  const response = await fetchPropertyList(query);
+  const authContext = getBetterAuthContext(c);
+  const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
+  const isBrokerUser = isProptryxBrokerUser(c);
+  const response = await fetchPropertyList({
+    ...query,
+    createdByUser: isBrokerUser ? (authContext.user?.id ?? "__none__") : query.createdByUser,
+    organizationId: isBrokerUser ? undefined : (companyPanelOrganizationId ?? query.organizationId),
+  });
 
   return c.json(
     createSuccessResponse({
@@ -99,11 +135,18 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, list, async (c) => {
 registerOpenApiRoute(kernelCompanyPropertyGroup, get, async (c) => {
   const { id } = c.req.valid("param");
   const query = c.req.valid("query");
+  const authContext = getBetterAuthContext(c);
+  const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
+  const isBrokerUser = isProptryxBrokerUser(c);
   const propertyData = await findPropertyByIdWithRelations(id, {
     includeDeleted: query.includeDeleted,
   });
 
-  if (!propertyData) {
+  if (
+    !propertyData ||
+    (companyPanelOrganizationId && propertyData.organizationId !== companyPanelOrganizationId) ||
+    (isBrokerUser && propertyData.createdByUser !== authContext.user?.id)
+  ) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -121,6 +164,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
   const {
     coOwnerIds,
     ownerTerms,
+    temporaryOwnerTerms,
     mediaItems,
     retailDetails,
     officeDetails,
@@ -130,6 +174,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
   } = body as typeof body & {
     coOwnerIds?: string[];
     ownerTerms?: import("./utils").PropertyOwnerTermsInput[];
+    temporaryOwnerTerms?: import("./utils").PropertyTemporaryOwnerTermsInput[];
     mediaItems?: import("./utils").PropertyMediaInput[];
     retailDetails?: import("./utils").PropertyTypeDetailsInput["retailDetails"];
     officeDetails?: import("./utils").PropertyTypeDetailsInput["officeDetails"];
@@ -137,17 +182,46 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
     parkingDetails?: import("./utils").PropertyTypeDetailsInput["parkingDetails"];
   };
   const { user: currentUser } = getBetterAuthContext(c);
+  const isBrokerUser =
+    currentUser?.panel === "proptryx" && currentUser.role?.trim().toLowerCase() === "broker";
+  const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
+  const effectivePropertyBody = {
+    ...propertyBody,
+    organizationId: isBrokerUser
+      ? null
+      : (companyPanelOrganizationId ?? propertyBody.organizationId),
+  };
+
+  if (isBrokerUser && !hasEMandateMedia(mediaItems)) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: "E-mandate PDF is required for broker property creation",
+      }),
+      400
+    );
+  }
+
+  if (!(isBrokerUser || effectivePropertyBody.organizationId)) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: "Organization id is required",
+      }),
+      400
+    );
+  }
   const normalizedOwnerTerms = normalizePropertyOwnerTerms({
-    superOwnerId: propertyBody.superOwnerId,
+    superOwnerId: effectivePropertyBody.superOwnerId,
     coOwnerIds,
     ownerTerms,
   });
   const referenceValidation = await validateKernelPropertyReferences({
-    organizationId: propertyBody.organizationId,
-    superOwnerId: propertyBody.superOwnerId,
+    organizationId: effectivePropertyBody.organizationId,
+    superOwnerId: effectivePropertyBody.superOwnerId,
     coOwnerIds: getValidatedCoOwnerIdsFromOwnerTerms(
       normalizedOwnerTerms,
-      propertyBody.superOwnerId
+      effectivePropertyBody.superOwnerId
     ),
   });
 
@@ -162,14 +236,14 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
     );
   }
 
-  const derivedFields = getDerivedPropertyFields(propertyBody);
+  const derivedFields = getDerivedPropertyFields(effectivePropertyBody);
 
   const [createdProperty] = await db.transaction(async (tx) => {
     const [insertedProperty] = await tx
       .insert(property)
       .values({
         id: generateRandomId(),
-        ...propertyBody,
+        ...effectivePropertyBody,
         ...derivedFields,
         createdByUser: currentUser?.id ?? null,
       })
@@ -196,6 +270,11 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
       propertyId: insertedProperty.id,
       mediaItems,
       userId: currentUser?.id ?? null,
+    });
+    await replacePropertyTemporaryOwnerTerms({
+      tx,
+      propertyId: insertedProperty.id,
+      temporaryOwnerTerms,
     });
     await replacePropertyTypeDetails({
       tx,
@@ -224,6 +303,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
   const {
     coOwnerIds,
     ownerTerms,
+    temporaryOwnerTerms,
     mediaItems,
     retailDetails,
     officeDetails,
@@ -233,6 +313,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
   } = body as typeof body & {
     coOwnerIds?: string[];
     ownerTerms?: import("./utils").PropertyOwnerTermsInput[];
+    temporaryOwnerTerms?: import("./utils").PropertyTemporaryOwnerTermsInput[];
     mediaItems?: import("./utils").PropertyMediaInput[];
     retailDetails?: import("./utils").PropertyTypeDetailsInput["retailDetails"];
     officeDetails?: import("./utils").PropertyTypeDetailsInput["officeDetails"];
@@ -240,9 +321,17 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
     parkingDetails?: import("./utils").PropertyTypeDetailsInput["parkingDetails"];
   };
   const { user: currentUser } = getBetterAuthContext(c);
+  const isBrokerUser =
+    currentUser?.panel === "proptryx" && currentUser.role?.trim().toLowerCase() === "broker";
+  const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
   const existingProperty = await findPropertyById(id);
 
-  if (!existingProperty) {
+  if (
+    !existingProperty ||
+    (companyPanelOrganizationId &&
+      existingProperty.organizationId !== companyPanelOrganizationId) ||
+    (isBrokerUser && existingProperty.createdByUser !== currentUser?.id)
+  ) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -252,8 +341,28 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
     );
   }
 
-  const effectiveOrganizationId = propertyBody.organizationId ?? existingProperty.organizationId;
-  const effectiveSuperOwnerId = propertyBody.superOwnerId ?? existingProperty.superOwnerId;
+  if (isBrokerUser && mediaItems !== undefined && !hasEMandateMedia(mediaItems)) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: "Broker properties must keep an e-mandate PDF",
+      }),
+      400
+    );
+  }
+
+  const effectiveOrganizationId = isBrokerUser
+    ? null
+    : (companyPanelOrganizationId ??
+      propertyBody.organizationId ??
+      existingProperty.organizationId);
+  const effectiveSuperOwnerId = isBrokerUser
+    ? null
+    : (propertyBody.superOwnerId ?? existingProperty.superOwnerId);
+  const effectivePropertyBody = {
+    ...propertyBody,
+    organizationId: effectiveOrganizationId,
+  };
 
   const normalizedOwnerTerms = normalizePropertyOwnerTerms({
     superOwnerId: effectiveSuperOwnerId,
@@ -291,7 +400,8 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
       .set(
         stripUndefinedFields({
           ...propertyBody,
-          ...getDerivedPropertyFields(propertyBody, existingProperty),
+          ...effectivePropertyBody,
+          ...getDerivedPropertyFields(effectivePropertyBody, existingProperty),
           updatedByUser: currentUser?.id ?? null,
         })
       )
@@ -322,6 +432,11 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
       propertyId: id,
       mediaItems,
       userId: currentUser?.id ?? null,
+    });
+    await replacePropertyTemporaryOwnerTerms({
+      tx,
+      propertyId: id,
+      temporaryOwnerTerms,
     });
 
     if (
@@ -354,11 +469,18 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
 registerOpenApiRoute(kernelCompanyPropertyGroup, remove, async (c) => {
   const { id } = c.req.valid("param");
   const { user: currentUser } = getBetterAuthContext(c);
+  const isBrokerUser = isProptryxBrokerUser(c);
+  const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
   const existingProperty = await findPropertyById(id, {
     includeDeleted: true,
   });
 
-  if (!existingProperty) {
+  if (
+    !existingProperty ||
+    (companyPanelOrganizationId &&
+      existingProperty.organizationId !== companyPanelOrganizationId) ||
+    (isBrokerUser && existingProperty.createdByUser !== currentUser?.id)
+  ) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -398,11 +520,18 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, remove, async (c) => {
 registerOpenApiRoute(kernelCompanyPropertyGroup, restore, async (c) => {
   const { id } = c.req.valid("param");
   const { user: currentUser } = getBetterAuthContext(c);
+  const isBrokerUser = isProptryxBrokerUser(c);
+  const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
   const existingProperty = await findPropertyById(id, {
     includeDeleted: true,
   });
 
-  if (!existingProperty) {
+  if (
+    !existingProperty ||
+    (companyPanelOrganizationId &&
+      existingProperty.organizationId !== companyPanelOrganizationId) ||
+    (isBrokerUser && existingProperty.createdByUser !== currentUser?.id)
+  ) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -463,11 +592,19 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, restore, async (c) => {
 
 registerOpenApiRoute(kernelCompanyPropertyGroup, removePermanently, async (c) => {
   const { id } = c.req.valid("param");
+  const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
+  const authContext = getBetterAuthContext(c);
+  const isBrokerUser = isProptryxBrokerUser(c);
   const existingProperty = await findPropertyById(id, {
     includeDeleted: true,
   });
 
-  if (!existingProperty) {
+  if (
+    !existingProperty ||
+    (companyPanelOrganizationId &&
+      existingProperty.organizationId !== companyPanelOrganizationId) ||
+    (isBrokerUser && existingProperty.createdByUser !== authContext.user?.id)
+  ) {
     return c.json(
       createErrorResponse({
         error: "Not Found",

@@ -40,6 +40,10 @@ export const MANAGED_MEMBER_PERMISSION_RESOURCE = "member";
 export const MANAGED_MEMBER_PERMISSION_ACCESS_LEVEL = "user";
 const PROPERTY_PERMISSION_RESOURCE = "property";
 const PROPERTY_PERMISSION_ACCESS_LEVEL = "user";
+const PROPERTY_READ_ACTIONS: PermissionActionMap = {
+  get: true,
+  getAll: true,
+};
 
 const RESOURCE_ACTIONS = Object.freeze(
   Object.fromEntries(COMPANY_RESOURCE_METADATA.map((item) => [item.resource, item.actions]))
@@ -220,6 +224,10 @@ const ROLE_RESOURCE_OVERRIDES: Record<
         MANAGED_USER_PERMISSION_RESOURCE,
         MANAGED_USER_PERMISSION_ACCESS_LEVEL
       ),
+      [PROPERTY_PERMISSION_RESOURCE]: {
+        accessLevel: PROPERTY_PERMISSION_ACCESS_LEVEL,
+        actions: fullActions(PROPERTY_PERMISSION_RESOURCE),
+      },
     },
   },
   property_owner: {
@@ -243,7 +251,7 @@ const ROLE_RESOURCE_OVERRIDES: Record<
       },
       [PROPERTY_PERMISSION_RESOURCE]: {
         accessLevel: PROPERTY_PERMISSION_ACCESS_LEVEL,
-        actions: fullActions(PROPERTY_PERMISSION_RESOURCE),
+        actions: PROPERTY_READ_ACTIONS,
       },
     },
   },

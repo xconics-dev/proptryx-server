@@ -7,8 +7,10 @@ import {
   createOperationalRateLimit,
   createResourceRbacGuards,
   DEFAULT_FAST_RBAC_AUTH_OPTIONS,
+  getBetterAuthContext,
   IdStringParamSchema,
 } from "@proptryx/utils";
+import type { MiddlewareHandler } from "hono";
 import {
   testimonialCreateSchema,
   testimonialListQuerySchema,
@@ -24,6 +26,21 @@ const testimonialRbac = createResourceRbacGuards({
   resource: DATABASE_RESOURCES.testimonial,
   auth: DEFAULT_FAST_RBAC_AUTH_OPTIONS,
 });
+
+const allowProptryxBrokerOr =
+  (middleware: MiddlewareHandler): MiddlewareHandler =>
+  async (c, next) => {
+    const authContext = getBetterAuthContext(c);
+    const panel = authContext.authorization.panel ?? authContext.user?.panel ?? null;
+    const role = authContext.authorization.role ?? authContext.user?.role ?? null;
+
+    if (panel === "proptryx" && role?.trim().toLowerCase() === "broker") {
+      await next();
+      return;
+    }
+
+    return middleware(c, next);
+  };
 
 const testimonialMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "testimonial-methods",
@@ -68,7 +85,10 @@ export const create = createOpenApiRoute({
   path: "/",
   operationId: "testimonialCreate",
   tags,
-  middleware: [testimonialMethodsRateLimit, testimonialRbac.custom("create")],
+  middleware: [
+    testimonialMethodsRateLimit,
+    allowProptryxBrokerOr(testimonialRbac.custom("create")),
+  ],
   summary: "Create a testimonial",
   request: {
     body: createApiJsonBody(testimonialCreateSchema),
@@ -83,7 +103,10 @@ export const update = createOpenApiRoute({
   path: "/{id}",
   operationId: "testimonialUpdateById",
   tags,
-  middleware: [testimonialMethodsRateLimit, testimonialRbac.custom("update")],
+  middleware: [
+    testimonialMethodsRateLimit,
+    allowProptryxBrokerOr(testimonialRbac.custom("update")),
+  ],
   summary: "Update a testimonial by ID",
   request: {
     params: IdStringParamSchema(),
@@ -100,7 +123,10 @@ export const remove = createOpenApiRoute({
   path: "/{id}",
   operationId: "testimonialDeleteById",
   tags,
-  middleware: [testimonialMethodsRateLimit, testimonialRbac.custom("delete")],
+  middleware: [
+    testimonialMethodsRateLimit,
+    allowProptryxBrokerOr(testimonialRbac.custom("delete")),
+  ],
   summary: "Delete a testimonial by ID",
   request: {
     params: IdStringParamSchema(),
@@ -116,7 +142,10 @@ export const restore = createOpenApiRoute({
   path: "/{id}/restore",
   operationId: "testimonialRestoreById",
   tags,
-  middleware: [testimonialMethodsRateLimit, testimonialRbac.custom("update")],
+  middleware: [
+    testimonialMethodsRateLimit,
+    allowProptryxBrokerOr(testimonialRbac.custom("update")),
+  ],
   summary: "Restore a testimonial by ID",
   request: {
     params: IdStringParamSchema(),
@@ -132,7 +161,10 @@ export const removePermanently = createOpenApiRoute({
   path: "/{id}/permanent",
   operationId: "testimonialPermanentDeleteById",
   tags,
-  middleware: [testimonialMethodsRateLimit, testimonialRbac.custom("delete")],
+  middleware: [
+    testimonialMethodsRateLimit,
+    allowProptryxBrokerOr(testimonialRbac.custom("delete")),
+  ],
   summary: "Permanently delete a testimonial by ID",
   request: {
     params: IdStringParamSchema(),

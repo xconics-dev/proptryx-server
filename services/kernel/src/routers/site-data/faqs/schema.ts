@@ -25,7 +25,7 @@ export const faqCreateSchema = createDbInsertSchema(faq, {
   ],
   customizeSchema(schema) {
     return schema.extend({
-      propertyId: zod.string("Invalid propertyId").optional().nullable(),
+      propertyId: zod.string("Invalid propertyId").trim().min(1, "Property id is required"),
     });
   },
 });
@@ -43,7 +43,11 @@ export const faqUpdateSchema = createDbUpdateSchema(faq, {
   ],
   customizeSchema(schema) {
     return schema.extend({
-      propertyId: zod.string("Invalid propertyId").optional().nullable(),
+      propertyId: zod
+        .string("Invalid propertyId")
+        .trim()
+        .min(1, "Property id is required")
+        .optional(),
     });
   },
 });
@@ -63,6 +67,9 @@ export const faqListQuerySchema = createListQuerySchema({
     includeDeleted: optionalBooleanQuerySchema,
     isArchived: optionalBooleanQuerySchema,
     propertyId: zod.string("Invalid propertyId").optional(),
+    propertyOrganizationId: zod.string("Invalid propertyOrganizationId").optional(),
+    propertyCreatedByUser: zod.string("Invalid propertyCreatedByUser").optional(),
+    propertyOwnerUserId: zod.string("Invalid propertyOwnerUserId").optional(),
   },
 });
 

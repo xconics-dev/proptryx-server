@@ -7,8 +7,10 @@ import {
   createOperationalRateLimit,
   createResourceRbacGuards,
   DEFAULT_FAST_RBAC_AUTH_OPTIONS,
+  getBetterAuthContext,
   IdStringParamSchema,
 } from "@proptryx/utils";
+import type { MiddlewareHandler } from "hono";
 import {
   faqCreateSchema,
   faqListQuerySchema,
@@ -24,6 +26,21 @@ const faqRbac = createResourceRbacGuards({
   resource: DATABASE_RESOURCES.faq,
   auth: DEFAULT_FAST_RBAC_AUTH_OPTIONS,
 });
+
+const allowProptryxBrokerOr =
+  (middleware: MiddlewareHandler): MiddlewareHandler =>
+  async (c, next) => {
+    const authContext = getBetterAuthContext(c);
+    const panel = authContext.authorization.panel ?? authContext.user?.panel ?? null;
+    const role = authContext.authorization.role ?? authContext.user?.role ?? null;
+
+    if (panel === "proptryx" && role?.trim().toLowerCase() === "broker") {
+      await next();
+      return;
+    }
+
+    return middleware(c, next);
+  };
 
 const faqMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "faq-methods",
@@ -65,7 +82,7 @@ export const create = createOpenApiRoute({
   path: "/",
   operationId: "faqCreate",
   tags,
-  middleware: [faqMethodsRateLimit, faqRbac.custom("create")],
+  middleware: [faqMethodsRateLimit, allowProptryxBrokerOr(faqRbac.custom("create"))],
   summary: "Create an FAQ",
   request: {
     body: createApiJsonBody(faqCreateSchema),
@@ -80,7 +97,7 @@ export const update = createOpenApiRoute({
   path: "/{id}",
   operationId: "faqUpdateById",
   tags,
-  middleware: [faqMethodsRateLimit, faqRbac.custom("update")],
+  middleware: [faqMethodsRateLimit, allowProptryxBrokerOr(faqRbac.custom("update"))],
   summary: "Update an FAQ by ID",
   request: {
     params: IdStringParamSchema(),
@@ -97,7 +114,7 @@ export const remove = createOpenApiRoute({
   path: "/{id}",
   operationId: "faqDeleteById",
   tags,
-  middleware: [faqMethodsRateLimit, faqRbac.custom("delete")],
+  middleware: [faqMethodsRateLimit, allowProptryxBrokerOr(faqRbac.custom("delete"))],
   summary: "Delete an FAQ by ID",
   request: {
     params: IdStringParamSchema(),
@@ -113,7 +130,7 @@ export const restore = createOpenApiRoute({
   path: "/{id}/restore",
   operationId: "faqRestoreById",
   tags,
-  middleware: [faqMethodsRateLimit, faqRbac.custom("update")],
+  middleware: [faqMethodsRateLimit, allowProptryxBrokerOr(faqRbac.custom("update"))],
   summary: "Restore an FAQ by ID",
   request: {
     params: IdStringParamSchema(),
@@ -129,7 +146,7 @@ export const removePermanently = createOpenApiRoute({
   path: "/{id}/permanent",
   operationId: "faqPermanentDeleteById",
   tags,
-  middleware: [faqMethodsRateLimit, faqRbac.custom("delete")],
+  middleware: [faqMethodsRateLimit, allowProptryxBrokerOr(faqRbac.custom("delete"))],
   summary: "Permanently delete an FAQ by ID",
   request: {
     params: IdStringParamSchema(),

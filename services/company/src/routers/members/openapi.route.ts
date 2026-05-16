@@ -6,11 +6,11 @@ import {
   createOpenApiRoute,
   createOperationalRateLimit,
   createResourceRbacGuards,
-  DEFAULT_FAST_RBAC_AUTH_OPTIONS,
   IdStringParamSchema,
 } from "@proptryx/utils";
 import {
   memberCreateSchema,
+  memberDeleteWithUserResultSchema,
   memberListItemSchema,
   memberListQuerySchema,
   memberListResponseSchema,
@@ -113,9 +113,7 @@ export const remove = createOpenApiRoute({
     params: IdStringParamSchema(),
   },
   responses: {
-    204: {
-      description: "Member removed successfully",
-    },
+    200: createApiSuccessResponse(memberSchema, "Member removed successfully"),
   },
 });
 
@@ -130,9 +128,10 @@ export const remove_with_user = createOpenApiRoute({
     params: IdStringParamSchema(),
   },
   responses: {
-    204: {
-      description: "Member with user removed successfully",
-    },
+    200: createApiSuccessResponse(
+      memberDeleteWithUserResultSchema,
+      "Member with user removed successfully"
+    ),
   },
 });
 

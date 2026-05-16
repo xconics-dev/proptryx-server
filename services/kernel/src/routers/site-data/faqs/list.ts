@@ -1,6 +1,6 @@
-import { faq, getDB } from "@proptryx/database";
+import { faq, getDB, property, propertyOwner } from "@proptryx/database";
 import { createTableListFetcher } from "@proptryx/utils";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { FaqListQuery } from "./schema";
 
 export const fetchFaqList = createTableListFetcher<
@@ -18,6 +18,39 @@ export const fetchFaqList = createTableListFetcher<
   filterColumns: {
     isArchived: faq.isArchived,
     propertyId: faq.propertyId,
+  },
+  filters: {
+    propertyOrganizationId: {
+      build: ({ value }) => sql`exists (
+        select 1 from ${property}
+        where ${property.id} = ${faq.propertyId}
+        and ${property.isDeleted} = false
+        and ${property.organizationId} = ${String(value)}
+      )`,
+    },
+    propertyCreatedByUser: {
+      build: ({ value }) => sql`exists (
+        select 1 from ${property}
+        where ${property.id} = ${faq.propertyId}
+        and ${property.isDeleted} = false
+        and ${property.createdByUser} = ${String(value)}
+      )`,
+    },
+    propertyOwnerUserId: {
+      build: ({ value }) => sql`exists (
+        select 1 from ${property}
+        where ${property.id} = ${faq.propertyId}
+        and ${property.isDeleted} = false
+        and (
+          ${property.superOwnerId} = ${String(value)}
+          or exists (
+            select 1 from ${propertyOwner}
+            where ${propertyOwner.propertyId} = ${property.id}
+            and ${propertyOwner.userId} = ${String(value)}
+          )
+        )
+      )`,
+    },
   },
   sorting: {
     defaultBy: "createdAt",

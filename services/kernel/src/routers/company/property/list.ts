@@ -1,6 +1,6 @@
-import { getDB, property } from "@proptryx/database";
+import { getDB, property, propertyOwner } from "@proptryx/database";
 import { createTableListFetcher } from "@proptryx/utils";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PropertyListQuery } from "./schema";
 
 export const fetchPropertyList = createTableListFetcher<
@@ -25,6 +25,7 @@ export const fetchPropertyList = createTableListFetcher<
   },
   filterColumns: {
     organizationId: property.organizationId,
+    createdByUser: property.createdByUser,
     superOwnerId: property.superOwnerId,
     type: property.type,
     status: property.status,
@@ -33,6 +34,18 @@ export const fetchPropertyList = createTableListFetcher<
     isPublished: property.isPublished,
     isOperational: property.isOperational,
     isVerified: property.isVerified,
+  },
+  filters: {
+    ownerUserId: {
+      build: ({ value }) => sql`(
+        ${property.superOwnerId} = ${String(value)}
+        or exists (
+          select 1 from ${propertyOwner}
+          where ${propertyOwner.propertyId} = ${property.id}
+          and ${propertyOwner.userId} = ${String(value)}
+        )
+      )`,
+    },
   },
   sorting: {
     defaultBy: "createdAt",

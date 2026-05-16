@@ -38,8 +38,11 @@ import {
 
 export const rolesPermissionGroup = new OpenAPIHono<AppBindings>();
 
+const OWNER_ROLE_SLUG = "owner";
+
 function resolveCurrentOrganizationContext(c: Context<AppBindings>) {
   const authCheck = resolveCurrentOrganizationAccess(c);
+  const memberRole = authCheck.authContext.member?.role ?? null;
 
   if (!authCheck.organizationId) {
     return {
@@ -51,13 +54,40 @@ function resolveCurrentOrganizationContext(c: Context<AppBindings>) {
         401
       ),
       organizationId: null,
+      memberRole,
     };
   }
 
   return {
     errorResponse: null,
     organizationId: authCheck.organizationId,
+    memberRole,
   };
+}
+
+function isOwnerRoleSlug(value?: string | null) {
+  return value?.trim().toLowerCase() === OWNER_ROLE_SLUG;
+}
+
+function isCurrentOrganizationOwner(memberRole?: string | null) {
+  return isOwnerRoleSlug(memberRole);
+}
+
+function createOwnerRoleForbiddenResponse(c: Context<AppBindings>) {
+  return c.json(
+    createErrorResponse({
+      error: "Forbidden",
+      message: "Only organization owners can manage owner role permissions",
+    }),
+    403
+  );
+}
+
+function canManageRole(
+  role: { slug?: string | null },
+  scopedOrganization: { memberRole?: string | null }
+) {
+  return !isOwnerRoleSlug(role.slug) || isCurrentOrganizationOwner(scopedOrganization.memberRole);
 }
 
 registerOpenApiRoute(rolesPermissionGroup, list, async (c) => {
@@ -109,6 +139,11 @@ registerOpenApiRoute(rolesPermissionGroup, create, async (c) => {
   }
 
   const slug = body.slug ?? createRoleSlug(body.name);
+
+  if (isOwnerRoleSlug(slug) && !isCurrentOrganizationOwner(scopedOrganization.memberRole)) {
+    return createOwnerRoleForbiddenResponse(c);
+  }
+
   const slugConflict = await findRoleSlugConflict(slug, scopedOrganization.organizationId);
 
   if (slugConflict) {
@@ -170,7 +205,15 @@ registerOpenApiRoute(rolesPermissionGroup, update, async (c) => {
     return c.json(createErrorResponse({ error: "Not Found", message: "Role not found" }), 404);
   }
 
+  if (!canManageRole(existingRole, scopedOrganization)) {
+    return createOwnerRoleForbiddenResponse(c);
+  }
+
   const slug = body.slug ?? (body.name ? createRoleSlug(body.name) : undefined);
+
+  if (isOwnerRoleSlug(slug) && !isCurrentOrganizationOwner(scopedOrganization.memberRole)) {
+    return createOwnerRoleForbiddenResponse(c);
+  }
 
   if (slug) {
     const slugConflict = await findRoleSlugConflict(slug, scopedOrganization.organizationId, id);
@@ -216,6 +259,10 @@ registerOpenApiRoute(rolesPermissionGroup, remove, async (c) => {
     return c.json(createErrorResponse({ error: "Not Found", message: "Role not found" }), 404);
   }
 
+  if (!canManageRole(existingRole, scopedOrganization)) {
+    return createOwnerRoleForbiddenResponse(c);
+  }
+
   await db.delete(rbacRole).where(eq(rbacRole.id, id));
   await invalidateAuthMiddlewareCache();
 
@@ -235,6 +282,10 @@ registerOpenApiRoute(rolesPermissionGroup, create_permission, async (c) => {
 
   if (!role) {
     return c.json(createErrorResponse({ error: "Not Found", message: "Role not found" }), 404);
+  }
+
+  if (!canManageRole(role, scopedOrganization)) {
+    return createOwnerRoleForbiddenResponse(c);
   }
 
   if (isManagedRolePermissionResource(body.resource)) {
@@ -265,6 +316,16 @@ registerOpenApiRoute(rolesPermissionGroup, update_permission, async (c) => {
 
   if (scopedOrganization.errorResponse) {
     return scopedOrganization.errorResponse;
+  }
+
+  const role = await findRoleDetailsById(roleId, scopedOrganization.organizationId);
+
+  if (!role) {
+    return c.json(createErrorResponse({ error: "Not Found", message: "Role not found" }), 404);
+  }
+
+  if (!canManageRole(role, scopedOrganization)) {
+    return createOwnerRoleForbiddenResponse(c);
   }
 
   const existingPermission = await findPermissionById(
@@ -309,6 +370,16 @@ registerOpenApiRoute(rolesPermissionGroup, remove_permission, async (c) => {
 
   if (scopedOrganization.errorResponse) {
     return scopedOrganization.errorResponse;
+  }
+
+  const role = await findRoleDetailsById(roleId, scopedOrganization.organizationId);
+
+  if (!role) {
+    return c.json(createErrorResponse({ error: "Not Found", message: "Role not found" }), 404);
+  }
+
+  if (!canManageRole(role, scopedOrganization)) {
+    return createOwnerRoleForbiddenResponse(c);
   }
 
   const existingPermission = await findPermissionById(

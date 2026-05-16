@@ -24,6 +24,7 @@ import {
   mergePropertyOwnerTermsWithExisting,
   normalizePropertyOwnerTerms,
   replacePropertyMediaItems,
+  replacePropertyTemporaryOwnerTerms,
   replacePropertyTypeDetails,
   stripUndefinedFields,
   validateCompanyPropertyReferences,
@@ -155,6 +156,7 @@ registerOpenApiRoute(propertyGroup, create, async (c) => {
   const {
     coOwnerIds,
     ownerTerms,
+    temporaryOwnerTerms,
     mediaItems,
     retailDetails,
     officeDetails,
@@ -164,6 +166,7 @@ registerOpenApiRoute(propertyGroup, create, async (c) => {
   } = body as typeof body & {
     coOwnerIds?: string[];
     ownerTerms?: import("./utils").PropertyOwnerTermsInput[];
+    temporaryOwnerTerms?: import("./utils").PropertyTemporaryOwnerTermsInput[];
     mediaItems?: import("./utils").PropertyMediaInput[];
     retailDetails?: import("./utils").PropertyTypeDetailsInput["retailDetails"];
     officeDetails?: import("./utils").PropertyTypeDetailsInput["officeDetails"];
@@ -249,6 +252,11 @@ registerOpenApiRoute(propertyGroup, create, async (c) => {
       mediaItems,
       userId: scopedOrganization.user?.id ?? null,
     });
+    await replacePropertyTemporaryOwnerTerms({
+      tx,
+      propertyId: insertedProperty.id,
+      temporaryOwnerTerms,
+    });
     await replacePropertyTypeDetails({
       tx,
       propertyId: insertedProperty.id,
@@ -277,6 +285,7 @@ registerOpenApiRoute(propertyGroup, update, async (c) => {
   const {
     coOwnerIds,
     ownerTerms,
+    temporaryOwnerTerms,
     mediaItems,
     retailDetails,
     officeDetails,
@@ -286,6 +295,7 @@ registerOpenApiRoute(propertyGroup, update, async (c) => {
   } = body as typeof body & {
     coOwnerIds?: string[];
     ownerTerms?: import("./utils").PropertyOwnerTermsInput[];
+    temporaryOwnerTerms?: import("./utils").PropertyTemporaryOwnerTermsInput[];
     mediaItems?: import("./utils").PropertyMediaInput[];
     retailDetails?: import("./utils").PropertyTypeDetailsInput["retailDetails"];
     officeDetails?: import("./utils").PropertyTypeDetailsInput["officeDetails"];
@@ -389,6 +399,11 @@ registerOpenApiRoute(propertyGroup, update, async (c) => {
       propertyId: id,
       mediaItems,
       userId: scopedOrganization.user?.id ?? null,
+    });
+    await replacePropertyTemporaryOwnerTerms({
+      tx,
+      propertyId: id,
+      temporaryOwnerTerms,
     });
 
     if (

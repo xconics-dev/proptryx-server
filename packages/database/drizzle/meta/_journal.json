@@ -15,6 +15,20 @@
       "when": 1778845095625,
       "tag": "0001_same_satana",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778898600000,
+      "tag": "0002_property_owner_temporary",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778932125042,
+      "tag": "0003_workable_rogue",
+      "breakpoints": true
     }
   ]
 }

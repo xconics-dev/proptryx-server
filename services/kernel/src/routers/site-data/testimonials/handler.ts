@@ -11,13 +11,36 @@ import {
 import { eq } from "drizzle-orm";
 import { create, get, list, remove, removePermanently, restore, update } from "./openapi.route";
 import { fetchTestimonialList } from "./list";
-import { findActivePropertyById, findTestimonialById } from "./utils";
+import {
+  applyTestimonialListAccessScope,
+  canAccessTestimonialRecord,
+  findAccessibleActivePropertyById,
+  findTestimonialById,
+  type SiteDataPropertyAccessContext,
+} from "./utils";
 
 export const testimonialsGroup = new OpenAPIHono<AppBindings>();
 
+function getPropertyAccessContext(c: Parameters<typeof getBetterAuthContext>[0]) {
+  const authContext = getBetterAuthContext(c);
+
+  return {
+    userId: authContext.user?.id ?? null,
+    panel: authContext.authorization.panel ?? authContext.user?.panel ?? null,
+    role: authContext.authorization.role ?? authContext.user?.role ?? null,
+    organizationId:
+      authContext.session?.activeOrganizationId ??
+      authContext.member?.organizationId ??
+      authContext.organization?.id ??
+      null,
+  } satisfies SiteDataPropertyAccessContext;
+}
+
 registerOpenApiRoute(testimonialsGroup, list, async (c) => {
   const query = c.req.valid("query");
-  const response = await fetchTestimonialList(query);
+  const response = await fetchTestimonialList(
+    applyTestimonialListAccessScope(query, getPropertyAccessContext(c))
+  );
 
   return c.json(createSuccessResponse(response), 200);
 });
@@ -36,25 +59,34 @@ registerOpenApiRoute(testimonialsGroup, get, async (c) => {
     );
   }
 
+  if (!(await canAccessTestimonialRecord(testimonialData, getPropertyAccessContext(c)))) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No testimonial found with id ${id}`,
+      }),
+      404
+    );
+  }
+
   return c.json(createSuccessResponse(testimonialData), 200);
 });
 
 registerOpenApiRoute(testimonialsGroup, create, async (c) => {
   const body = c.req.valid("json");
   const { user } = getBetterAuthContext(c);
+  const accessContext = getPropertyAccessContext(c);
 
-  if (body.propertyId !== undefined && body.propertyId !== null) {
-    const linkedProperty = await findActivePropertyById(body.propertyId);
+  const linkedProperty = await findAccessibleActivePropertyById(body.propertyId, accessContext);
 
-    if (!linkedProperty) {
-      return c.json(
-        createErrorResponse({
-          error: "Not Found",
-          message: `No active property found with id ${body.propertyId}`,
-        }),
-        404
-      );
-    }
+  if (!linkedProperty) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No active property found with id ${body.propertyId}`,
+      }),
+      404
+    );
   }
 
   const [createdTestimonial] = await db
@@ -73,6 +105,7 @@ registerOpenApiRoute(testimonialsGroup, update, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
   const { user } = getBetterAuthContext(c);
+  const accessContext = getPropertyAccessContext(c);
 
   const existingTestimonial = await findTestimonialById(id);
 
@@ -86,8 +119,18 @@ registerOpenApiRoute(testimonialsGroup, update, async (c) => {
     );
   }
 
-  if (body.propertyId !== undefined && body.propertyId !== null) {
-    const linkedProperty = await findActivePropertyById(body.propertyId);
+  if (!(await canAccessTestimonialRecord(existingTestimonial, accessContext))) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No testimonial found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (body.propertyId !== undefined) {
+    const linkedProperty = await findAccessibleActivePropertyById(body.propertyId, accessContext);
 
     if (!linkedProperty) {
       return c.json(
@@ -115,10 +158,21 @@ registerOpenApiRoute(testimonialsGroup, update, async (c) => {
 registerOpenApiRoute(testimonialsGroup, remove, async (c) => {
   const { id } = c.req.valid("param");
   const { user } = getBetterAuthContext(c);
+  const accessContext = getPropertyAccessContext(c);
 
   const existingTestimonial = await findTestimonialById(id, { includeDeleted: true });
 
   if (!existingTestimonial) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No testimonial found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!(await canAccessTestimonialRecord(existingTestimonial, accessContext))) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -154,9 +208,20 @@ registerOpenApiRoute(testimonialsGroup, remove, async (c) => {
 registerOpenApiRoute(testimonialsGroup, restore, async (c) => {
   const { id } = c.req.valid("param");
   const { user } = getBetterAuthContext(c);
+  const accessContext = getPropertyAccessContext(c);
   const existingTestimonial = await findTestimonialById(id, { includeDeleted: true });
 
   if (!existingTestimonial) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No testimonial found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!(await canAccessTestimonialRecord(existingTestimonial, accessContext))) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -192,9 +257,20 @@ registerOpenApiRoute(testimonialsGroup, restore, async (c) => {
 
 registerOpenApiRoute(testimonialsGroup, removePermanently, async (c) => {
   const { id } = c.req.valid("param");
+  const accessContext = getPropertyAccessContext(c);
   const existingTestimonial = await findTestimonialById(id, { includeDeleted: true });
 
   if (!existingTestimonial) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No testimonial found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!(await canAccessTestimonialRecord(existingTestimonial, accessContext))) {
     return c.json(
       createErrorResponse({
         error: "Not Found",

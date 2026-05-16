@@ -9,7 +9,9 @@ import {
   createOpenApiRoute,
   createOperationalRateLimit,
   createResourceRbacGuards,
+  getBetterAuthContext,
 } from "@proptryx/utils";
+import type { MiddlewareHandler } from "hono";
 import {
   propertyCreateSchema,
   propertyDetailSchema,
@@ -27,6 +29,21 @@ const propertyRbac = createResourceRbacGuards({
   auth: DEFAULT_FAST_RBAC_AUTH_OPTIONS,
 });
 
+const allowProptryxBrokerOr =
+  (middleware: MiddlewareHandler): MiddlewareHandler =>
+  async (c, next) => {
+    const authContext = getBetterAuthContext(c);
+    const panel = authContext.authorization.panel ?? authContext.user?.panel ?? null;
+    const role = authContext.authorization.role ?? authContext.user?.role ?? null;
+
+    if (panel === "proptryx" && role?.trim().toLowerCase() === "broker") {
+      await next();
+      return;
+    }
+
+    return middleware(c, next);
+  };
+
 const propertyMethodsRateLimit = createOperationalRateLimit({
   keyPrefix: "kernel-company-property-methods",
 });
@@ -36,7 +53,7 @@ export const list = createOpenApiRoute({
   path: "/list",
   operationId: "kernelCompanyPropertyList",
   tags,
-  middleware: [propertyMethodsRateLimit, propertyRbac.custom("getAll")],
+  middleware: [propertyMethodsRateLimit, allowProptryxBrokerOr(propertyRbac.custom("getAll"))],
   summary: "List properties across organizations",
   request: {
     query: propertyListQuerySchema,
@@ -51,7 +68,7 @@ export const get = createOpenApiRoute({
   path: "/{id}",
   operationId: "kernelCompanyPropertyGetById",
   tags,
-  middleware: [propertyMethodsRateLimit, propertyRbac.get],
+  middleware: [propertyMethodsRateLimit, allowProptryxBrokerOr(propertyRbac.get)],
   summary: "Get property by ID",
   request: {
     params: IdStringParamSchema(),
@@ -68,7 +85,7 @@ export const create = createOpenApiRoute({
   path: "/",
   operationId: "kernelCompanyPropertyCreate",
   tags,
-  middleware: [propertyMethodsRateLimit, propertyRbac.custom("create")],
+  middleware: [propertyMethodsRateLimit, allowProptryxBrokerOr(propertyRbac.custom("create"))],
   summary: "Create property for any organization",
   request: {
     body: createApiJsonBody(propertyCreateSchema),
@@ -84,7 +101,7 @@ export const update = createOpenApiRoute({
   path: "/{id}",
   operationId: "kernelCompanyPropertyUpdateById",
   tags,
-  middleware: [propertyMethodsRateLimit, propertyRbac.custom("update")],
+  middleware: [propertyMethodsRateLimit, allowProptryxBrokerOr(propertyRbac.custom("update"))],
   summary: "Update property by ID",
   request: {
     params: IdStringParamSchema(),
@@ -102,7 +119,7 @@ export const remove = createOpenApiRoute({
   path: "/{id}",
   operationId: "kernelCompanyPropertyDeleteById",
   tags,
-  middleware: [propertyMethodsRateLimit, propertyRbac.custom("delete")],
+  middleware: [propertyMethodsRateLimit, allowProptryxBrokerOr(propertyRbac.custom("delete"))],
   summary: "Soft delete property by ID",
   request: {
     params: IdStringParamSchema(),
@@ -119,7 +136,7 @@ export const restore = createOpenApiRoute({
   path: "/{id}/restore",
   operationId: "kernelCompanyPropertyRestoreById",
   tags,
-  middleware: [propertyMethodsRateLimit, propertyRbac.custom("update")],
+  middleware: [propertyMethodsRateLimit, allowProptryxBrokerOr(propertyRbac.custom("update"))],
   summary: "Restore property by ID",
   request: {
     params: IdStringParamSchema(),
@@ -135,7 +152,7 @@ export const removePermanently = createOpenApiRoute({
   path: "/{id}/permanent",
   operationId: "kernelCompanyPropertyPermanentDeleteById",
   tags,
-  middleware: [propertyMethodsRateLimit, propertyRbac.custom("delete")],
+  middleware: [propertyMethodsRateLimit, allowProptryxBrokerOr(propertyRbac.custom("delete"))],
   summary: "Permanently delete property by ID",
   request: {
     params: IdStringParamSchema(),

@@ -6,6 +6,7 @@ import {
   propertyMedia,
   propertyOffice,
   propertyOwner,
+  propertyOwnerTemporary,
   propertyParking,
   propertyRetail,
   propertyWarehouse,
@@ -32,6 +33,13 @@ export type PropertyOwnerTermsInput = {
   pricePerUnit?: number | null;
   priceUnit?: "PER_SQFT" | "LUMP_SUM" | "PER_MONTH" | null;
   priceNegotiable?: boolean | null;
+};
+
+export type PropertyTemporaryOwnerTermsInput = Omit<PropertyOwnerTermsInput, "userId"> & {
+  id?: string;
+  name: string;
+  email?: string | null;
+  phoneNumber?: string | null;
 };
 
 export type PropertyMediaInput = {
@@ -108,6 +116,11 @@ export async function attachPropertyRelations<TProperty extends PropertyRecord>(
               user: UserSummary;
             }
         >;
+        temporaryOwnerTerms: Array<
+          {
+            id: string;
+          } & PropertyTemporaryOwnerTermsInput
+        >;
         organization: OrganizationSummary | null;
         superOwner: UserSummary | null;
         mediaItems: Array<typeof propertyMedia.$inferSelect>;
@@ -166,9 +179,17 @@ export async function attachPropertyRelations<TProperty extends PropertyRecord>(
           .where(and(inArray(user.id, superOwnerIds), eq(user.isDeleted, false))),
   ]);
   const propertyIds = propertiesData.map((item) => item.id);
-  const [coOwnerRows, mediaRows, retailRows, officeRows, warehouseRows, parkingRows] =
+  const [
+    coOwnerRows,
+    temporaryOwnerRows,
+    mediaRows,
+    retailRows,
+    officeRows,
+    warehouseRows,
+    parkingRows,
+  ] =
     propertyIds.length === 0
-      ? [[], [], [], [], [], []]
+      ? [[], [], [], [], [], [], []]
       : await Promise.all([
           db
             .select({
@@ -196,6 +217,10 @@ export async function attachPropertyRelations<TProperty extends PropertyRecord>(
             .from(propertyOwner)
             .innerJoin(user, eq(user.id, propertyOwner.userId))
             .where(and(inArray(propertyOwner.propertyId, propertyIds), eq(user.isDeleted, false))),
+          db
+            .select()
+            .from(propertyOwnerTemporary)
+            .where(inArray(propertyOwnerTemporary.propertyId, propertyIds)),
           db
             .select()
             .from(propertyMedia)
@@ -226,6 +251,14 @@ export async function attachPropertyRelations<TProperty extends PropertyRecord>(
         }
     >
   >();
+  const temporaryOwnerTermsByPropertyId = new Map<
+    string,
+    Array<
+      {
+        id: string;
+      } & PropertyTemporaryOwnerTermsInput
+    >
+  >();
   const mediaByPropertyId = new Map<string, Array<typeof propertyMedia.$inferSelect>>();
   const retailByPropertyId = new Map(retailRows.map((item) => [item.propertyId, item]));
   const officeByPropertyId = new Map(officeRows.map((item) => [item.propertyId, item]));
@@ -249,6 +282,24 @@ export async function attachPropertyRelations<TProperty extends PropertyRecord>(
     ownerTermsByPropertyId.set(row.propertyId, existingTerms);
   }
 
+  for (const row of temporaryOwnerRows) {
+    const existingTerms = temporaryOwnerTermsByPropertyId.get(row.propertyId) ?? [];
+    existingTerms.push({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      phoneNumber: row.phoneNumber,
+      floorNumber: row.floorNumber,
+      allocatedAreaSqft: row.allocatedAreaSqft,
+      areaDescription: row.areaDescription,
+      handoverType: row.handoverType,
+      pricePerUnit: row.pricePerUnit,
+      priceUnit: row.priceUnit,
+      priceNegotiable: row.priceNegotiable,
+    });
+    temporaryOwnerTermsByPropertyId.set(row.propertyId, existingTerms);
+  }
+
   for (const row of mediaRows) {
     const existingMedia = mediaByPropertyId.get(row.propertyId) ?? [];
     existingMedia.push(row);
@@ -262,6 +313,7 @@ export async function attachPropertyRelations<TProperty extends PropertyRecord>(
         .filter((ownerTerm) => ownerTerm.userId !== propertyData.superOwnerId)
         .map((ownerTerm) => ownerTerm.user) ?? [],
     ownerTerms: ownerTermsByPropertyId.get(propertyData.id) ?? [],
+    temporaryOwnerTerms: temporaryOwnerTermsByPropertyId.get(propertyData.id) ?? [],
     organization: propertyData.organizationId
       ? (organizationById.get(propertyData.organizationId) ?? null)
       : null,
@@ -308,6 +360,7 @@ export async function validateKernelPropertyReferences(input: PropertyReferenceI
               and(
                 eq(member.organizationId, input.organizationId),
                 eq(member.userId, input.superOwnerId),
+                eq(member.role, "property_owner"),
                 eq(member.isDeleted, false),
                 eq(user.isDeleted, false)
               )
@@ -331,6 +384,7 @@ export async function validateKernelPropertyReferences(input: PropertyReferenceI
               and(
                 eq(member.organizationId, input.organizationId),
                 inArray(member.userId, normalizedCoOwnerIds),
+                eq(member.role, "property_owner"),
                 eq(member.isDeleted, false),
                 eq(user.isDeleted, false)
               )
@@ -352,7 +406,7 @@ export async function validateKernelPropertyReferences(input: PropertyReferenceI
   if (input.superOwnerId && !checks[1]) {
     errors.push(
       input.organizationId
-        ? `Super owner ${input.superOwnerId} is not an active member of organization ${input.organizationId}`
+        ? `Super owner ${input.superOwnerId} is not an active property owner member of organization ${input.organizationId}`
         : `Super owner ${input.superOwnerId} does not exist or is deleted`
     );
   }
@@ -373,7 +427,7 @@ export async function validateKernelPropertyReferences(input: PropertyReferenceI
     if (invalidCoOwnerIds.length > 0) {
       errors.push(
         input.organizationId
-          ? `Co-owners must be active members of organization ${input.organizationId}: ${invalidCoOwnerIds.join(", ")}`
+          ? `Co-owners must be active property owner members of organization ${input.organizationId}: ${invalidCoOwnerIds.join(", ")}`
           : `Co-owners do not exist or are deleted: ${invalidCoOwnerIds.join(", ")}`
       );
     }
@@ -407,6 +461,21 @@ export function normalizePropertyOwnerTerms(input: {
   }
 
   return Array.from(ownerTermByUserId.values());
+}
+
+export function normalizePropertyTemporaryOwnerTerms(
+  temporaryOwnerTerms?: PropertyTemporaryOwnerTermsInput[]
+) {
+  return (temporaryOwnerTerms ?? [])
+    .map((ownerTerm) => ({
+      ...ownerTerm,
+      name: ownerTerm.name.trim(),
+      email: ownerTerm.email?.trim() || null,
+      phoneNumber: ownerTerm.phoneNumber?.trim() || null,
+      floorNumber: ownerTerm.floorNumber?.trim() || null,
+      areaDescription: ownerTerm.areaDescription?.trim() || null,
+    }))
+    .filter((ownerTerm) => ownerTerm.name.length > 0);
 }
 
 export function mergePropertyOwnerTermsWithExisting(
@@ -507,6 +576,44 @@ export async function replacePropertyMediaItems({
       isThumbnail: mediaItem.isThumbnail ?? index === 0,
       createdByUser: userId ?? null,
       updatedByUser: userId ?? null,
+    }))
+  );
+}
+
+export async function replacePropertyTemporaryOwnerTerms({
+  tx,
+  propertyId,
+  temporaryOwnerTerms,
+}: {
+  tx: PropertyMutationClient;
+  propertyId: string;
+  temporaryOwnerTerms?: PropertyTemporaryOwnerTermsInput[];
+}) {
+  if (temporaryOwnerTerms === undefined) {
+    return;
+  }
+
+  await tx.delete(propertyOwnerTemporary).where(eq(propertyOwnerTemporary.propertyId, propertyId));
+
+  const normalizedTemporaryOwnerTerms = normalizePropertyTemporaryOwnerTerms(temporaryOwnerTerms);
+
+  if (normalizedTemporaryOwnerTerms.length === 0) {
+    return;
+  }
+
+  await tx.insert(propertyOwnerTemporary).values(
+    normalizedTemporaryOwnerTerms.map((ownerTerm) => ({
+      propertyId,
+      name: ownerTerm.name,
+      email: ownerTerm.email ?? null,
+      phoneNumber: ownerTerm.phoneNumber ?? null,
+      floorNumber: ownerTerm.floorNumber ?? null,
+      allocatedAreaSqft: ownerTerm.allocatedAreaSqft ?? null,
+      areaDescription: ownerTerm.areaDescription ?? null,
+      handoverType: ownerTerm.handoverType ?? null,
+      pricePerUnit: ownerTerm.pricePerUnit ?? null,
+      priceUnit: ownerTerm.priceUnit ?? null,
+      priceNegotiable: ownerTerm.priceNegotiable ?? null,
     }))
   );
 }

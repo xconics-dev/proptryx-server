@@ -63,9 +63,20 @@ const propertyOwnerTermsSchema = z.object({
   priceNegotiable: z.boolean().nullable().optional(),
 });
 
+const propertyTemporaryOwnerTermsSchema = propertyOwnerTermsSchema.omit({ userId: true }).extend({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, "Temporary owner name is required"),
+  email: z.string().trim().email("Enter a valid owner email").nullable().optional(),
+  phoneNumber: z.string().trim().min(1).nullable().optional(),
+});
+
 const propertyOwnerDetailSchema = propertyOwnerTermsSchema.extend({
   id: z.string().uuid(),
   user: propertyUserSummarySchema,
+});
+
+const propertyTemporaryOwnerDetailSchema = propertyTemporaryOwnerTermsSchema.extend({
+  id: z.string().uuid(),
 });
 
 const propertyMediaInputSchema = z.object({
@@ -83,7 +94,7 @@ const propertyMediaInputSchema = z.object({
 });
 
 const propertyMediaLimits: Record<(typeof PropertyMediaType.enumValues)[number], number> = {
-  DOCUMENT: 10,
+  DOCUMENT: 11,
   IMAGE: 12,
   VIDEO: 4,
 };
@@ -119,23 +130,35 @@ const validatePropertyMediaLimits = (
 const validateOwnerAllocatedArea = (
   {
     ownerTerms,
+    temporaryOwnerTerms,
     totalAreaSqft,
   }: {
     ownerTerms?: z.infer<typeof propertyOwnerTermsSchema>[];
+    temporaryOwnerTerms?: z.infer<typeof propertyTemporaryOwnerTermsSchema>[];
     totalAreaSqft?: number | null;
   },
   ctx: z.RefinementCtx
 ) => {
-  if (!(totalAreaSqft && totalAreaSqft > 0 && ownerTerms?.length)) {
+  if (
+    !(
+      totalAreaSqft &&
+      totalAreaSqft > 0 &&
+      ((ownerTerms?.length ?? 0) > 0 || (temporaryOwnerTerms?.length ?? 0) > 0)
+    )
+  ) {
     return;
   }
 
-  const allocatedAreaSqft = ownerTerms.reduce(
+  const allocatedAreaSqft = (ownerTerms ?? []).reduce(
+    (total, term) => total + (term.allocatedAreaSqft ?? 0),
+    0
+  );
+  const temporaryAllocatedAreaSqft = (temporaryOwnerTerms ?? []).reduce(
     (total, term) => total + (term.allocatedAreaSqft ?? 0),
     0
   );
 
-  if (allocatedAreaSqft > totalAreaSqft) {
+  if (allocatedAreaSqft + temporaryAllocatedAreaSqft > totalAreaSqft) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: `Owner allocations cannot exceed total area sqft (${totalAreaSqft}).`,
@@ -200,6 +223,7 @@ export const propertyDetailSchema = propertySchema.extend({
   superOwner: propertyUserSummarySchema.nullable(),
   coOwners: z.array(propertyUserSummarySchema).default([]),
   ownerTerms: z.array(propertyOwnerDetailSchema).default([]),
+  temporaryOwnerTerms: z.array(propertyTemporaryOwnerDetailSchema).default([]),
   mediaItems: z.array(propertyMediaDetailSchema).default([]),
   retailDetails: propertyRetailDetailsSchema.nullable(),
   officeDetails: propertyOfficeDetailsSchema.nullable(),
@@ -223,6 +247,7 @@ export const propertyCreateSchema = createDbInsertSchema(property, {
   .extend({
     coOwnerIds: z.array(z.string().min(1)).optional(),
     ownerTerms: z.array(propertyOwnerTermsSchema).optional(),
+    temporaryOwnerTerms: z.array(propertyTemporaryOwnerTermsSchema).optional(),
     mediaItems: z.array(propertyMediaInputSchema).optional(),
     retailDetails: propertyRetailDetailsSchema.nullable().optional(),
     officeDetails: propertyOfficeDetailsSchema.nullable().optional(),
@@ -250,6 +275,7 @@ export const propertyUpdateSchema = createDbUpdateSchema(property, {
   .extend({
     coOwnerIds: z.array(z.string().min(1)).optional(),
     ownerTerms: z.array(propertyOwnerTermsSchema).optional(),
+    temporaryOwnerTerms: z.array(propertyTemporaryOwnerTermsSchema).optional(),
     mediaItems: z.array(propertyMediaInputSchema).optional(),
     retailDetails: propertyRetailDetailsSchema.nullable().optional(),
     officeDetails: propertyOfficeDetailsSchema.nullable().optional(),

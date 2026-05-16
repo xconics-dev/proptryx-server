@@ -164,6 +164,7 @@ export async function getMemberCredentialDeliveryData(
       password,
       organizationName: orgData.name,
       role: memberData.role,
+      userId: memberData.userId,
     },
   };
 }

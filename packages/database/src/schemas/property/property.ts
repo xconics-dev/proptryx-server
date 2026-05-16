@@ -26,6 +26,7 @@ import {
 import { propertyMedia } from "./property-media";
 import { propertyOffice } from "./property-office";
 import { propertyOwner } from "./property-owner";
+import { propertyOwnerTemporary } from "./property-owner-temporary";
 import { propertyParking } from "./property-parking";
 import { propertyRetail } from "./property-retail";
 import { propertyWarehouse } from "./property-warehouse";
@@ -97,7 +98,7 @@ export const property = pgTable(
     superOwnerId: text("super_owner_id").references(() => user.id, {
       onDelete: "set null",
     }),
-    // Co-owners are stored in the property_owner junction table
+    // Co-owners are stored in property_owner; manual owners in property_owner_temporary.
 
     // For keep reference
     createdByUser: text("created_by_user").references(() => user.id, {
@@ -169,6 +170,7 @@ export const propertyRelations = relations(property, ({ one, many }) => {
     updatedByUser: auditUser(property.updatedByUser, auditRelations.property.updated),
     deletedByUser: auditUser(property.deletedByUser, auditRelations.property.deleted),
     owners: many(propertyOwner),
+    temporaryOwners: many(propertyOwnerTemporary),
     mediaItems: many(propertyMedia),
     meetings: many(meeting),
     faqs: many(faq),

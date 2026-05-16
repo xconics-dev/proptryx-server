@@ -35,6 +35,18 @@ import {
 
 export const membersGroup = new OpenAPIHono<AppBindings>();
 
+const OWNER_ROLE_SLUG = "owner";
+
+function isProtectedMember(
+  memberData: { role?: string | null; userId?: string | null },
+  currentUserId?: string | null
+) {
+  return (
+    memberData.role?.trim().toLowerCase() === OWNER_ROLE_SLUG ||
+    Boolean(currentUserId && memberData.userId === currentUserId)
+  );
+}
+
 function resolveCurrentOrganizationContext(c: Context<AppBindings>) {
   const authCheck = resolveCurrentOrganizationAccess(c);
   const organizationId = authCheck.organizationId;
@@ -71,6 +83,7 @@ registerOpenApiRoute(membersGroup, list, async (c) => {
   const response = await fetchMemberList({
     ...query,
     organizationId: scopedOrganization.organizationId,
+    excludeUserId: scopedOrganization.user?.id,
   });
 
   return c.json(createSuccessResponse(response), 200);
@@ -86,7 +99,7 @@ registerOpenApiRoute(membersGroup, get, async (c) => {
 
   const memberData = await findMemberDetailsById(id, scopedOrganization.organizationId);
 
-  if (!memberData) {
+  if (!memberData || isProtectedMember(memberData, scopedOrganization.user?.id)) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -105,6 +118,16 @@ registerOpenApiRoute(membersGroup, create, async (c) => {
 
   if (scopedOrganization.errorResponse) {
     return scopedOrganization.errorResponse;
+  }
+
+  if (body.role.trim().toLowerCase() === OWNER_ROLE_SLUG) {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Owner role cannot be assigned from company member management",
+      }),
+      403
+    );
   }
 
   const [existingUserWithMember, orgData] = await Promise.all([
@@ -215,7 +238,7 @@ registerOpenApiRoute(membersGroup, create, async (c) => {
       });
   }
 
-  return c.json(memberData, 201);
+  return c.json(createSuccessResponse(memberData), 201);
 });
 
 registerOpenApiRoute(membersGroup, update, async (c) => {
@@ -227,11 +250,21 @@ registerOpenApiRoute(membersGroup, update, async (c) => {
     return scopedOrganization.errorResponse;
   }
 
+  if (body.role?.trim().toLowerCase() === OWNER_ROLE_SLUG) {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Owner role cannot be assigned from company member management",
+      }),
+      403
+    );
+  }
+
   const existingMember = await findMemberById(id, {
     organizationId: scopedOrganization.organizationId,
   });
 
-  if (!existingMember) {
+  if (!existingMember || isProtectedMember(existingMember, scopedOrganization.user?.id)) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -273,7 +306,7 @@ registerOpenApiRoute(membersGroup, update, async (c) => {
     );
   }
 
-  return c.json(updatedMember);
+  return c.json(createSuccessResponse(updatedMember), 200);
 });
 
 registerOpenApiRoute(membersGroup, remove, async (c) => {
@@ -288,23 +321,13 @@ registerOpenApiRoute(membersGroup, remove, async (c) => {
     organizationId: scopedOrganization.organizationId,
   });
 
-  if (!existingMember) {
+  if (!existingMember || isProtectedMember(existingMember, scopedOrganization.user?.id)) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
         message: "Member not found",
       }),
       404
-    );
-  }
-
-  if (existingMember.role === "owner") {
-    return c.json(
-      createErrorResponse({
-        error: "Forbidden",
-        message: "Cannot delete owner member",
-      }),
-      403
     );
   }
 
@@ -328,7 +351,7 @@ registerOpenApiRoute(membersGroup, remove, async (c) => {
     );
   }
 
-  return c.json(deletedMember);
+  return c.json(createSuccessResponse(deletedMember), 200);
 });
 
 registerOpenApiRoute(membersGroup, remove_with_user, async (c) => {
@@ -343,23 +366,13 @@ registerOpenApiRoute(membersGroup, remove_with_user, async (c) => {
     organizationId: scopedOrganization.organizationId,
   });
 
-  if (!existingMember) {
+  if (!existingMember || isProtectedMember(existingMember, scopedOrganization.user?.id)) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
         message: "Member not found",
       }),
       404
-    );
-  }
-
-  if (existingMember.role === "owner") {
-    return c.json(
-      createErrorResponse({
-        error: "Forbidden",
-        message: "Cannot delete owner member",
-      }),
-      403
     );
   }
 
@@ -383,7 +396,7 @@ registerOpenApiRoute(membersGroup, remove_with_user, async (c) => {
     );
   }
 
-  return c.json(null);
+  return c.json(createSuccessResponse({ message: "Member permanently deleted successfully" }), 200);
 });
 
 registerOpenApiRoute(membersGroup, resendCredentials, async (c) => {
@@ -405,6 +418,19 @@ registerOpenApiRoute(membersGroup, resendCredentials, async (c) => {
       createErrorResponse({
         error: "Not Found",
         message: credentialData.message,
+      }),
+      404
+    );
+  }
+
+  if (
+    credentialData.data.role?.trim().toLowerCase() === OWNER_ROLE_SLUG ||
+    credentialData.data.userId === scopedOrganization.user?.id
+  ) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Member not found",
       }),
       404
     );
