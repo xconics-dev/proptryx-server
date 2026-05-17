@@ -36,6 +36,17 @@ export const fetchPropertyList = createTableListFetcher<
     isVerified: property.isVerified,
   },
   filters: {
+    ownUserId: {
+      build: ({ value }) => sql`(
+        ${property.createdByUser} = ${String(value)}
+        or ${property.superOwnerId} = ${String(value)}
+        or exists (
+          select 1 from ${propertyOwner}
+          where ${propertyOwner.propertyId} = ${property.id}
+          and ${propertyOwner.userId} = ${String(value)}
+        )
+      )`,
+    },
     ownerUserId: {
       build: ({ value }) => sql`(
         ${property.superOwnerId} = ${String(value)}

@@ -67,6 +67,7 @@ export const faqListQuerySchema = createListQuerySchema({
     includeDeleted: optionalBooleanQuerySchema,
     isArchived: optionalBooleanQuerySchema,
     propertyId: zod.string("Invalid propertyId").optional(),
+    createdByUser: zod.string("Invalid createdByUser").optional(),
     propertyOrganizationId: zod.string("Invalid propertyOrganizationId").optional(),
     propertyCreatedByUser: zod.string("Invalid propertyCreatedByUser").optional(),
     propertyOwnerUserId: zod.string("Invalid propertyOwnerUserId").optional(),

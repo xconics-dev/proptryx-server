@@ -69,6 +69,7 @@ export const testimonialListQuerySchema = createListQuerySchema({
     includeDeleted: optionalBooleanQuerySchema,
     isArchived: optionalBooleanQuerySchema,
     propertyId: zod.string().optional(),
+    createdByUser: zod.string().optional(),
     propertyOrganizationId: zod.string().optional(),
     propertyCreatedByUser: zod.string().optional(),
     propertyOwnerUserId: zod.string().optional(),

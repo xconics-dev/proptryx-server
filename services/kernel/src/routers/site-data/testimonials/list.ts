@@ -18,6 +18,7 @@ export const fetchTestimonialList = createTableListFetcher<
   filterColumns: {
     isArchived: testimonial.isArchived,
     propertyId: testimonial.propertyId,
+    createdByUser: testimonial.createdByUser,
   },
   filters: {
     propertyOrganizationId: {

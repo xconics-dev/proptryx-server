@@ -325,6 +325,7 @@ export const propertyListQuerySchema = createListQuerySchema({
     isOperational: optionalBooleanQuerySchema,
     isVerified: optionalBooleanQuerySchema,
     createdByUser: z.string().optional(),
+    ownUserId: z.string().optional(),
     ownerUserId: z.string().optional(),
     includeDeleted: optionalBooleanQuerySchema,
   },

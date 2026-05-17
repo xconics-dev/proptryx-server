@@ -4,6 +4,7 @@ import { deleteUploadObjects } from "@/lib/object-storage";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
   db,
+  DATABASE_RESOURCES,
   member,
   property,
   propertyMedia,
@@ -17,6 +18,7 @@ import {
   createSuccessResponse,
   generateRandomId,
   getBetterAuthContext,
+  getPermissionAccessLevel,
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { and, eq } from "drizzle-orm";
@@ -54,6 +56,32 @@ function isProptryxBrokerUser(c: Parameters<typeof getBetterAuthContext>[0]) {
   const panel = authContext.authorization.panel ?? authContext.user?.panel ?? null;
 
   return panel === "proptryx" && role?.trim().toLowerCase() === "broker";
+}
+
+function getPropertyAccessLevel(c: Parameters<typeof getBetterAuthContext>[0]) {
+  return getPermissionAccessLevel(getBetterAuthContext(c), DATABASE_RESOURCES.property);
+}
+
+async function canAccessPropertyAsCurrentUser(
+  propertyData: Pick<typeof property.$inferSelect, "id" | "createdByUser" | "superOwnerId">,
+  userId?: string | null
+) {
+  if (!userId) {
+    return false;
+  }
+
+  if (propertyData.createdByUser === userId || propertyData.superOwnerId === userId) {
+    return true;
+  }
+
+  return Boolean(
+    await db
+      .select({ id: propertyOwner.id })
+      .from(propertyOwner)
+      .where(and(eq(propertyOwner.propertyId, propertyData.id), eq(propertyOwner.userId, userId)))
+      .limit(1)
+      .then((rows) => rows[0])
+  );
 }
 
 function hasEMandateMedia(mediaItems?: import("./utils").PropertyMediaInput[]) {
@@ -117,9 +145,12 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, list, async (c) => {
   const authContext = getBetterAuthContext(c);
   const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
   const isBrokerUser = isProptryxBrokerUser(c);
+  const isUserAccess = getPropertyAccessLevel(c) === "user";
   const response = await fetchPropertyList({
     ...query,
     createdByUser: isBrokerUser ? (authContext.user?.id ?? "__none__") : query.createdByUser,
+    ownUserId:
+      !isBrokerUser && isUserAccess ? (authContext.user?.id ?? "__none__") : query.ownUserId,
     organizationId: isBrokerUser ? undefined : (companyPanelOrganizationId ?? query.organizationId),
   });
 
@@ -138,6 +169,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, get, async (c) => {
   const authContext = getBetterAuthContext(c);
   const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
   const isBrokerUser = isProptryxBrokerUser(c);
+  const isUserAccess = getPropertyAccessLevel(c) === "user";
   const propertyData = await findPropertyByIdWithRelations(id, {
     includeDeleted: query.includeDeleted,
   });
@@ -145,7 +177,10 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, get, async (c) => {
   if (
     !propertyData ||
     (companyPanelOrganizationId && propertyData.organizationId !== companyPanelOrganizationId) ||
-    (isBrokerUser && propertyData.createdByUser !== authContext.user?.id)
+    (isBrokerUser && propertyData.createdByUser !== authContext.user?.id) ||
+    (!isBrokerUser &&
+      isUserAccess &&
+      !(await canAccessPropertyAsCurrentUser(propertyData, authContext.user?.id)))
   ) {
     return c.json(
       createErrorResponse({
@@ -324,13 +359,18 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
   const isBrokerUser =
     currentUser?.panel === "proptryx" && currentUser.role?.trim().toLowerCase() === "broker";
   const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
+  const authContext = getBetterAuthContext(c);
+  const isUserAccess = getPropertyAccessLevel(c) === "user";
   const existingProperty = await findPropertyById(id);
 
   if (
     !existingProperty ||
     (companyPanelOrganizationId &&
       existingProperty.organizationId !== companyPanelOrganizationId) ||
-    (isBrokerUser && existingProperty.createdByUser !== currentUser?.id)
+    (isBrokerUser && existingProperty.createdByUser !== currentUser?.id) ||
+    (!isBrokerUser &&
+      isUserAccess &&
+      !(await canAccessPropertyAsCurrentUser(existingProperty, authContext.user?.id)))
   ) {
     return c.json(
       createErrorResponse({
@@ -471,6 +511,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, remove, async (c) => {
   const { user: currentUser } = getBetterAuthContext(c);
   const isBrokerUser = isProptryxBrokerUser(c);
   const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
+  const isUserAccess = getPropertyAccessLevel(c) === "user";
   const existingProperty = await findPropertyById(id, {
     includeDeleted: true,
   });
@@ -479,7 +520,10 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, remove, async (c) => {
     !existingProperty ||
     (companyPanelOrganizationId &&
       existingProperty.organizationId !== companyPanelOrganizationId) ||
-    (isBrokerUser && existingProperty.createdByUser !== currentUser?.id)
+    (isBrokerUser && existingProperty.createdByUser !== currentUser?.id) ||
+    (!isBrokerUser &&
+      isUserAccess &&
+      !(await canAccessPropertyAsCurrentUser(existingProperty, currentUser?.id)))
   ) {
     return c.json(
       createErrorResponse({
@@ -522,6 +566,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, restore, async (c) => {
   const { user: currentUser } = getBetterAuthContext(c);
   const isBrokerUser = isProptryxBrokerUser(c);
   const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
+  const isUserAccess = getPropertyAccessLevel(c) === "user";
   const existingProperty = await findPropertyById(id, {
     includeDeleted: true,
   });
@@ -530,7 +575,10 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, restore, async (c) => {
     !existingProperty ||
     (companyPanelOrganizationId &&
       existingProperty.organizationId !== companyPanelOrganizationId) ||
-    (isBrokerUser && existingProperty.createdByUser !== currentUser?.id)
+    (isBrokerUser && existingProperty.createdByUser !== currentUser?.id) ||
+    (!isBrokerUser &&
+      isUserAccess &&
+      !(await canAccessPropertyAsCurrentUser(existingProperty, currentUser?.id)))
   ) {
     return c.json(
       createErrorResponse({
@@ -595,6 +643,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, removePermanently, async (c) =>
   const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
   const authContext = getBetterAuthContext(c);
   const isBrokerUser = isProptryxBrokerUser(c);
+  const isUserAccess = getPropertyAccessLevel(c) === "user";
   const existingProperty = await findPropertyById(id, {
     includeDeleted: true,
   });
@@ -603,7 +652,10 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, removePermanently, async (c) =>
     !existingProperty ||
     (companyPanelOrganizationId &&
       existingProperty.organizationId !== companyPanelOrganizationId) ||
-    (isBrokerUser && existingProperty.createdByUser !== authContext.user?.id)
+    (isBrokerUser && existingProperty.createdByUser !== authContext.user?.id) ||
+    (!isBrokerUser &&
+      isUserAccess &&
+      !(await canAccessPropertyAsCurrentUser(existingProperty, authContext.user?.id)))
   ) {
     return c.json(
       createErrorResponse({

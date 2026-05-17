@@ -1,11 +1,12 @@
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { db, faq } from "@proptryx/database";
+import { db, DATABASE_RESOURCES, faq } from "@proptryx/database";
 import {
   createErrorResponse,
   createSuccessResponse,
   generateRandomId,
   getBetterAuthContext,
+  getPermissionAccessLevel,
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
@@ -33,6 +34,7 @@ function getPropertyAccessContext(c: Parameters<typeof getBetterAuthContext>[0])
       authContext.member?.organizationId ??
       authContext.organization?.id ??
       null,
+    accessLevel: getPermissionAccessLevel(authContext, DATABASE_RESOURCES.faq),
   } satisfies SiteDataPropertyAccessContext;
 }
 

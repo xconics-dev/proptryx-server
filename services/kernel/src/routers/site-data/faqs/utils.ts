@@ -10,6 +10,7 @@ export type SiteDataPropertyAccessContext = {
   panel?: string | null;
   role?: string | null;
   organizationId?: string | null;
+  accessLevel?: string | null;
 };
 
 const normalizeAccessValue = (value?: string | null) => value?.trim().toLowerCase() ?? null;
@@ -20,6 +21,8 @@ const isCompanyPanel = (context: SiteDataPropertyAccessContext) =>
   normalizeAccessValue(context.panel) === "company";
 const isCompanyPropertyOwner = (context: SiteDataPropertyAccessContext) =>
   isCompanyPanel(context) && normalizeAccessValue(context.role) === "property_owner";
+const isUserScopedAccess = (context: SiteDataPropertyAccessContext) =>
+  normalizeAccessValue(context.accessLevel) === "user";
 
 export async function findFaqById(id: string, options?: IncludeDeletedOptions) {
   const whereClause = options?.includeDeleted
@@ -92,6 +95,14 @@ export async function canAccessFaqRecord(
   record: typeof faq.$inferSelect,
   context: SiteDataPropertyAccessContext
 ) {
+  if (
+    isUserScopedAccess(context) &&
+    !(isProptryxBroker(context) || isCompanyPropertyOwner(context)) &&
+    record.createdByUser !== context.userId
+  ) {
+    return false;
+  }
+
   if (!(isProptryxBroker(context) || isCompanyPanel(context))) {
     return true;
   }
@@ -126,6 +137,14 @@ export function applyFaqListAccessScope<TQuery extends Record<string, unknown>>(
     return {
       ...query,
       propertyOrganizationId: context.organizationId ?? "__none__",
+      ...(isUserScopedAccess(context) ? { createdByUser: context.userId ?? "__none__" } : {}),
+    };
+  }
+
+  if (isUserScopedAccess(context)) {
+    return {
+      ...query,
+      createdByUser: context.userId ?? "__none__",
     };
   }
 

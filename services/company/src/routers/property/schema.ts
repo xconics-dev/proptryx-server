@@ -311,6 +311,7 @@ export const propertyListQuerySchema = createListQuerySchema({
     isPublished: optionalBooleanQuerySchema,
     isOperational: optionalBooleanQuerySchema,
     isVerified: optionalBooleanQuerySchema,
+    ownUserId: z.string().optional(),
     includeDeleted: optionalBooleanQuerySchema,
   },
 });

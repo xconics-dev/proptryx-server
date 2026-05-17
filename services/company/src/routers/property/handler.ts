@@ -2,13 +2,14 @@ import type { AppBindings } from "@/types/app";
 import { logger } from "@/lib/logger";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
-import { db, member, property, propertyOwner, user } from "@proptryx/database";
+import { db, DATABASE_RESOURCES, member, property, propertyOwner, user } from "@proptryx/database";
 import { sendPropertyPublishedNotificationEmails } from "@proptryx/notification";
 import {
   checkCurrentOrganizationLimit,
   createErrorResponse,
   createSuccessResponse,
   generateRandomId,
+  getPermissionAccessLevel,
   registerOpenApiRoute,
   resolveCurrentOrganizationAccess,
 } from "@proptryx/utils";
@@ -47,6 +48,7 @@ function resolveCurrentOrganizationContext(c: Context<AppBindings>) {
       ),
       organizationId: null,
       user: authCheck.user,
+      authContext: authCheck.authContext,
     };
   }
 
@@ -54,7 +56,38 @@ function resolveCurrentOrganizationContext(c: Context<AppBindings>) {
     errorResponse: null,
     organizationId,
     user: authCheck.user,
+    authContext: authCheck.authContext,
   };
+}
+
+async function canAccessPropertyAsCurrentUser(
+  propertyData: Pick<typeof property.$inferSelect, "id" | "createdByUser" | "superOwnerId">,
+  userId?: string | null
+) {
+  if (!userId) {
+    return false;
+  }
+
+  if (propertyData.createdByUser === userId || propertyData.superOwnerId === userId) {
+    return true;
+  }
+
+  return Boolean(
+    await db
+      .select({ id: propertyOwner.id })
+      .from(propertyOwner)
+      .where(and(eq(propertyOwner.propertyId, propertyData.id), eq(propertyOwner.userId, userId)))
+      .limit(1)
+      .then((rows) => rows[0])
+  );
+}
+
+function hasUserLevelPropertyAccess(scopedOrganization: {
+  authContext: ReturnType<typeof resolveCurrentOrganizationAccess>["authContext"];
+}) {
+  return (
+    getPermissionAccessLevel(scopedOrganization.authContext, DATABASE_RESOURCES.property) === "user"
+  );
 }
 
 async function getOrganizationOwnerRecipients(organizationId: string) {
@@ -113,6 +146,9 @@ registerOpenApiRoute(propertyGroup, list, async (c) => {
   const response = await fetchPropertyList({
     ...query,
     organizationId: scopedOrganization.organizationId,
+    ownUserId: hasUserLevelPropertyAccess(scopedOrganization)
+      ? (scopedOrganization.user?.id ?? "__none__")
+      : query.ownUserId,
   });
 
   return c.json(
@@ -138,7 +174,11 @@ registerOpenApiRoute(propertyGroup, get, async (c) => {
     includeDeleted: query.includeDeleted,
   });
 
-  if (!propertyData) {
+  if (
+    !propertyData ||
+    (hasUserLevelPropertyAccess(scopedOrganization) &&
+      !(await canAccessPropertyAsCurrentUser(propertyData, scopedOrganization.user?.id)))
+  ) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -312,7 +352,11 @@ registerOpenApiRoute(propertyGroup, update, async (c) => {
     organizationId: scopedOrganization.organizationId,
   });
 
-  if (!existingProperty) {
+  if (
+    !existingProperty ||
+    (hasUserLevelPropertyAccess(scopedOrganization) &&
+      !(await canAccessPropertyAsCurrentUser(existingProperty, scopedOrganization.user?.id)))
+  ) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -447,7 +491,11 @@ registerOpenApiRoute(propertyGroup, remove, async (c) => {
     includeDeleted: true,
   });
 
-  if (!existingProperty) {
+  if (
+    !existingProperty ||
+    (hasUserLevelPropertyAccess(scopedOrganization) &&
+      !(await canAccessPropertyAsCurrentUser(existingProperty, scopedOrganization.user?.id)))
+  ) {
     return c.json(
       createErrorResponse({
         error: "Not Found",

@@ -51,7 +51,10 @@ export const list = createOpenApiRoute({
   path: "/list",
   operationId: "testimonialList",
   tags,
-  middleware: [testimonialMethodsRateLimit],
+  middleware: [
+    testimonialMethodsRateLimit,
+    allowProptryxBrokerOr(testimonialRbac.custom("getAll")),
+  ],
   summary: "List testimonials",
   request: {
     query: testimonialListQuerySchema,
@@ -69,7 +72,7 @@ export const get = createOpenApiRoute({
   path: "/{id}",
   operationId: "testimonialGetById",
   tags,
-  middleware: [testimonialMethodsRateLimit],
+  middleware: [testimonialMethodsRateLimit, allowProptryxBrokerOr(testimonialRbac.custom("get"))],
   summary: "Get a testimonial by ID",
   request: {
     params: IdStringParamSchema(),

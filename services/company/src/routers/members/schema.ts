@@ -1,4 +1,4 @@
-import { member, user } from "@proptryx/database";
+import { member, session, user } from "@proptryx/database";
 import {
   createDbInsertSchema,
   createDbSelectSchema,
@@ -57,6 +57,21 @@ export const memberUpdateSchema = createDbUpdateSchema(member, {
   },
 });
 
+export const memberBanSchema = z
+  .object({
+    banned: z.boolean().default(true),
+    reason: z.string().trim().min(1, "Ban reason is required").nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.banned && !value.reason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reason"],
+        message: "Ban reason is required",
+      });
+    }
+  });
+
 export const memberListQuerySchema = createListQuerySchema({
   sortFields: ["name", "email", "role", "zone", "region", "createdAt", "updatedAt"],
   extraShape: {
@@ -68,7 +83,28 @@ export const memberListQuerySchema = createListQuerySchema({
   },
 });
 
+export const memberDetailQuerySchema = z.object({
+  includeDeleted: z.coerce.boolean().optional(),
+});
+
 export const memberDeleteWithUserResultSchema = z.object({
+  message: z.string(),
+});
+
+export const memberRemoveResultSchema = z.object({
+  message: z.string(),
+});
+
+export const memberSessionSchema = createDbSelectSchema(session);
+
+export const memberSessionListSchema = z.array(memberSessionSchema);
+
+export const memberSessionTokenParamsSchema = z.object({
+  id: z.string().min(1),
+  sessionToken: z.string().min(1),
+});
+
+export const memberSessionRevokeResultSchema = z.object({
   message: z.string(),
 });
 

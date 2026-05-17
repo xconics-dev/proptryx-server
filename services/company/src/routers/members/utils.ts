@@ -1,4 +1,4 @@
-import { account, db, member, organization, user } from "@proptryx/database";
+import { account, db, member, organization, session, user } from "@proptryx/database";
 import {
   decryptPassword,
   encryptPassword,
@@ -6,22 +6,27 @@ import {
   generateUID,
   PasswordUtils,
 } from "@proptryx/utils";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 type IncludeDeletedOptions = {
   includeDeleted?: boolean;
   organizationId?: string;
 };
 
-export async function findMemberDetailsById(id: string, organizationId?: string) {
+export async function findMemberDetailsById(
+  id: string,
+  organizationId?: string,
+  options?: { includeDeleted?: boolean }
+) {
+  const memberDeletedClause = options?.includeDeleted ? undefined : eq(member.isDeleted, false);
   const whereClause = organizationId
     ? and(
         eq(member.id, id),
         eq(member.organizationId, organizationId),
-        eq(member.isDeleted, false),
+        memberDeletedClause,
         eq(user.isDeleted, false)
       )
-    : and(eq(member.id, id), eq(member.isDeleted, false), eq(user.isDeleted, false));
+    : and(eq(member.id, id), memberDeletedClause, eq(user.isDeleted, false));
 
   return db
     .select({
@@ -166,5 +171,27 @@ export async function getMemberCredentialDeliveryData(
       role: memberData.role,
       userId: memberData.userId,
     },
+  };
+}
+
+export async function listMemberSessionsByMemberId(id: string, organizationId: string) {
+  const memberData = await findMemberById(id, {
+    includeDeleted: true,
+    organizationId,
+  });
+
+  if (!memberData) {
+    return;
+  }
+
+  const sessions = await db
+    .select()
+    .from(session)
+    .where(eq(session.userId, memberData.userId))
+    .orderBy(desc(session.updatedAt), desc(session.createdAt));
+
+  return {
+    memberData,
+    sessions,
   };
 }

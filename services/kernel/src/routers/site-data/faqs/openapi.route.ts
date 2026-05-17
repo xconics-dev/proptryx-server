@@ -51,7 +51,7 @@ export const list = createOpenApiRoute({
   path: "/list",
   operationId: "faqList",
   tags,
-  middleware: [faqMethodsRateLimit],
+  middleware: [faqMethodsRateLimit, allowProptryxBrokerOr(faqRbac.custom("getAll"))],
   summary: "List FAQs",
   request: {
     query: faqListQuerySchema,
@@ -66,7 +66,7 @@ export const get = createOpenApiRoute({
   path: "/{id}",
   operationId: "faqGetById",
   tags,
-  middleware: [faqMethodsRateLimit],
+  middleware: [faqMethodsRateLimit, allowProptryxBrokerOr(faqRbac.custom("get"))],
   summary: "Get an FAQ by ID",
   request: {
     params: IdStringParamSchema(),

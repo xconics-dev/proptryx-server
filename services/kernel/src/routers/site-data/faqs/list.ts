@@ -18,6 +18,7 @@ export const fetchFaqList = createTableListFetcher<
   filterColumns: {
     isArchived: faq.isArchived,
     propertyId: faq.propertyId,
+    createdByUser: faq.createdByUser,
   },
   filters: {
     propertyOrganizationId: {
