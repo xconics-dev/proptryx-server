@@ -204,12 +204,6 @@ async function createAuthInstance() {
           });
         }
 
-        if (liveUser?.banned) {
-          throw new APIError("FORBIDDEN", {
-            message: liveUser.banReason ?? "Your account has been banned.",
-          });
-        }
-
         const userWithTags = {
           ...sessionUser,
           banned: liveUser?.banned ?? sessionUser.banned,

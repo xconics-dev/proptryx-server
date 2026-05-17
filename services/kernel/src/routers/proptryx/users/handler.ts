@@ -1,5 +1,6 @@
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
+import { deleteUploadObjects } from "@/lib/object-storage";
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { account, db, user } from "@proptryx/database";
@@ -253,6 +254,8 @@ registerOpenApiRoute(proptryxUsersGroup, removePermanently, async (c) => {
       500
     );
   }
+
+  await deleteUploadObjects([existingUser.image]);
 
   return c.json(
     createSuccessResponse({

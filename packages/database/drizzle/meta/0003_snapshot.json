@@ -1,6 +1,6 @@
 {
-  "id": "d0156034-efe9-427b-a780-6345b034c44b",
-  "prevId": "4aebf15d-858b-418e-ad8e-8c57c21083c1",
+  "id": "8b1e78b2-f53a-4d76-a226-5005a5588221",
+  "prevId": "9960a225-50a8-4c71-86a8-7d51f4c5e6b1",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1055,6 +1055,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by_user": {
+          "name": "deleted_by_user",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1082,6 +1101,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"organization_subscription\".\"is_deleted\" = false",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1097,6 +1117,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"organization_subscription\".\"is_deleted\" = false and \"organization_subscription\".\"razorpay_subscription_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1136,6 +1157,27 @@
           "columns": [
             {
               "expression": "subscription_plan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "organization_subscription_subscriptionPlanId_status_idx": {
+          "name": "organization_subscription_subscriptionPlanId_status_idx",
+          "columns": [
+            {
+              "expression": "subscription_plan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1190,6 +1232,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "organization_subscription_isDeleted_idx": {
+          "name": "organization_subscription_isDeleted_idx",
+          "columns": [
+            {
+              "expression": "is_deleted",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1225,6 +1282,15 @@
           "tableFrom": "organization_subscription",
           "tableTo": "user",
           "columnsFrom": ["updated_by_user"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "organization_subscription_deleted_by_user_user_id_fk": {
+          "name": "organization_subscription_deleted_by_user_user_id_fk",
+          "tableFrom": "organization_subscription",
+          "tableTo": "user",
+          "columnsFrom": ["deleted_by_user"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
@@ -1498,6 +1564,13 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
+        "is_recommended": {
+          "name": "is_recommended",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "is_active": {
           "name": "is_active",
           "type": "boolean",
@@ -1580,6 +1653,22 @@
           ],
           "isUnique": true,
           "where": "\"subscription_plans\".\"is_deleted\" = false",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "subscription_plans_isRecommended_uidx": {
+          "name": "subscription_plans_isRecommended_uidx",
+          "columns": [
+            {
+              "expression": "is_recommended",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"subscription_plans\".\"is_deleted\" = false and \"subscription_plans\".\"is_recommended\" = true",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2260,6 +2349,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"company_request\".\"is_deleted\" = false",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -3073,6 +3163,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "total_floors": {
+          "name": "total_floors",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "area_type": {
           "name": "area_type",
           "type": "area_type",
@@ -3083,8 +3179,14 @@
         },
         "transaction_type": {
           "name": "transaction_type",
-          "type": "transaction_type",
+          "type": "handover_type",
           "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_per_unit": {
+          "name": "price_per_unit",
+          "type": "real",
           "primaryKey": false,
           "notNull": false
         },
@@ -3100,7 +3202,7 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": false
         },
         "type": {
           "name": "type",
@@ -3115,6 +3217,12 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "ownership_type": {
           "name": "ownership_type",
@@ -3182,6 +3290,42 @@
           "columns": [
             {
               "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "property_organizationId_idx": {
+          "name": "property_organizationId_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "property_isDeleted_organizationId_idx": {
+          "name": "property_isDeleted_organizationId_idx",
+          "columns": [
+            {
+              "expression": "is_deleted",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "organization_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3368,6 +3512,15 @@
         }
       },
       "foreignKeys": {
+        "property_organization_id_organization_id_fk": {
+          "name": "property_organization_id_organization_id_fk",
+          "tableFrom": "property",
+          "tableTo": "organization",
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "property_super_owner_id_user_id_fk": {
           "name": "property_super_owner_id_user_id_fk",
           "tableFrom": "property",
@@ -3793,6 +3946,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "handover_type": {
+          "name": "handover_type",
+          "type": "handover_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
         "price_per_unit": {
           "name": "price_per_unit",
           "type": "real",
@@ -3873,6 +4033,150 @@
           "columns": ["property_id", "user_id"]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.property_owner_temporary": {
+      "name": "property_owner_temporary",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone_number": {
+          "name": "phone_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "floor_number": {
+          "name": "floor_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "allocated_area_sqft": {
+          "name": "allocated_area_sqft",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "area_description": {
+          "name": "area_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "handover_type": {
+          "name": "handover_type",
+          "type": "handover_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_per_unit": {
+          "name": "price_per_unit",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_unit": {
+          "name": "price_unit",
+          "type": "price_unit",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_negotiable": {
+          "name": "price_negotiable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "property_owner_temporary_propertyId_idx": {
+          "name": "property_owner_temporary_propertyId_idx",
+          "columns": [
+            {
+              "expression": "property_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "property_owner_temporary_email_idx": {
+          "name": "property_owner_temporary_email_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "property_owner_temporary_phoneNumber_idx": {
+          "name": "property_owner_temporary_phoneNumber_idx",
+          "columns": [
+            {
+              "expression": "phone_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "property_owner_temporary_property_id_property_id_fk": {
+          "name": "property_owner_temporary_property_id_property_id_fk",
+          "tableFrom": "property_owner_temporary",
+          "tableTo": "property",
+          "columnsFrom": ["property_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -4393,7 +4697,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'MEETING'"
+          "default": "'ONLINE'"
         },
         "status": {
           "name": "status",
@@ -4784,10 +5088,9 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "property_id": {
           "name": "property_id",
@@ -5171,7 +5474,7 @@
     "public.organization_type": {
       "name": "organization_type",
       "schema": "public",
-      "values": ["DEVELOPER", "OCCUPIER", "MANAGEMENT", "APPLICATION", "BROKER"]
+      "values": ["DEVELOPER", "OCCUPIER", "MANAGEMENT"]
     },
     "public.permission_access_level": {
       "name": "permission_access_level",
@@ -5197,6 +5500,11 @@
       "name": "certificate_type",
       "schema": "public",
       "values": ["OC", "CC"]
+    },
+    "public.handover_type": {
+      "name": "handover_type",
+      "schema": "public",
+      "values": ["LEASE", "SALE", "LEASE_PURCHASE"]
     },
     "public.parking_access_type": {
       "name": "parking_access_type",
@@ -5231,7 +5539,7 @@
     "public.property_media_type": {
       "name": "property_media_type",
       "schema": "public",
-      "values": ["IMAGE", "DOCUMENT"]
+      "values": ["IMAGE", "VIDEO", "DOCUMENT"]
     },
     "public.property_media_visibility": {
       "name": "property_media_visibility",
@@ -5284,11 +5592,6 @@
       "schema": "public",
       "values": ["ANCHOR", "VANILLA"]
     },
-    "public.transaction_type": {
-      "name": "transaction_type",
-      "schema": "public",
-      "values": ["LEASE", "SALE", "LEASE_PURCHASE"]
-    },
     "public.warehouse_construction_type": {
       "name": "warehouse_construction_type",
       "schema": "public",
@@ -5302,7 +5605,7 @@
     "public.meeting_type": {
       "name": "meeting_type",
       "schema": "public",
-      "values": ["MEETING", "SITE_VISIT"]
+      "values": ["ONLINE", "SITE_VISIT"]
     }
   },
   "schemas": {},

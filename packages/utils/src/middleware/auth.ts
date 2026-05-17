@@ -151,8 +151,10 @@ const DEFAULT_RETRYABLE_STATUS_CODES = [408, 425, 429, 500, 502, 503, 504] as co
 const DEFAULT_SKIP_PATHS = ["/health", "/favicon.ico", "/favicon.png"];
 const DEFAULT_CACHE_TTL_MS = 3_000;
 const DEFAULT_CACHE_MAX_ENTRIES = 2_000;
-const DEFAULT_AUTHORIZATION_CACHE_TTL_MS = 60_000;
+const DEFAULT_AUTHORIZATION_CACHE_TTL_MS = 1_000;
 const DEFAULT_AUTHORIZATION_CACHE_MAX_ENTRIES = 2_000;
+const AUTH_MIDDLEWARE_CACHE_SCAN_COUNT = 500;
+const AUTH_MIDDLEWARE_CACHE_DELETE_BATCH_SIZE = 500;
 
 const authSessionCache = new Map<string, AuthSessionCacheRecord>();
 const authorizationCache = new Map<string, AuthorizationCacheRecord>();
@@ -693,6 +695,64 @@ async function setCachedAuthorizationInRedis(
     );
   } catch {
     // Ignore Redis cache write errors.
+  }
+}
+
+async function deleteRedisKeys(keys: string[]) {
+  if (keys.length === 0) {
+    return;
+  }
+
+  const client = getReadyRedisClient();
+  if (!client) {
+    return;
+  }
+
+  try {
+    await client.unlink(...keys);
+  } catch {
+    await client.del(...keys);
+  }
+}
+
+async function deleteRedisKeysByPattern(pattern: string) {
+  const client = getReadyRedisClient();
+  if (!client) {
+    return;
+  }
+
+  let cursor = "0";
+  const keysToDelete: string[] = [];
+
+  do {
+    const [nextCursor, keys] = await client.scan(
+      cursor,
+      "MATCH",
+      pattern,
+      "COUNT",
+      `${AUTH_MIDDLEWARE_CACHE_SCAN_COUNT}`
+    );
+    cursor = nextCursor;
+    keysToDelete.push(...keys);
+
+    while (keysToDelete.length >= AUTH_MIDDLEWARE_CACHE_DELETE_BATCH_SIZE) {
+      const batch = keysToDelete.splice(0, AUTH_MIDDLEWARE_CACHE_DELETE_BATCH_SIZE);
+      await deleteRedisKeys(batch);
+    }
+  } while (cursor !== "0");
+
+  await deleteRedisKeys(keysToDelete);
+}
+
+export async function invalidateAuthMiddlewareCache() {
+  authSessionCache.clear();
+  authorizationCache.clear();
+  authContextResolutionInFlight.clear();
+
+  try {
+    await deleteRedisKeysByPattern(`${AUTH_MIDDLEWARE_REDIS_NAMESPACE}:*`);
+  } catch {
+    // Cache invalidation must not fail the role mutation that triggered it.
   }
 }
 

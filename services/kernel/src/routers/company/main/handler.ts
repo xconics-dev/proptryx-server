@@ -1,6 +1,7 @@
 import type { AppBindings } from "@/types/app";
 import { env } from "@/config/env";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { deleteUploadObjects } from "@/lib/object-storage";
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -16,9 +17,11 @@ import {
   member,
   organization,
   organizationSubscription,
+  property,
+  propertyMedia,
   user,
 } from "@proptryx/database";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray, ne, or } from "drizzle-orm";
 import { emailSubject, renderAccountCredEmail, sendEmail } from "@proptryx/notification";
 import { logger } from "@/lib/logger";
 import { fetchCompanyList } from "./list";
@@ -30,6 +33,7 @@ import {
   get_settings,
   list,
   remove,
+  remove_permanently,
   restore,
   restore_only,
   resendCredentials,
@@ -52,7 +56,7 @@ import {
   restoreCompanyById,
   syncCompanyRazorpayCustomer,
 } from "./utils";
-import { findCompanyRequestById } from "../request/utils";
+import { findCompanyRequestById, findCompanyRequestGstConflict } from "../request/utils";
 
 export const companyMainGroup = new OpenAPIHono<AppBindings>();
 
@@ -148,6 +152,21 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
   const { user: currentAuthUser } = getBetterAuthContext(c);
   const stepsCompleted: CompanyCreationStep[] = [];
   const stepsFailed: CompanyCreationStep[] = [];
+
+  const gstConflict = body.gstNumber ? await findCompanyRequestGstConflict(body.gstNumber) : null;
+
+  if (gstConflict) {
+    return c.json(
+      createErrorResponse({
+        error: "Conflict",
+        message: gstConflict.message,
+        details: {
+          code: gstConflict.code,
+        },
+      }),
+      409
+    );
+  }
 
   const [{ userId, password, hashedPassword, accountId }, nextOrgId, ownerConflicts] =
     await Promise.all([
@@ -543,6 +562,69 @@ registerOpenApiRoute(companyMainGroup, remove, async (c) => {
         roles: [],
       }
     ),
+    200
+  );
+});
+
+registerOpenApiRoute(companyMainGroup, remove_permanently, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const existingCompany = await findCompanyById(id, { includeDeleted: true });
+
+  if (!existingCompany) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No company found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  const linkedMembers = await db
+    .select({ userId: member.userId })
+    .from(member)
+    .where(eq(member.organizationId, id));
+  const linkedUserIds = Array.from(new Set(linkedMembers.map((row) => row.userId)));
+  const otherMembershipUserIds =
+    linkedUserIds.length > 0
+      ? await db
+          .select({ userId: member.userId })
+          .from(member)
+          .where(and(inArray(member.userId, linkedUserIds), ne(member.organizationId, id)))
+      : [];
+  const sharedUserIds = new Set(otherMembershipUserIds.map((row) => row.userId));
+  const deletableUserIds = linkedUserIds.filter((userId) => !sharedUserIds.has(userId));
+  const propertyMediaObjects = await db
+    .select({ storageKey: propertyMedia.storageKey })
+    .from(propertyMedia)
+    .innerJoin(property, eq(propertyMedia.propertyId, property.id))
+    .where(eq(property.organizationId, id));
+  const userImages =
+    deletableUserIds.length > 0
+      ? await db.select({ image: user.image }).from(user).where(inArray(user.id, deletableUserIds))
+      : [];
+
+  await db.transaction(async (tx) => {
+    await tx.delete(property).where(eq(property.organizationId, id));
+    await tx.delete(organization).where(eq(organization.id, id));
+
+    if (deletableUserIds.length > 0) {
+      await tx.delete(user).where(inArray(user.id, deletableUserIds));
+    }
+  });
+
+  await deleteUploadObjects([
+    existingCompany.logo,
+    ...propertyMediaObjects.map((media) => media.storageKey),
+    ...userImages.map((row) => row.image),
+  ]);
+
+  return c.json(
+    createSuccessResponse({
+      message:
+        "Company, related properties, and organization-only users permanently deleted successfully",
+    }),
     200
   );
 });

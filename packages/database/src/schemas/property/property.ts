@@ -1,5 +1,14 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, jsonb, pgTable, real, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  real,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { organization, user } from "../auth/schema";
 import { meeting } from "../meeting/schema";
 import { faq } from "../site-data/faqs/schema";
@@ -8,15 +17,16 @@ import {
   AreaType,
   CertificateStatus,
   CertificateType,
+  HandoverType,
   PriceUnit,
   PropertyOwnershipType,
   PropertyStatus,
   PropertyType,
-  TransactionType,
 } from "./enums";
 import { propertyMedia } from "./property-media";
 import { propertyOffice } from "./property-office";
 import { propertyOwner } from "./property-owner";
+import { propertyOwnerTemporary } from "./property-owner-temporary";
 import { propertyParking } from "./property-parking";
 import { propertyRetail } from "./property-retail";
 import { propertyWarehouse } from "./property-warehouse";
@@ -67,13 +77,14 @@ export const property = pgTable(
     // Area Details
     totalAreaSqft: real("total_area_sqft"),
     roadWidthFt: real("road_width_ft"),
+    totalFloors: integer("total_floors"),
     /** SINGLE = one unit; SPLIT = divided floor/area-wise across multiple owners */
     areaType: AreaType("area_type").default("SINGLE").notNull(),
-
-    // Pricing
-    transactionType: TransactionType("transaction_type"),
+    /** Parent commercial defaults inherited by owner split terms when their values are null. */
+    transactionType: HandoverType("transaction_type"),
+    pricePerUnit: real("price_per_unit"),
     priceUnit: PriceUnit("price_unit"),
-    priceNegotiable: boolean("price_negotiable").default(true).notNull(),
+    priceNegotiable: boolean("price_negotiable").default(false).notNull(),
 
     // Enums
     type: PropertyType("type").notNull(),
@@ -87,7 +98,7 @@ export const property = pgTable(
     superOwnerId: text("super_owner_id").references(() => user.id, {
       onDelete: "set null",
     }),
-    // Co-owners are stored in the property_owner junction table
+    // Co-owners are stored in property_owner; manual owners in property_owner_temporary.
 
     // For keep reference
     createdByUser: text("created_by_user").references(() => user.id, {
@@ -159,6 +170,7 @@ export const propertyRelations = relations(property, ({ one, many }) => {
     updatedByUser: auditUser(property.updatedByUser, auditRelations.property.updated),
     deletedByUser: auditUser(property.deletedByUser, auditRelations.property.deleted),
     owners: many(propertyOwner),
+    temporaryOwners: many(propertyOwnerTemporary),
     mediaItems: many(propertyMedia),
     meetings: many(meeting),
     faqs: many(faq),

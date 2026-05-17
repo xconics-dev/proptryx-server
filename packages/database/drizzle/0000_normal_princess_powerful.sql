@@ -6,6 +6,7 @@ CREATE TYPE "public"."area_type" AS ENUM('SINGLE', 'SPLIT');--> statement-breakp
 CREATE TYPE "public"."business_district_type" AS ENUM('CBD', 'SBD', 'TBD');--> statement-breakpoint
 CREATE TYPE "public"."certificate_status" AS ENUM('PENDING', 'RECEIVED', 'NOT_REQUIRED');--> statement-breakpoint
 CREATE TYPE "public"."certificate_type" AS ENUM('OC', 'CC');--> statement-breakpoint
+CREATE TYPE "public"."handover_type" AS ENUM('LEASE', 'SALE', 'LEASE_PURCHASE');--> statement-breakpoint
 CREATE TYPE "public"."parking_access_type" AS ENUM('DIRECT_ENTRY', 'THROUGH_RAMP', 'MULTI_LEVEL_ACCESS');--> statement-breakpoint
 CREATE TYPE "public"."parking_configuration" AS ENUM('BASE_PARKING', 'INDIVIDUAL_COVERED_SPACE', 'HYDRAULIC_RACK');--> statement-breakpoint
 CREATE TYPE "public"."parking_security_control" AS ENUM('RFID_ENTRY', 'MANUAL_TICKETING', 'ANPR', 'CCTV_ENABLED');--> statement-breakpoint
@@ -20,7 +21,6 @@ CREATE TYPE "public"."property_type" AS ENUM('RETAIL', 'OFFICE', 'WAREHOUSE', 'C
 CREATE TYPE "public"."retail_brand_category" AS ENUM('HYPERMARKET', 'APPAREL', 'F_AND_B', 'MULTIPLEX', 'ACCESSORIES', 'DEPARTMENTAL_STORES', 'OTHERS');--> statement-breakpoint
 CREATE TYPE "public"."retail_mall_type" AS ENUM('MALL', 'HIGH_STREET');--> statement-breakpoint
 CREATE TYPE "public"."retail_store_type" AS ENUM('ANCHOR', 'VANILLA');--> statement-breakpoint
-CREATE TYPE "public"."transaction_type" AS ENUM('LEASE', 'SALE', 'LEASE_PURCHASE');--> statement-breakpoint
 CREATE TYPE "public"."warehouse_construction_type" AS ENUM('RCC_COMPLIANT', 'NON_RCC');--> statement-breakpoint
 CREATE TYPE "public"."meeting_status" AS ENUM('REQUESTED', 'SCHEDULED', 'COMPLETED', 'CANCELLED', 'REJECTED', 'IN_PROGRESS');--> statement-breakpoint
 CREATE TYPE "public"."meeting_type" AS ENUM('MEETING', 'SITE_VISIT');--> statement-breakpoint
@@ -121,6 +121,11 @@ CREATE TABLE "organization_subscription" (
 	"cancel_at_cycle_end" boolean DEFAULT false NOT NULL,
 	"notes" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"created_by_user" text,
+	"updated_by_user" text,
+	"is_deleted" boolean DEFAULT false NOT NULL,
+	"deleted_at" timestamp,
+	"deleted_by_user" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -155,6 +160,7 @@ CREATE TABLE "subscription_plans" (
 	"addon_property_one_time_cost_in_paise" integer DEFAULT 0 NOT NULL,
 	"features" jsonb DEFAULT '{"maxProperties":0,"maxUsers":0}'::jsonb NOT NULL,
 	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"is_recommended" boolean DEFAULT false NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_by_user" text,
 	"updated_by_user" text,
@@ -295,11 +301,9 @@ CREATE TABLE "property" (
 	"total_area_sqft" real,
 	"road_width_ft" real,
 	"area_type" "area_type" DEFAULT 'SINGLE' NOT NULL,
-	"transaction_type" "transaction_type",
-	"price_unit" "price_unit",
-	"price_negotiable" boolean DEFAULT true NOT NULL,
 	"type" "property_type" NOT NULL,
 	"status" "property_status" NOT NULL,
+	"organization_id" text,
 	"ownership_type" "property_ownership_type" DEFAULT 'SINGLE_OWNER' NOT NULL,
 	"super_owner_id" text,
 	"created_by_user" text,
@@ -313,7 +317,7 @@ CREATE TABLE "property" (
 --> statement-breakpoint
 CREATE TABLE "property_media" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"property_id" uuid NOT NULL,
+	"property_id" text NOT NULL,
 	"media_type" "property_media_type" NOT NULL,
 	"name" text NOT NULL,
 	"storage_key" text NOT NULL,
@@ -335,7 +339,7 @@ CREATE TABLE "property_media" (
 --> statement-breakpoint
 CREATE TABLE "property_office" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"property_id" uuid NOT NULL,
+	"property_id" text NOT NULL,
 	"floor" text,
 	"building_name" text,
 	"business_district_type" "business_district_type",
@@ -346,11 +350,12 @@ CREATE TABLE "property_office" (
 --> statement-breakpoint
 CREATE TABLE "property_owner" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"property_id" uuid NOT NULL,
+	"property_id" text NOT NULL,
 	"user_id" text NOT NULL,
 	"floor_number" text,
 	"allocated_area_sqft" real,
 	"area_description" text,
+	"handover_type" "handover_type",
 	"price_per_unit" real,
 	"price_unit" "price_unit",
 	"price_negotiable" boolean,
@@ -359,7 +364,7 @@ CREATE TABLE "property_owner" (
 --> statement-breakpoint
 CREATE TABLE "property_parking" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"property_id" uuid NOT NULL,
+	"property_id" text NOT NULL,
 	"parking_type" "parking_type" NOT NULL,
 	"parking_configuration" "parking_configuration" NOT NULL,
 	"total_capacity" integer,
@@ -372,7 +377,7 @@ CREATE TABLE "property_parking" (
 --> statement-breakpoint
 CREATE TABLE "property_retail" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"property_id" uuid NOT NULL,
+	"property_id" text NOT NULL,
 	"property_type" "retail_mall_type" NOT NULL,
 	"store_type" "retail_store_type" NOT NULL,
 	"frontage_width_ft" real,
@@ -384,7 +389,7 @@ CREATE TABLE "property_retail" (
 --> statement-breakpoint
 CREATE TABLE "property_warehouse" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"property_id" uuid NOT NULL,
+	"property_id" text NOT NULL,
 	"eaves_height_ft" real,
 	"top_height_ft" real,
 	"construction_type" "warehouse_construction_type",
@@ -394,7 +399,7 @@ CREATE TABLE "property_warehouse" (
 --> statement-breakpoint
 CREATE TABLE "property_zone" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"property_id" uuid NOT NULL,
+	"property_id" text NOT NULL,
 	"zone_id" text NOT NULL,
 	"created_by_user" text,
 	"updated_by_user" text,
@@ -424,7 +429,7 @@ CREATE TABLE "meeting" (
 	"cancellation_reason" text,
 	"mom_published_at" timestamp,
 	"developer_id" text,
-	"property_id" uuid NOT NULL,
+	"property_id" text NOT NULL,
 	"occupier_id" text,
 	"requested_by_user" text,
 	"created_by_user" text,
@@ -482,6 +487,9 @@ ALTER TABLE "organization" ADD CONSTRAINT "organization_updated_by_user_user_id_
 ALTER TABLE "organization" ADD CONSTRAINT "organization_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_subscription" ADD CONSTRAINT "organization_subscription_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organization_subscription" ADD CONSTRAINT "organization_subscription_subscription_plan_id_subscription_plans_id_fk" FOREIGN KEY ("subscription_plan_id") REFERENCES "public"."subscription_plans"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "organization_subscription" ADD CONSTRAINT "organization_subscription_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "organization_subscription" ADD CONSTRAINT "organization_subscription_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "organization_subscription" ADD CONSTRAINT "organization_subscription_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_active_organization_id_organization_id_fk" FOREIGN KEY ("active_organization_id") REFERENCES "public"."organization"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subscription_plans" ADD CONSTRAINT "subscription_plans_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -506,6 +514,7 @@ ALTER TABLE "zone" ADD CONSTRAINT "zone_region_id_region_id_fk" FOREIGN KEY ("re
 ALTER TABLE "zone" ADD CONSTRAINT "zone_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "zone" ADD CONSTRAINT "zone_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "zone" ADD CONSTRAINT "zone_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "property" ADD CONSTRAINT "property_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property" ADD CONSTRAINT "property_super_owner_id_user_id_fk" FOREIGN KEY ("super_owner_id") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property" ADD CONSTRAINT "property_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property" ADD CONSTRAINT "property_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -546,6 +555,8 @@ CREATE INDEX "member_organizationId_idx" ON "member" USING btree ("organization_
 CREATE INDEX "member_userId_idx" ON "member" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "member_panel_idx" ON "member" USING btree ("panel");--> statement-breakpoint
 CREATE INDEX "member_organizationId_role_idx" ON "member" USING btree ("organization_id","role");--> statement-breakpoint
+CREATE INDEX "member_organizationId_isDeleted_userId_idx" ON "member" USING btree ("organization_id","is_deleted","user_id");--> statement-breakpoint
+CREATE INDEX "member_organizationId_isDeleted_role_idx" ON "member" USING btree ("organization_id","is_deleted","role");--> statement-breakpoint
 CREATE UNIQUE INDEX "organization_slug_uidx" ON "organization" USING btree ("slug");--> statement-breakpoint
 CREATE INDEX "organization_isDeleted_createdAt_idx" ON "organization" USING btree ("is_deleted","created_at");--> statement-breakpoint
 CREATE INDEX "organization_isDeleted_updatedAt_idx" ON "organization" USING btree ("is_deleted","updated_at");--> statement-breakpoint
@@ -556,17 +567,23 @@ CREATE INDEX "organization_email_idx" ON "organization" USING btree ("email");--
 CREATE INDEX "organization_phoneNumber_idx" ON "organization" USING btree ("phone_number");--> statement-breakpoint
 CREATE INDEX "organization_gstNumber_idx" ON "organization" USING btree ("gst_number");--> statement-breakpoint
 CREATE INDEX "organization_razorpayCustomerId_idx" ON "organization" USING btree ("razorpay_customer_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "organization_subscription_organizationId_uidx" ON "organization_subscription" USING btree ("organization_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "organization_subscription_razorpaySubscriptionId_uidx" ON "organization_subscription" USING btree ("razorpay_subscription_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "organization_subscription_organizationId_uidx" ON "organization_subscription" USING btree ("organization_id") WHERE "organization_subscription"."is_deleted" = false;--> statement-breakpoint
+CREATE UNIQUE INDEX "organization_subscription_razorpaySubscriptionId_uidx" ON "organization_subscription" USING btree ("razorpay_subscription_id") WHERE "organization_subscription"."is_deleted" = false and "organization_subscription"."razorpay_subscription_id" is not null;--> statement-breakpoint
 CREATE INDEX "organization_subscription_status_idx" ON "organization_subscription" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "organization_subscription_planCode_idx" ON "organization_subscription" USING btree ("plan_code");--> statement-breakpoint
 CREATE INDEX "organization_subscription_subscriptionPlanId_idx" ON "organization_subscription" USING btree ("subscription_plan_id");--> statement-breakpoint
+CREATE INDEX "organization_subscription_subscriptionPlanId_status_idx" ON "organization_subscription" USING btree ("subscription_plan_id","status");--> statement-breakpoint
+CREATE INDEX "organization_subscription_billingPeriod_idx" ON "organization_subscription" USING btree ("billing_period");--> statement-breakpoint
+CREATE INDEX "organization_subscription_createdAt_idx" ON "organization_subscription" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "organization_subscription_createdByUser_idx" ON "organization_subscription" USING btree ("created_by_user");--> statement-breakpoint
+CREATE INDEX "organization_subscription_isDeleted_idx" ON "organization_subscription" USING btree ("is_deleted");--> statement-breakpoint
 CREATE UNIQUE INDEX "session_token_uidx" ON "session" USING btree ("token");--> statement-breakpoint
 CREATE INDEX "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "session_activeOrganizationId_idx" ON "session" USING btree ("active_organization_id");--> statement-breakpoint
 CREATE INDEX "session_expiresAt_idx" ON "session" USING btree ("expires_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "subscription_plans_code_uidx" ON "subscription_plans" USING btree ("code") WHERE "subscription_plans"."is_deleted" = false;--> statement-breakpoint
 CREATE UNIQUE INDEX "subscription_plans_razorpayPlanId_uidx" ON "subscription_plans" USING btree ("razorpay_plan_id") WHERE "subscription_plans"."is_deleted" = false;--> statement-breakpoint
+CREATE UNIQUE INDEX "subscription_plans_isRecommended_uidx" ON "subscription_plans" USING btree ("is_recommended") WHERE "subscription_plans"."is_deleted" = false and "subscription_plans"."is_recommended" = true;--> statement-breakpoint
 CREATE INDEX "subscription_plans_isDeleted_isActive_idx" ON "subscription_plans" USING btree ("is_deleted","is_active");--> statement-breakpoint
 CREATE INDEX "subscription_plans_discountAvailableTill_idx" ON "subscription_plans" USING btree ("discount_available_till");--> statement-breakpoint
 CREATE INDEX "user_name_idx" ON "user" USING btree ("name");--> statement-breakpoint
@@ -579,7 +596,7 @@ CREATE INDEX "rbac_role_slug_idx" ON "rbac_role" USING btree ("slug");--> statem
 CREATE INDEX "rbac_role_panel_slug_idx" ON "rbac_role" USING btree ("panel","slug");--> statement-breakpoint
 CREATE UNIQUE INDEX "rbac_role_permission_role_resource_uidx" ON "rbac_role_permission" USING btree ("role_id","resource");--> statement-breakpoint
 CREATE INDEX "rbac_role_permission_resource_idx" ON "rbac_role_permission" USING btree ("resource");--> statement-breakpoint
-CREATE UNIQUE INDEX "company_request_gst_number_uidx" ON "company_request" USING btree ("company_gst_number");--> statement-breakpoint
+CREATE UNIQUE INDEX "company_request_gst_number_uidx" ON "company_request" USING btree ("company_gst_number") WHERE "company_request"."is_deleted" = false;--> statement-breakpoint
 CREATE INDEX "company_request_owner_email_idx" ON "company_request" USING btree ("owner_email");--> statement-breakpoint
 CREATE INDEX "company_request_owner_phone_idx" ON "company_request" USING btree ("owner_phone");--> statement-breakpoint
 CREATE INDEX "company_request_isDeleted_createdAt_idx" ON "company_request" USING btree ("is_deleted","created_at");--> statement-breakpoint
@@ -598,12 +615,17 @@ CREATE UNIQUE INDEX "region_name_uidx" ON "region" USING btree ("name");--> stat
 CREATE INDEX "zone_regionId_idx" ON "zone" USING btree ("region_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "zone_regionId_name_uidx" ON "zone" USING btree ("region_id","name");--> statement-breakpoint
 CREATE INDEX "property_name_idx" ON "property" USING btree ("name");--> statement-breakpoint
+CREATE INDEX "property_organizationId_idx" ON "property" USING btree ("organization_id");--> statement-breakpoint
+CREATE INDEX "property_isDeleted_organizationId_idx" ON "property" USING btree ("is_deleted","organization_id");--> statement-breakpoint
 CREATE INDEX "property_superOwnerId_idx" ON "property" USING btree ("super_owner_id");--> statement-breakpoint
+CREATE INDEX "property_createdByUser_idx" ON "property" USING btree ("created_by_user");--> statement-breakpoint
 CREATE INDEX "property_type_idx" ON "property" USING btree ("type");--> statement-breakpoint
 CREATE INDEX "property_status_idx" ON "property" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "property_city_idx" ON "property" USING btree ("city");--> statement-breakpoint
 CREATE INDEX "property_pincode_idx" ON "property" USING btree ("pincode");--> statement-breakpoint
 CREATE INDEX "property_certificateStatus_idx" ON "property" USING btree ("certificate_status");--> statement-breakpoint
+CREATE INDEX "property_isDeleted_superOwnerId_idx" ON "property" USING btree ("is_deleted","super_owner_id");--> statement-breakpoint
+CREATE INDEX "property_isDeleted_createdByUser_idx" ON "property" USING btree ("is_deleted","created_by_user");--> statement-breakpoint
 CREATE INDEX "property_isDeleted_isPublished_createdAt_idx" ON "property" USING btree ("is_deleted","is_published","created_at");--> statement-breakpoint
 CREATE INDEX "property_media_propertyId_idx" ON "property_media" USING btree ("property_id");--> statement-breakpoint
 CREATE INDEX "property_media_propertyId_mediaType_idx" ON "property_media" USING btree ("property_id","media_type");--> statement-breakpoint

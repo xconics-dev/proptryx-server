@@ -43,7 +43,8 @@ function createBrokerRequestListFetcher(enableFuzzySearch: boolean) {
   >({
     db: getDB,
     table: broker_request,
-    where: eq(broker_request.isDeleted, false),
+    where: ({ params }) =>
+      params.includeDeleted ? undefined : eq(broker_request.isDeleted, false),
     search: {
       exact: [broker_request.id],
       prefix: [broker_request.email, broker_request.phoneNumber, broker_request.pincode],

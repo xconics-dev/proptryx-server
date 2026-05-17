@@ -23,6 +23,9 @@ export const CLIENT_IP_HEADER_CANDIDATES = [
   "cf-connecting-ip",
   "true-client-ip",
   "x-client-ip",
+  "fastly-client-ip",
+  "fly-client-ip",
+  "x-vercel-forwarded-for",
 ] as const;
 
 export const AUTH_SESSION_FORWARD_HEADERS = [
@@ -44,6 +47,11 @@ export function normalizeForwardedIp(value: string | undefined) {
     ?.trim()
     .replace(/^\[|\]$/g, "");
   if (!first) {
+    return undefined;
+  }
+
+  const normalized = first.toLowerCase();
+  if (normalized === "unknown" || normalized === "localhost") {
     return undefined;
   }
 

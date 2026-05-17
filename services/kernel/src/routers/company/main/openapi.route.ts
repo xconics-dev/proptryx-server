@@ -15,6 +15,7 @@ import {
   companyGstInfoSchema,
   companyListQuerySchema,
   companyListResponseSchema,
+  companyPermanentDeleteResultSchema,
   companySchema,
   companySettingsSchema,
   companyUpdateSchema,
@@ -160,6 +161,24 @@ export const remove = createOpenApiRoute({
   },
   responses: {
     200: createApiSuccessResponse(companySchema, "Company deleted successfully"),
+  },
+});
+
+export const remove_permanently = createOpenApiRoute({
+  method: "delete",
+  path: "/{id}/permanent",
+  operationId: "companyPermanentDeleteById",
+  tags,
+  middleware: [companyMethodsRateLimit, companyRequestRbac.custom("delete")],
+  summary: "Permanently delete a company with related users and properties",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      companyPermanentDeleteResultSchema,
+      "Company permanently deleted successfully"
+    ),
   },
 });
 

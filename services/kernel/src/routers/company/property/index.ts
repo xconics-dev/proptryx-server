@@ -1,1 +1,1 @@
-export { companyPropertyGroup } from "./handler";
+export { kernelCompanyPropertyGroup } from "./handler";

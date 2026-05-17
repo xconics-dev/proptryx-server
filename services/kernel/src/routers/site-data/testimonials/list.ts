@@ -1,6 +1,6 @@
-import { getDB, testimonial } from "@proptryx/database";
+import { getDB, property, propertyOwner, testimonial } from "@proptryx/database";
 import { createTableListFetcher } from "@proptryx/utils";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { TestimonialListQuery } from "./schema";
 
 export const fetchTestimonialList = createTableListFetcher<
@@ -10,7 +10,7 @@ export const fetchTestimonialList = createTableListFetcher<
 >({
   db: getDB,
   table: testimonial,
-  where: eq(testimonial.isDeleted, false),
+  where: ({ params }) => (params.includeDeleted ? undefined : eq(testimonial.isDeleted, false)),
   search: {
     exact: [testimonial.id],
     contains: [testimonial.authorName, testimonial.designation, testimonial.description],
@@ -18,6 +18,40 @@ export const fetchTestimonialList = createTableListFetcher<
   filterColumns: {
     isArchived: testimonial.isArchived,
     propertyId: testimonial.propertyId,
+    createdByUser: testimonial.createdByUser,
+  },
+  filters: {
+    propertyOrganizationId: {
+      build: ({ value }) => sql`exists (
+        select 1 from ${property}
+        where ${property.id} = ${testimonial.propertyId}
+        and ${property.isDeleted} = false
+        and ${property.organizationId} = ${String(value)}
+      )`,
+    },
+    propertyCreatedByUser: {
+      build: ({ value }) => sql`exists (
+        select 1 from ${property}
+        where ${property.id} = ${testimonial.propertyId}
+        and ${property.isDeleted} = false
+        and ${property.createdByUser} = ${String(value)}
+      )`,
+    },
+    propertyOwnerUserId: {
+      build: ({ value }) => sql`exists (
+        select 1 from ${property}
+        where ${property.id} = ${testimonial.propertyId}
+        and ${property.isDeleted} = false
+        and (
+          ${property.superOwnerId} = ${String(value)}
+          or exists (
+            select 1 from ${propertyOwner}
+            where ${propertyOwner.propertyId} = ${property.id}
+            and ${propertyOwner.userId} = ${String(value)}
+          )
+        )
+      )`,
+    },
   },
   sorting: {
     defaultBy: "createdAt",

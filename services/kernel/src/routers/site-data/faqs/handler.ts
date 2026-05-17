@@ -1,22 +1,46 @@
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { db, faq } from "@proptryx/database";
+import { db, DATABASE_RESOURCES, faq } from "@proptryx/database";
 import {
   createErrorResponse,
   createSuccessResponse,
+  generateRandomId,
   getBetterAuthContext,
+  getPermissionAccessLevel,
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
-import { create, get, list, remove, update } from "./openapi.route";
+import { create, get, list, remove, removePermanently, restore, update } from "./openapi.route";
 import { fetchFaqList } from "./list";
-import { findActivePropertyById, findFaqById } from "./utils";
+import {
+  applyFaqListAccessScope,
+  canAccessFaqRecord,
+  findAccessibleActivePropertyById,
+  findFaqById,
+  type SiteDataPropertyAccessContext,
+} from "./utils";
 
 export const faqsGroup = new OpenAPIHono<AppBindings>();
 
+function getPropertyAccessContext(c: Parameters<typeof getBetterAuthContext>[0]) {
+  const authContext = getBetterAuthContext(c);
+
+  return {
+    userId: authContext.user?.id ?? null,
+    panel: authContext.authorization.panel ?? authContext.user?.panel ?? null,
+    role: authContext.authorization.role ?? authContext.user?.role ?? null,
+    organizationId:
+      authContext.session?.activeOrganizationId ??
+      authContext.member?.organizationId ??
+      authContext.organization?.id ??
+      null,
+    accessLevel: getPermissionAccessLevel(authContext, DATABASE_RESOURCES.faq),
+  } satisfies SiteDataPropertyAccessContext;
+}
+
 registerOpenApiRoute(faqsGroup, list, async (c) => {
   const query = c.req.valid("query");
-  const response = await fetchFaqList(query);
+  const response = await fetchFaqList(applyFaqListAccessScope(query, getPropertyAccessContext(c)));
 
   return c.json(createSuccessResponse(response), 200);
 });
@@ -35,31 +59,41 @@ registerOpenApiRoute(faqsGroup, get, async (c) => {
     );
   }
 
+  if (!(await canAccessFaqRecord(faqData, getPropertyAccessContext(c)))) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No FAQ found with id ${id}`,
+      }),
+      404
+    );
+  }
+
   return c.json(createSuccessResponse(faqData), 200);
 });
 
 registerOpenApiRoute(faqsGroup, create, async (c) => {
   const body = c.req.valid("json");
   const { user } = getBetterAuthContext(c);
+  const accessContext = getPropertyAccessContext(c);
 
-  if (body.propertyId !== undefined && body.propertyId !== null) {
-    const linkedProperty = await findActivePropertyById(body.propertyId);
+  const linkedProperty = await findAccessibleActivePropertyById(body.propertyId, accessContext);
 
-    if (!linkedProperty) {
-      return c.json(
-        createErrorResponse({
-          error: "Not Found",
-          message: `No active property found with id ${body.propertyId}`,
-        }),
-        404
-      );
-    }
+  if (!linkedProperty) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No active property found with id ${body.propertyId}`,
+      }),
+      404
+    );
   }
 
   const [createdFaq] = await db
     .insert(faq)
     .values({
       ...body,
+      id: generateRandomId(),
       createdByUser: user?.id ?? null,
     })
     .returning();
@@ -71,6 +105,7 @@ registerOpenApiRoute(faqsGroup, update, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
   const { user } = getBetterAuthContext(c);
+  const accessContext = getPropertyAccessContext(c);
 
   const existingFaq = await findFaqById(id);
 
@@ -84,8 +119,18 @@ registerOpenApiRoute(faqsGroup, update, async (c) => {
     );
   }
 
-  if (body.propertyId !== undefined && body.propertyId !== null) {
-    const linkedProperty = await findActivePropertyById(body.propertyId);
+  if (!(await canAccessFaqRecord(existingFaq, accessContext))) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No FAQ found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (body.propertyId !== undefined) {
+    const linkedProperty = await findAccessibleActivePropertyById(body.propertyId, accessContext);
 
     if (!linkedProperty) {
       return c.json(
@@ -113,10 +158,21 @@ registerOpenApiRoute(faqsGroup, update, async (c) => {
 registerOpenApiRoute(faqsGroup, remove, async (c) => {
   const { id } = c.req.valid("param");
   const { user } = getBetterAuthContext(c);
+  const accessContext = getPropertyAccessContext(c);
 
   const existingFaq = await findFaqById(id, { includeDeleted: true });
 
   if (!existingFaq) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No FAQ found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!(await canAccessFaqRecord(existingFaq, accessContext))) {
     return c.json(
       createErrorResponse({
         error: "Not Found",
@@ -147,4 +203,89 @@ registerOpenApiRoute(faqsGroup, remove, async (c) => {
     .returning();
 
   return c.json(createSuccessResponse(deletedFaq), 200);
+});
+
+registerOpenApiRoute(faqsGroup, restore, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user } = getBetterAuthContext(c);
+  const accessContext = getPropertyAccessContext(c);
+  const existingFaq = await findFaqById(id, { includeDeleted: true });
+
+  if (!existingFaq) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No FAQ found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!(await canAccessFaqRecord(existingFaq, accessContext))) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No FAQ found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!existingFaq.isDeleted) {
+    return c.json(
+      createErrorResponse({
+        error: "Conflict",
+        message: `FAQ with id ${id} is already active.`,
+      }),
+      409
+    );
+  }
+
+  const [restoredFaq] = await db
+    .update(faq)
+    .set({
+      isDeleted: false,
+      deletedAt: null,
+      deletedByUser: null,
+      updatedByUser: user?.id ?? null,
+    })
+    .where(eq(faq.id, id))
+    .returning();
+
+  return c.json(createSuccessResponse(restoredFaq), 200);
+});
+
+registerOpenApiRoute(faqsGroup, removePermanently, async (c) => {
+  const { id } = c.req.valid("param");
+  const accessContext = getPropertyAccessContext(c);
+  const existingFaq = await findFaqById(id, { includeDeleted: true });
+
+  if (!existingFaq) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No FAQ found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  if (!(await canAccessFaqRecord(existingFaq, accessContext))) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: `No FAQ found with id ${id}`,
+      }),
+      404
+    );
+  }
+
+  await db.delete(faq).where(eq(faq.id, id));
+
+  return c.json(
+    createSuccessResponse({
+      message: "FAQ permanently deleted successfully",
+    }),
+    200
+  );
 });

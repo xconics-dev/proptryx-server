@@ -3,6 +3,7 @@ import { env } from "../config/env";
 export * from "./templates";
 export * from "./transporter";
 export * from "./static/const";
+export * from "./notifications";
 
 export const reactEmailApp = {
   templatesDirectory: "src/email/templates",

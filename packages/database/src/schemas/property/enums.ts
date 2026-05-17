@@ -25,9 +25,9 @@ export type PropertyStatus = (typeof PropertyStatus.enumValues)[number];
 export const AreaType = pgEnum("area_type", ["SINGLE", "SPLIT"]);
 export type AreaType = (typeof AreaType.enumValues)[number];
 
-/** How the property is being transacted */
-export const TransactionType = pgEnum("transaction_type", ["LEASE", "SALE", "LEASE_PURCHASE"]);
-export type TransactionType = (typeof TransactionType.enumValues)[number];
+/** How possession/transfer is being offered for the property or a split owner segment */
+export const HandoverType = pgEnum("handover_type", ["LEASE", "SALE", "LEASE_PURCHASE"]);
+export type HandoverType = (typeof HandoverType.enumValues)[number];
 
 /** Unit in which Price is expressed */
 export const PriceUnit = pgEnum("price_unit", ["PER_SQFT", "LUMP_SUM", "PER_MONTH"]);
@@ -60,7 +60,7 @@ export type PropertyOwnershipType = (typeof PropertyOwnershipType.enumValues)[nu
 
 // ─── Property Media ──────────────────────────────────────────────────────────
 
-export const PropertyMediaType = pgEnum("property_media_type", ["IMAGE", "DOCUMENT"]);
+export const PropertyMediaType = pgEnum("property_media_type", ["IMAGE", "VIDEO", "DOCUMENT"]);
 export type PropertyMediaType = (typeof PropertyMediaType.enumValues)[number];
 
 export const PropertyMediaVisibility = pgEnum("property_media_visibility", ["PUBLIC", "PRIVATE"]);

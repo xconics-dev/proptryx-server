@@ -45,7 +45,8 @@ function createCompanyRequestListFetcher(enableFuzzySearch: boolean) {
   >({
     db: getDB,
     table: company_request,
-    where: eq(company_request.isDeleted, false),
+    where: ({ params }) =>
+      params.includeDeleted ? undefined : eq(company_request.isDeleted, false),
     search: {
       exact: [company_request.id],
       prefix: [

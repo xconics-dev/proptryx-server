@@ -18,3 +18,7 @@ export const createCredentialAuthLink = ({
 
   return authUrl.toString();
 };
+
+export const formatString = (str: string) => {
+  return str.replace(/_/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+};

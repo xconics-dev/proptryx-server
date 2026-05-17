@@ -23,6 +23,11 @@ export const testimonialCreateSchema = createDbInsertSchema(testimonial, {
     "updatedByUser",
     "deletedByUser",
   ],
+  customizeSchema(schema) {
+    return schema.extend({
+      propertyId: zod.string("Invalid propertyId").trim().min(1, "Property id is required"),
+    });
+  },
 });
 
 export const testimonialUpdateSchema = createDbUpdateSchema(testimonial, {
@@ -36,6 +41,15 @@ export const testimonialUpdateSchema = createDbUpdateSchema(testimonial, {
     "updatedByUser",
     "deletedByUser",
   ],
+  customizeSchema(schema) {
+    return schema.extend({
+      propertyId: zod
+        .string("Invalid propertyId")
+        .trim()
+        .min(1, "Property id is required")
+        .optional(),
+    });
+  },
 });
 
 export const testimonialListSortFields = [
@@ -52,11 +66,20 @@ export const testimonialListSortFields = [
 export const testimonialListQuerySchema = createListQuerySchema({
   sortFields: testimonialListSortFields,
   extraShape: {
+    includeDeleted: optionalBooleanQuerySchema,
     isArchived: optionalBooleanQuerySchema,
     propertyId: zod.string().optional(),
+    createdByUser: zod.string().optional(),
+    propertyOrganizationId: zod.string().optional(),
+    propertyCreatedByUser: zod.string().optional(),
+    propertyOwnerUserId: zod.string().optional(),
   },
 });
 
 export type TestimonialListQuery = z.infer<typeof testimonialListQuerySchema>;
 
 export const testimonialListResponseSchema = createListResponseSchema(testimonialSchema);
+
+export const testimonialPermanentDeleteResultSchema = zod.object({
+  message: zod.string(),
+});

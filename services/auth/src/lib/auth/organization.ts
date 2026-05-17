@@ -2,23 +2,14 @@ import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
-import {
-  company_request,
-  gstCheckBodySchema,
-  gstInfoResponseSchema,
-  organization,
-} from "@proptryx/database";
+import { company_request, gstCheckBodySchema, organization } from "@proptryx/database";
+import { fetchGstInfoFromUpstream, GST_INVALID_MESSAGE } from "@proptryx/utils";
 import { and, eq } from "drizzle-orm";
 import { resolveAuthDatabase } from "./utils";
 
 const GST_REQUEST_EXISTS_MESSAGE =
   "A company request with this GST number has already been raised.";
 const GST_ORGANIZATION_EXISTS_MESSAGE = "A company with this GST number is already registered.";
-const GST_INVALID_MESSAGE = "GST number is invalid or inactive.";
-const GST_UNAVAILABLE_MESSAGE =
-  "GST verification is temporarily unavailable. Please try again in a moment.";
-const GST_UPSTREAM_TIMEOUT_MS = 8000;
-
 async function findGstConflict(gstNumber: string) {
   const db = resolveAuthDatabase();
 
@@ -85,47 +76,25 @@ const gstCheckEndpoint = createAuthEndpoint(
       });
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), GST_UPSTREAM_TIMEOUT_MS);
-    let payload: unknown;
+    const gstResult = await fetchGstInfoFromUpstream({
+      apiKey: env.GST_API_KEY,
+      gstNumber,
+    });
 
-    try {
-      const response = await fetch(
-        `http://sheet.gstincheck.co.in/check/${encodeURIComponent(env.GST_API_KEY)}/${encodeURIComponent(gstNumber)}`,
-        { signal: controller.signal }
-      );
-
-      payload = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new APIError("BAD_REQUEST", {
-          message: GST_INVALID_MESSAGE,
+    if (!gstResult.success) {
+      if (gstResult.status === 503) {
+        logger.error("[auth.organization.gst] GST upstream verification failed", {
+          gstNumber,
+          error: gstResult.cause instanceof Error ? gstResult.cause.stack : gstResult.cause,
         });
       }
-    } catch (error) {
-      if (error instanceof APIError) {
-        throw error;
-      }
 
-      logger.error("[auth.organization.gst] GST upstream verification failed", {
-        gstNumber,
-        error: error instanceof Error ? error.stack : error,
+      throw new APIError(gstResult.status === 400 ? "BAD_REQUEST" : "INTERNAL_SERVER_ERROR", {
+        message: gstResult.message,
       });
-
-      throw new APIError("INTERNAL_SERVER_ERROR", {
-        message: GST_UNAVAILABLE_MESSAGE,
-      });
-    } finally {
-      clearTimeout(timeout);
     }
 
-    const parsedPayload = gstInfoResponseSchema.safeParse(payload);
-
-    if (
-      !parsedPayload.success ||
-      !parsedPayload.data.flag ||
-      parsedPayload.data.data?.sts !== "Active"
-    ) {
+    if (!gstResult.data.flag || gstResult.data.data?.sts !== "Active") {
       throw new APIError("BAD_REQUEST", {
         message: GST_INVALID_MESSAGE,
       });
@@ -134,7 +103,7 @@ const gstCheckEndpoint = createAuthEndpoint(
     return ctx.json({
       success: true,
       message: "Company GST info fetched successfully.",
-      data: parsedPayload.data,
+      data: gstResult.data,
     });
   }
 );

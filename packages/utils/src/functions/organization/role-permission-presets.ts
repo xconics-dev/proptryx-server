@@ -1,6 +1,6 @@
 import { getRbacResourceMetadata, type RbacResourceScope } from "@proptryx/database";
 
-export type OrganizationRoleSlug = "owner" | "admin" | "executive";
+export type OrganizationRoleSlug = "owner" | "admin" | "executive" | "property_owner";
 export type RolePermissionAccessLevel = "company" | "user" | "all";
 type ManagedRolePermissionScope = RbacResourceScope;
 
@@ -32,19 +32,18 @@ const PROPTRYX_SCOPE: RbacResourceScope = "proptryx";
 const PROPTRYX_RESOURCE_METADATA = getRbacResourceMetadata(PROPTRYX_SCOPE);
 export const MANAGED_ACCOUNT_PERMISSION_RESOURCE = "account";
 export const MANAGED_ACCOUNT_PERMISSION_ACCESS_LEVEL = "user";
+export const MANAGED_SESSION_PERMISSION_RESOURCE = "session";
+export const MANAGED_SESSION_PERMISSION_ACCESS_LEVEL = "user";
 export const MANAGED_USER_PERMISSION_RESOURCE = "user";
 export const MANAGED_USER_PERMISSION_ACCESS_LEVEL = "user";
-const DEFAULT_COMPANY_MEMBER_BASE_RESOURCES = [
-  "account",
-  "member",
-  "organization",
-  "rbac_role",
-  "rbac_role_permission",
-  "region",
-  "user",
-  "zone",
-] as const;
-const EXECUTIVE_EXTRA_RESOURCES = ["faq", "meeting", "property", "testimonial"] as const;
+export const MANAGED_MEMBER_PERMISSION_RESOURCE = "member";
+export const MANAGED_MEMBER_PERMISSION_ACCESS_LEVEL = "user";
+const PROPERTY_PERMISSION_RESOURCE = "property";
+const PROPERTY_PERMISSION_ACCESS_LEVEL = "user";
+const PROPERTY_READ_ACTIONS: PermissionActionMap = {
+  get: true,
+  getAll: true,
+};
 
 const RESOURCE_ACTIONS = Object.freeze(
   Object.fromEntries(COMPANY_RESOURCE_METADATA.map((item) => [item.resource, item.actions]))
@@ -66,6 +65,10 @@ const MANAGED_ROLE_PERMISSIONS_BY_SCOPE: Record<
       accessLevel: MANAGED_ACCOUNT_PERMISSION_ACCESS_LEVEL,
     },
     {
+      resource: MANAGED_SESSION_PERMISSION_RESOURCE,
+      accessLevel: MANAGED_SESSION_PERMISSION_ACCESS_LEVEL,
+    },
+    {
       resource: MANAGED_USER_PERMISSION_RESOURCE,
       accessLevel: MANAGED_USER_PERMISSION_ACCESS_LEVEL,
     },
@@ -74,6 +77,14 @@ const MANAGED_ROLE_PERMISSIONS_BY_SCOPE: Record<
     {
       resource: MANAGED_ACCOUNT_PERMISSION_RESOURCE,
       accessLevel: MANAGED_ACCOUNT_PERMISSION_ACCESS_LEVEL,
+    },
+    {
+      resource: MANAGED_SESSION_PERMISSION_RESOURCE,
+      accessLevel: MANAGED_SESSION_PERMISSION_ACCESS_LEVEL,
+    },
+    {
+      resource: MANAGED_USER_PERMISSION_RESOURCE,
+      accessLevel: MANAGED_USER_PERMISSION_ACCESS_LEVEL,
     },
   ],
 };
@@ -158,15 +169,21 @@ const ROLE_RESOURCE_OVERRIDES: Record<
   {
     defaultAccessLevel: RolePermissionAccessLevel;
     defaultActions: (resource: string) => PermissionActionMap;
-    includeResources?: readonly string[];
+    includeAllResources?: boolean;
     resources?: Record<string, RoleResourceOverride>;
   }
 > = {
   owner: {
     defaultAccessLevel: "company",
     defaultActions: fullActions,
+    includeAllResources: true,
     resources: {
       [MANAGED_ACCOUNT_PERMISSION_RESOURCE]: getManagedRolePermission(COMPANY_SCOPE),
+      [MANAGED_SESSION_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_SESSION_PERMISSION_RESOURCE,
+        MANAGED_SESSION_PERMISSION_ACCESS_LEVEL
+      ),
       [MANAGED_USER_PERMISSION_RESOURCE]: buildManagedRolePermission(
         COMPANY_SCOPE,
         MANAGED_USER_PERMISSION_RESOURCE,
@@ -177,8 +194,14 @@ const ROLE_RESOURCE_OVERRIDES: Record<
   admin: {
     defaultAccessLevel: "company",
     defaultActions: fullActions,
+    includeAllResources: true,
     resources: {
       [MANAGED_ACCOUNT_PERMISSION_RESOURCE]: getManagedRolePermission(COMPANY_SCOPE),
+      [MANAGED_SESSION_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_SESSION_PERMISSION_RESOURCE,
+        MANAGED_SESSION_PERMISSION_ACCESS_LEVEL
+      ),
       [MANAGED_USER_PERMISSION_RESOURCE]: buildManagedRolePermission(
         COMPANY_SCOPE,
         MANAGED_USER_PERMISSION_RESOURCE,
@@ -187,16 +210,49 @@ const ROLE_RESOURCE_OVERRIDES: Record<
     },
   },
   executive: {
-    defaultAccessLevel: "company",
+    defaultAccessLevel: "user",
     defaultActions: fullActions,
-    includeResources: [...DEFAULT_COMPANY_MEMBER_BASE_RESOURCES, ...EXECUTIVE_EXTRA_RESOURCES],
     resources: {
       [MANAGED_ACCOUNT_PERMISSION_RESOURCE]: getManagedRolePermission(COMPANY_SCOPE),
+      [MANAGED_SESSION_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_SESSION_PERMISSION_RESOURCE,
+        MANAGED_SESSION_PERMISSION_ACCESS_LEVEL
+      ),
       [MANAGED_USER_PERMISSION_RESOURCE]: buildManagedRolePermission(
         COMPANY_SCOPE,
         MANAGED_USER_PERMISSION_RESOURCE,
         MANAGED_USER_PERMISSION_ACCESS_LEVEL
       ),
+      [PROPERTY_PERMISSION_RESOURCE]: {
+        accessLevel: PROPERTY_PERMISSION_ACCESS_LEVEL,
+        actions: fullActions(PROPERTY_PERMISSION_RESOURCE),
+      },
+    },
+  },
+  property_owner: {
+    defaultAccessLevel: "user",
+    defaultActions: fullActions,
+    resources: {
+      [MANAGED_ACCOUNT_PERMISSION_RESOURCE]: getManagedRolePermission(COMPANY_SCOPE),
+      [MANAGED_SESSION_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_SESSION_PERMISSION_RESOURCE,
+        MANAGED_SESSION_PERMISSION_ACCESS_LEVEL
+      ),
+      [MANAGED_USER_PERMISSION_RESOURCE]: buildManagedRolePermission(
+        COMPANY_SCOPE,
+        MANAGED_USER_PERMISSION_RESOURCE,
+        MANAGED_USER_PERMISSION_ACCESS_LEVEL
+      ),
+      [MANAGED_MEMBER_PERMISSION_RESOURCE]: {
+        accessLevel: MANAGED_MEMBER_PERMISSION_ACCESS_LEVEL,
+        actions: fullActions(MANAGED_MEMBER_PERMISSION_RESOURCE),
+      },
+      [PROPERTY_PERMISSION_RESOURCE]: {
+        accessLevel: PROPERTY_PERMISSION_ACCESS_LEVEL,
+        actions: PROPERTY_READ_ACTIONS,
+      },
     },
   },
 };
@@ -207,8 +263,9 @@ export const DEFAULT_ROLE_PERMISSION_PRESETS: readonly RolePreset[] = (
   >
 ).map(([roleSlug, rolePreset]) => ({
   role: roleSlug.toUpperCase() as Uppercase<OrganizationRoleSlug>,
-  permissions: COMPANY_RESOURCE_METADATA.filter((resourceMeta) =>
-    rolePreset.includeResources ? rolePreset.includeResources.includes(resourceMeta.resource) : true
+  permissions: COMPANY_RESOURCE_METADATA.filter(
+    (resourceMeta) =>
+      rolePreset.includeAllResources || rolePreset.resources?.[resourceMeta.resource]
   ).map((resourceMeta) => {
     const override = rolePreset.resources?.[resourceMeta.resource];
     return {

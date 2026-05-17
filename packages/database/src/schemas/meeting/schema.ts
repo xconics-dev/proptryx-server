@@ -7,7 +7,7 @@ export const meeting = pgTable(
   "meeting",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    type: MeetingType("type").default("MEETING").notNull(),
+    type: MeetingType("type").default("ONLINE").notNull(),
     status: MeetingStatus("status").default("REQUESTED").notNull(),
     agenda: text("agenda"), // before meeting note
     requestNote: text("request_note"),

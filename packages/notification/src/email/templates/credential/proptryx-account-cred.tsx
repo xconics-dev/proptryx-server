@@ -17,7 +17,7 @@ import EmailHeader from "../../components/email-header";
 import { CredentialsBox } from "../../components/credentials-box";
 import { EmailButton } from "../../components/email-button";
 import Footer from "../../components/footer";
-import { createCredentialAuthLink } from "./utils";
+import { createCredentialAuthLink, formatString } from "./utils";
 
 const defaultData = {
   previewText: "You're invited to join Proptryx!",
@@ -58,7 +58,7 @@ export const ProptryxAccountCredEmail = ({
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-4">Hello,</Text>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
                     Your Proptryx account has been successfully set up as a{" "}
-                    <span className="font-semibold text-fg">{role?.toUpperCase()}</span>.
+                    <span className="font-semibold text-fg">{formatString(role || "")}</span>.
                   </Text>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
                     Here's your Login Details:
