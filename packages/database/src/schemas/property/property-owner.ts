@@ -16,6 +16,7 @@ export const propertyOwner = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
 
     // Floor / area split — only populated when property.areaType = "SPLIT"
+    distributionBlockId: text("distribution_block_id"),
     floorNumber: text("floor_number"),
     allocatedAreaSqft: real("allocated_area_sqft"),
     /** Free-form label for the split segment, e.g. "North wing, floors 3–5" */

@@ -15,6 +15,14 @@ export type PropertyLocationMetadata = {
   };
 };
 
+export type PropertyAreaDistributionBlock = {
+  id: string;
+  label?: string | null;
+  floorNumber?: string | null;
+  areaSqft?: number | null;
+  description?: string | null;
+};
+
 export const defaultPropertyLocationMetadata: PropertyLocationMetadata = {
   distances: {
     airportKm: 0,
@@ -26,3 +34,4 @@ export const defaultPropertyLocationMetadata: PropertyLocationMetadata = {
 };
 
 export const defaultPropertyDocuments: PropertyDocument[] = [];
+export const defaultPropertyAreaDistribution: PropertyAreaDistributionBlock[] = [];

@@ -14,6 +14,7 @@ export const propertyOwnerTemporary = pgTable(
     email: text("email"),
     phoneNumber: text("phone_number"),
 
+    distributionBlockId: text("distribution_block_id"),
     floorNumber: text("floor_number"),
     allocatedAreaSqft: real("allocated_area_sqft"),
     areaDescription: text("area_description"),

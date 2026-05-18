@@ -54,6 +54,7 @@ export const propertySchema = createDbSelectSchema(property);
 
 const propertyOwnerTermsSchema = z.object({
   userId: z.string().min(1, "Owner user id is required"),
+  distributionBlockId: z.string().trim().min(1).nullable().optional(),
   floorNumber: z.string().trim().min(1).nullable().optional(),
   allocatedAreaSqft: z.number().nullable().optional(),
   areaDescription: z.string().trim().min(1).nullable().optional(),
@@ -91,6 +92,14 @@ const propertyMediaInputSchema = z.object({
   sortOrder: z.number().int().nullable().optional(),
   altText: z.string().trim().min(1).nullable().optional(),
   isThumbnail: z.boolean().optional(),
+});
+
+const propertyAreaDistributionBlockSchema = z.object({
+  id: z.string().trim().min(1, "Distribution block id is required"),
+  label: z.string().trim().min(1).nullable().optional(),
+  floorNumber: z.string().trim().min(1).nullable().optional(),
+  areaSqft: z.number().nullable().optional(),
+  description: z.string().trim().min(1).nullable().optional(),
 });
 
 const propertyMediaLimits: Record<(typeof PropertyMediaType.enumValues)[number], number> = {
@@ -164,6 +173,95 @@ const validateOwnerAllocatedArea = (
       message: `Owner allocations cannot exceed total area sqft (${totalAreaSqft}).`,
       path: ["ownerTerms"],
     });
+  }
+};
+
+const validatePropertyAreaDistribution = (
+  {
+    areaDistribution,
+    areaType,
+    ownerTerms,
+    temporaryOwnerTerms,
+    totalAreaSqft,
+  }: {
+    areaDistribution?: z.infer<typeof propertyAreaDistributionBlockSchema>[];
+    areaType?: string | null;
+    ownerTerms?: z.infer<typeof propertyOwnerTermsSchema>[];
+    temporaryOwnerTerms?: z.infer<typeof propertyTemporaryOwnerTermsSchema>[];
+    totalAreaSqft?: number | null;
+  },
+  ctx: z.RefinementCtx
+) => {
+  const blocks = areaDistribution ?? [];
+
+  if (areaType === "SPLIT" && blocks.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "At least one area distribution block is required for split properties.",
+      path: ["areaDistribution"],
+    });
+  }
+
+  const blockIds = new Set<string>();
+  const blockAreaById = new Map<string, number>();
+  let distributedArea = 0;
+
+  blocks.forEach((block, index) => {
+    if (blockIds.has(block.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Distribution block ids must be unique.",
+        path: ["areaDistribution", index, "id"],
+      });
+    }
+
+    blockIds.add(block.id);
+    const blockArea = block.areaSqft ?? 0;
+    blockAreaById.set(block.id, blockArea);
+    distributedArea += blockArea;
+  });
+
+  if (totalAreaSqft && totalAreaSqft > 0 && distributedArea > totalAreaSqft) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Area distribution cannot exceed total area sqft (${totalAreaSqft}).`,
+      path: ["areaDistribution"],
+    });
+  }
+
+  const allocatedAreaByBlockId = new Map<string, number>();
+
+  for (const ownerTerm of [...(ownerTerms ?? []), ...(temporaryOwnerTerms ?? [])]) {
+    if (!ownerTerm.distributionBlockId) {
+      continue;
+    }
+
+    if (!blockIds.has(ownerTerm.distributionBlockId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Owner allocation references unknown distribution block ${ownerTerm.distributionBlockId}.`,
+        path: ["ownerTerms"],
+      });
+      continue;
+    }
+
+    allocatedAreaByBlockId.set(
+      ownerTerm.distributionBlockId,
+      (allocatedAreaByBlockId.get(ownerTerm.distributionBlockId) ?? 0) +
+        (ownerTerm.allocatedAreaSqft ?? 0)
+    );
+  }
+
+  for (const [blockId, allocatedArea] of allocatedAreaByBlockId) {
+    const blockArea = blockAreaById.get(blockId) ?? 0;
+
+    if (blockArea > 0 && allocatedArea > blockArea) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Owner allocations for distribution block ${blockId} cannot exceed ${blockArea} sqft.`,
+        path: ["ownerTerms"],
+      });
+    }
   }
 };
 
@@ -246,6 +344,7 @@ export const propertyCreateSchema = createDbInsertSchema(property, {
 })
   .extend({
     coOwnerIds: z.array(z.string().min(1)).optional(),
+    areaDistribution: z.array(propertyAreaDistributionBlockSchema).optional(),
     ownerTerms: z.array(propertyOwnerTermsSchema).optional(),
     temporaryOwnerTerms: z.array(propertyTemporaryOwnerTermsSchema).optional(),
     mediaItems: z.array(propertyMediaInputSchema).optional(),
@@ -257,6 +356,7 @@ export const propertyCreateSchema = createDbInsertSchema(property, {
   .superRefine((value, ctx) => {
     validatePropertyMediaLimits(value.mediaItems, ctx);
     validateOwnerAllocatedArea(value, ctx);
+    validatePropertyAreaDistribution(value, ctx);
   });
 
 export const propertyUpdateSchema = createDbUpdateSchema(property, {
@@ -274,6 +374,7 @@ export const propertyUpdateSchema = createDbUpdateSchema(property, {
 })
   .extend({
     coOwnerIds: z.array(z.string().min(1)).optional(),
+    areaDistribution: z.array(propertyAreaDistributionBlockSchema).optional(),
     ownerTerms: z.array(propertyOwnerTermsSchema).optional(),
     temporaryOwnerTerms: z.array(propertyTemporaryOwnerTermsSchema).optional(),
     mediaItems: z.array(propertyMediaInputSchema).optional(),
@@ -285,6 +386,7 @@ export const propertyUpdateSchema = createDbUpdateSchema(property, {
   .superRefine((value, ctx) => {
     validatePropertyMediaLimits(value.mediaItems, ctx);
     validateOwnerAllocatedArea(value, ctx);
+    validatePropertyAreaDistribution(value, ctx);
   });
 
 export const propertyListSortFields = [

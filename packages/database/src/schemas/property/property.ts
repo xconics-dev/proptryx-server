@@ -31,7 +31,12 @@ import { propertyParking } from "./property-parking";
 import { propertyRetail } from "./property-retail";
 import { propertyWarehouse } from "./property-warehouse";
 import { propertyZone } from "./property-zone";
-import { defaultPropertyLocationMetadata, type PropertyLocationMetadata } from "./types";
+import {
+  defaultPropertyAreaDistribution,
+  defaultPropertyLocationMetadata,
+  type PropertyAreaDistributionBlock,
+  type PropertyLocationMetadata,
+} from "./types";
 
 const auditRelations = {
   property: createAuditRelationNames("property"),
@@ -80,6 +85,10 @@ export const property = pgTable(
     totalFloors: integer("total_floors"),
     /** SINGLE = one unit; SPLIT = divided floor/area-wise across multiple owners */
     areaType: AreaType("area_type").default("SINGLE").notNull(),
+    areaDistribution: jsonb("area_distribution")
+      .$type<PropertyAreaDistributionBlock[]>()
+      .default(defaultPropertyAreaDistribution)
+      .notNull(),
     /** Parent commercial defaults inherited by owner split terms when their values are null. */
     transactionType: HandoverType("transaction_type"),
     pricePerUnit: real("price_per_unit"),

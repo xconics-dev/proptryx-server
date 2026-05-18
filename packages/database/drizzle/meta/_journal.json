@@ -29,6 +29,13 @@
       "when": 1778932125042,
       "tag": "0003_workable_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779081300000,
+      "tag": "0004_property_area_distribution",
+      "breakpoints": true
     }
   ]
 }
