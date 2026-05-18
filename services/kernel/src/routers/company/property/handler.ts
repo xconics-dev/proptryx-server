@@ -289,7 +289,6 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
         normalizedOwnerTerms.map((ownerTerm) => ({
           propertyId: insertedProperty.id,
           userId: ownerTerm.userId,
-          distributionBlockId: ownerTerm.distributionBlockId ?? null,
           floorNumber: ownerTerm.floorNumber ?? null,
           allocatedAreaSqft: ownerTerm.allocatedAreaSqft ?? null,
           areaDescription: ownerTerm.areaDescription ?? null,
@@ -456,7 +455,6 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
           mergedOwnerTerms.map((ownerTerm) => ({
             propertyId: id,
             userId: ownerTerm.userId,
-            distributionBlockId: ownerTerm.distributionBlockId ?? null,
             floorNumber: ownerTerm.floorNumber ?? null,
             allocatedAreaSqft: ownerTerm.allocatedAreaSqft ?? null,
             areaDescription: ownerTerm.areaDescription ?? null,

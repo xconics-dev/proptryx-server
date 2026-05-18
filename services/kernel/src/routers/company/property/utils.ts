@@ -26,7 +26,6 @@ type PropertyReferenceInput = {
 
 export type PropertyOwnerTermsInput = {
   userId: string;
-  distributionBlockId?: string | null;
   floorNumber?: string | null;
   allocatedAreaSqft?: number | null;
   areaDescription?: string | null;
@@ -197,7 +196,6 @@ export async function attachPropertyRelations<TProperty extends PropertyRecord>(
               id: propertyOwner.id,
               propertyId: propertyOwner.propertyId,
               userId: propertyOwner.userId,
-              distributionBlockId: propertyOwner.distributionBlockId,
               floorNumber: propertyOwner.floorNumber,
               allocatedAreaSqft: propertyOwner.allocatedAreaSqft,
               areaDescription: propertyOwner.areaDescription,
@@ -272,7 +270,6 @@ export async function attachPropertyRelations<TProperty extends PropertyRecord>(
     existingTerms.push({
       id: row.id,
       userId: row.userId,
-      distributionBlockId: row.distributionBlockId,
       floorNumber: row.floorNumber,
       allocatedAreaSqft: row.allocatedAreaSqft,
       areaDescription: row.areaDescription,
@@ -292,7 +289,6 @@ export async function attachPropertyRelations<TProperty extends PropertyRecord>(
       name: row.name,
       email: row.email,
       phoneNumber: row.phoneNumber,
-      distributionBlockId: row.distributionBlockId,
       floorNumber: row.floorNumber,
       allocatedAreaSqft: row.allocatedAreaSqft,
       areaDescription: row.areaDescription,
@@ -476,7 +472,6 @@ export function normalizePropertyTemporaryOwnerTerms(
       name: ownerTerm.name.trim(),
       email: ownerTerm.email?.trim() || null,
       phoneNumber: ownerTerm.phoneNumber?.trim() || null,
-      distributionBlockId: ownerTerm.distributionBlockId?.trim() || null,
       floorNumber: ownerTerm.floorNumber?.trim() || null,
       areaDescription: ownerTerm.areaDescription?.trim() || null,
     }))
@@ -502,10 +497,6 @@ export function mergePropertyOwnerTermsWithExisting(
       ...ownerTerm,
       floorNumber:
         ownerTerm.floorNumber === undefined ? existingOwnerTerm.floorNumber : ownerTerm.floorNumber,
-      distributionBlockId:
-        ownerTerm.distributionBlockId === undefined
-          ? existingOwnerTerm.distributionBlockId
-          : ownerTerm.distributionBlockId,
       allocatedAreaSqft:
         ownerTerm.allocatedAreaSqft === undefined
           ? existingOwnerTerm.allocatedAreaSqft
@@ -616,7 +607,6 @@ export async function replacePropertyTemporaryOwnerTerms({
       name: ownerTerm.name,
       email: ownerTerm.email ?? null,
       phoneNumber: ownerTerm.phoneNumber ?? null,
-      distributionBlockId: ownerTerm.distributionBlockId ?? null,
       floorNumber: ownerTerm.floorNumber ?? null,
       allocatedAreaSqft: ownerTerm.allocatedAreaSqft ?? null,
       areaDescription: ownerTerm.areaDescription ?? null,
