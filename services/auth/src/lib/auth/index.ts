@@ -49,7 +49,7 @@ const {
 // Auth instance factory
 // ─────────────────────────────────────────────
 
-async function createAuthInstance() {
+async function createAuthInstance(): Promise<BetterAuthInstance> {
   // Resolve DB once — reuse across all hooks in this closure
   const db = resolveAuthDatabase();
   const userStatusCache = resolveAuthUserStatusCache();
@@ -461,8 +461,10 @@ export async function warmAuth() {
   await initializeAuthInstance();
 }
 
-export async function getAuth() {
+export async function getAuth(): Promise<BetterAuthInstance> {
   return initializeAuthInstance();
 }
 
-export type BetterAuthInstance = Awaited<ReturnType<typeof createAuthInstance>>;
+export type BetterAuthInstance = {
+  handler: (request: Request) => Response | Promise<Response>;
+};
