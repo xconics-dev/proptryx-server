@@ -9,8 +9,8 @@ import {
   subscriptionPlans,
   user,
 } from "@proptryx/database";
-import { createTableListFetcher } from "@proptryx/utils";
-import { and, count, countDistinct, eq, inArray, or, sql } from "drizzle-orm";
+import { createTableListFetcher, resolveDateRangeBoundary } from "@proptryx/utils";
+import { and, count, countDistinct, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import type { CompanyListQuery } from "./schema";
 
 const ACTIVE_SUBSCRIPTION_STATUSES = [
@@ -99,6 +99,26 @@ const fetchCompanyBaseList = createTableListFetcher<
     industry: organization.industry,
   },
   filters: {
+    startDate: {
+      build: ({ params, value }) => {
+        const date = resolveDateRangeBoundary({
+          boundary: "start",
+          timeZone: params.timeZone,
+          value,
+        });
+        return date ? gte(organization.createdAt, date) : undefined;
+      },
+    },
+    endDate: {
+      build: ({ params, value }) => {
+        const date = resolveDateRangeBoundary({
+          boundary: "end",
+          timeZone: params.timeZone,
+          value,
+        });
+        return date ? lte(organization.createdAt, date) : undefined;
+      },
+    },
     subscriptionPlanId: {
       build: ({ value }) =>
         and(

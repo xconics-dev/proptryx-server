@@ -1,6 +1,6 @@
 import { getDB, property, propertyOwner } from "@proptryx/database";
-import { createTableListFetcher } from "@proptryx/utils";
-import { eq, sql } from "drizzle-orm";
+import { createTableListFetcher, resolveDateRangeBoundary } from "@proptryx/utils";
+import { gte, eq, lte, sql } from "drizzle-orm";
 import type { PropertyListQuery } from "./schema";
 
 export const fetchPropertyList = createTableListFetcher<
@@ -36,6 +36,26 @@ export const fetchPropertyList = createTableListFetcher<
     isVerified: property.isVerified,
   },
   filters: {
+    startDate: {
+      build: ({ params, value }) => {
+        const date = resolveDateRangeBoundary({
+          boundary: "start",
+          timeZone: params.timeZone,
+          value,
+        });
+        return date ? gte(property.createdAt, date) : undefined;
+      },
+    },
+    endDate: {
+      build: ({ params, value }) => {
+        const date = resolveDateRangeBoundary({
+          boundary: "end",
+          timeZone: params.timeZone,
+          value,
+        });
+        return date ? lte(property.createdAt, date) : undefined;
+      },
+    },
     ownUserId: {
       build: ({ value }) => sql`(
         ${property.createdByUser} = ${String(value)}

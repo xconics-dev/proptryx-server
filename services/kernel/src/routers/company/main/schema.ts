@@ -182,6 +182,9 @@ export const companyListQuerySchema = createListQuerySchema({
     companyType: z.string().optional(),
     industry: z.string().optional(),
     subscriptionPlanId: z.string().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    timeZone: z.string().optional(),
   },
 });
 export type CompanyListQuery = z.infer<typeof companyListQuerySchema>;

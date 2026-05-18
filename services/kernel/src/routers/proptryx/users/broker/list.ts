@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Drizzle query builders are intentionally passed through reusable helpers. */
 import { broker_request, getDB, region, user, zone } from "@proptryx/database";
-import { createTableListFetcher } from "@proptryx/utils";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { createTableListFetcher, resolveDateRangeBoundary } from "@proptryx/utils";
+import { and, eq, gte, lte, ne, sql } from "drizzle-orm";
 import type { ScopedProptryxBrokerUserListQuery } from "./schema";
 
 function proptryxBrokerUserListJoins(queryBuilder: any) {
@@ -50,6 +50,28 @@ export const fetchProptryxBrokerUserList = createTableListFetcher<
   filterColumns: {
     zoneId: user.zoneId,
     regionId: zone.regionId,
+  },
+  filters: {
+    startDate: {
+      build: ({ params, value }) => {
+        const date = resolveDateRangeBoundary({
+          boundary: "start",
+          timeZone: params.timeZone,
+          value,
+        });
+        return date ? gte(user.createdAt, date) : undefined;
+      },
+    },
+    endDate: {
+      build: ({ params, value }) => {
+        const date = resolveDateRangeBoundary({
+          boundary: "end",
+          timeZone: params.timeZone,
+          value,
+        });
+        return date ? lte(user.createdAt, date) : undefined;
+      },
+    },
   },
   sorting: {
     defaultBy: "createdAt",

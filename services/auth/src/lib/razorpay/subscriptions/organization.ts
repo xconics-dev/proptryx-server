@@ -3,6 +3,7 @@ import * as crypto from "node:crypto";
 import * as schema from "@proptryx/database";
 import { getOrganizationSubscriptionLimits } from "@proptryx/database";
 import { emailSubject, renderCompleteSubscriptionEmail, sendEmail } from "@proptryx/notification";
+import { resolveDateRangeBoundary } from "@proptryx/utils";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
 import { eq, and, or, gte, lte, ilike, count, asc, desc } from "drizzle-orm";
@@ -1483,13 +1484,24 @@ const listSubscriptionsEndpoint = createAuthEndpoint(
       organizationId,
       planCode,
       billingPeriod,
-      createdFrom,
-      createdTo,
+      startDate,
+      endDate,
+      timeZone,
       sortBy,
       sortOrder: sortDir,
     } = ctx.query;
 
     const offset = (page - 1) * limit;
+    const startDateBoundary = resolveDateRangeBoundary({
+      boundary: "start",
+      timeZone,
+      value: startDate,
+    });
+    const endDateBoundary = resolveDateRangeBoundary({
+      boundary: "end",
+      timeZone,
+      value: endDate,
+    });
 
     const conditions = [
       eq(schema.organizationSubscription.isDeleted, false),
@@ -1499,8 +1511,10 @@ const listSubscriptionsEndpoint = createAuthEndpoint(
         : undefined,
       planCode ? eq(schema.organizationSubscription.planCode, planCode) : undefined,
       billingPeriod ? eq(schema.organizationSubscription.billingPeriod, billingPeriod) : undefined,
-      createdFrom ? gte(schema.organizationSubscription.createdAt, createdFrom) : undefined,
-      createdTo ? lte(schema.organizationSubscription.createdAt, createdTo) : undefined,
+      startDateBoundary
+        ? gte(schema.organizationSubscription.createdAt, startDateBoundary)
+        : undefined,
+      endDateBoundary ? lte(schema.organizationSubscription.createdAt, endDateBoundary) : undefined,
       search
         ? or(
             ilike(schema.organization.name, `%${search}%`),

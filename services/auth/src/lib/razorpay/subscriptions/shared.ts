@@ -526,8 +526,9 @@ export const listSubscriptionsQuerySchema = z.object({
   organizationId: z.string().optional(),
   planCode: z.string().optional(),
   billingPeriod: z.enum(["monthly", "yearly"]).optional(),
-  createdFrom: z.coerce.date().optional(),
-  createdTo: z.coerce.date().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  timeZone: z.string().optional(),
   sortBy: z.enum(["createdAt", "updatedAt", "status", "paidCount"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });

@@ -108,6 +108,7 @@ export {
 } from "./functions/list-query";
 export { PasswordUtils, generateRandomPassword } from "./functions/password";
 export { encryptPassword, decryptPassword } from "./functions/encrypt";
+export { resolveDateRangeBoundary } from "./functions/date-range";
 export {
   buildOrganizationLimitDeniedMessage,
   checkCurrentOrganizationLimit,
