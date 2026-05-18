@@ -93,6 +93,14 @@ const propertyMediaInputSchema = z.object({
   isThumbnail: z.boolean().optional(),
 });
 
+const propertyAreaDistributionBlockSchema = z.object({
+  id: z.string().trim().min(1, "Distribution block id is required"),
+  label: z.string().trim().min(1).nullable().optional(),
+  floorNumber: z.string().trim().min(1).nullable().optional(),
+  areaSqft: z.number().nullable().optional(),
+  description: z.string().trim().min(1).nullable().optional(),
+});
+
 const propertyMediaLimits: Record<(typeof PropertyMediaType.enumValues)[number], number> = {
   DOCUMENT: 11,
   IMAGE: 12,
@@ -163,6 +171,53 @@ const validateOwnerAllocatedArea = (
       code: z.ZodIssueCode.custom,
       message: `Owner allocations cannot exceed total area sqft (${totalAreaSqft}).`,
       path: ["ownerTerms"],
+    });
+  }
+};
+
+const validatePropertyAreaDistribution = (
+  {
+    areaDistribution,
+    areaType,
+    totalAreaSqft,
+  }: {
+    areaDistribution?: z.infer<typeof propertyAreaDistributionBlockSchema>[];
+    areaType?: string | null;
+    totalAreaSqft?: number | null;
+  },
+  ctx: z.RefinementCtx
+) => {
+  const blocks = areaDistribution ?? [];
+
+  if (areaType === "SPLIT" && blocks.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "At least one area distribution block is required for split properties.",
+      path: ["areaDistribution"],
+    });
+  }
+
+  const blockIds = new Set<string>();
+  let distributedArea = 0;
+
+  blocks.forEach((block, index) => {
+    if (blockIds.has(block.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Distribution block ids must be unique.",
+        path: ["areaDistribution", index, "id"],
+      });
+    }
+
+    blockIds.add(block.id);
+    distributedArea += block.areaSqft ?? 0;
+  });
+
+  if (totalAreaSqft && totalAreaSqft > 0 && distributedArea > totalAreaSqft) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Area distribution cannot exceed total area sqft (${totalAreaSqft}).`,
+      path: ["areaDistribution"],
     });
   }
 };
@@ -258,6 +313,7 @@ export const propertyCreateSchema = createDbInsertSchema(property, {
 })
   .extend({
     coOwnerIds: z.array(z.string().min(1)).optional(),
+    areaDistribution: z.array(propertyAreaDistributionBlockSchema).optional(),
     ownerTerms: z.array(propertyOwnerTermsSchema).optional(),
     temporaryOwnerTerms: z.array(propertyTemporaryOwnerTermsSchema).optional(),
     mediaItems: z.array(propertyMediaInputSchema).optional(),
@@ -269,6 +325,7 @@ export const propertyCreateSchema = createDbInsertSchema(property, {
   .superRefine((value, ctx) => {
     validatePropertyMediaLimits(value.mediaItems, ctx);
     validateOwnerAllocatedArea(value, ctx);
+    validatePropertyAreaDistribution(value, ctx);
   });
 
 export const propertyUpdateSchema = createDbUpdateSchema(property, {
@@ -285,6 +342,7 @@ export const propertyUpdateSchema = createDbUpdateSchema(property, {
 })
   .extend({
     coOwnerIds: z.array(z.string().min(1)).optional(),
+    areaDistribution: z.array(propertyAreaDistributionBlockSchema).optional(),
     ownerTerms: z.array(propertyOwnerTermsSchema).optional(),
     temporaryOwnerTerms: z.array(propertyTemporaryOwnerTermsSchema).optional(),
     mediaItems: z.array(propertyMediaInputSchema).optional(),
@@ -296,6 +354,7 @@ export const propertyUpdateSchema = createDbUpdateSchema(property, {
   .superRefine((value, ctx) => {
     validatePropertyMediaLimits(value.mediaItems, ctx);
     validateOwnerAllocatedArea(value, ctx);
+    validatePropertyAreaDistribution(value, ctx);
   });
 
 export const propertyListSortFields = [
@@ -321,6 +380,9 @@ export const propertyListQuerySchema = createListQuerySchema({
     status: z.enum(PropertyStatus.enumValues).optional(),
     city: z.string().optional(),
     state: z.string().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    timeZone: z.string().optional(),
     isPublished: optionalBooleanQuerySchema,
     isOperational: optionalBooleanQuerySchema,
     isVerified: optionalBooleanQuerySchema,

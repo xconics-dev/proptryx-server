@@ -75,6 +75,9 @@ export const proptryxBrokerUserListQuerySchema = createListQuerySchema({
   extraShape: {
     zoneId: z.string().optional(),
     regionId: z.string().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    timeZone: z.string().optional(),
   },
 });
 
