@@ -23,8 +23,8 @@ export const RBAC_ACTIONS = {
   search: "search",
   terminate: "terminate",
   subscription: "subscription",
-  unpublish: "unpublish",
   update: "update",
+  verify: "verify",
   view: "view",
 } as const;
 export type RbacAction =

@@ -25,7 +25,6 @@ export const fetchPropertyList = createTableListFetcher<
   },
   filterColumns: {
     organizationId: property.organizationId,
-    createdByUser: property.createdByUser,
     superOwnerId: property.superOwnerId,
     type: property.type,
     status: property.status,
@@ -36,6 +35,12 @@ export const fetchPropertyList = createTableListFetcher<
     isVerified: property.isVerified,
   },
   filters: {
+    createdByUser: {
+      build: ({ value }) => sql`(
+        ${property.createdByUser} = ${String(value)}
+        or ${property.superOwnerId} = ${String(value)}
+      )`,
+    },
     startDate: {
       build: ({ params, value }) => {
         const date = resolveDateRangeBoundary({
