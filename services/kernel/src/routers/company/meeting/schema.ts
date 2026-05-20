@@ -124,6 +124,19 @@ export const meetingScheduleSchema = z.object({
     .nullable()
     .optional()
     .describe("Occupier user assigned for the scheduled meeting"),
+  syncGoogle: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Create or update the connected user's Google Meet and Calendar event"),
+  googleDurationMinutes: z
+    .number()
+    .int()
+    .min(15)
+    .max(480)
+    .optional()
+    .default(60)
+    .describe("Duration used for Google Calendar event creation"),
 });
 
 export const meetingConfirmSchema = z.object({
@@ -159,6 +172,36 @@ export const meetingPublishMomSchema = z.object({
 });
 
 export const meetingLifecycleResponseSchema = meetingDetailSchema;
+
+export const googleCalendarEventsQuerySchema = z.object({
+  timeMin: z.coerce.date().describe("Inclusive lower date-time bound for calendar events"),
+  timeMax: z.coerce.date().describe("Exclusive upper date-time bound for calendar events"),
+  query: z.string().optional().describe("Optional Google Calendar free text search"),
+  maxResults: z.coerce.number().int().min(1).max(250).optional().default(50),
+});
+
+export const googleCalendarEventSchema = z.object({
+  id: z.string(),
+  summary: z.string().nullable(),
+  description: z.string().nullable(),
+  htmlLink: z.string().nullable(),
+  location: z.string().nullable(),
+  status: z.string().nullable(),
+  start: z.string().nullable(),
+  end: z.string().nullable(),
+});
+
+export const googleCalendarEventsResponseSchema = z.object({
+  items: z.array(googleCalendarEventSchema),
+  nextPageToken: z.string().nullable(),
+});
+
+export const meetingGoogleSyncSchema = z.object({
+  durationMinutes: z.number().int().min(15).max(480).optional().default(60),
+  summary: z.string().min(1).optional(),
+  description: z.string().optional(),
+  force: z.boolean().optional().default(false),
+});
 
 export const meetingListSortFields = [
   "id",

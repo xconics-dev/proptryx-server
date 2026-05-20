@@ -1,7 +1,8 @@
 import type { BetterAuthPlugin } from "better-auth";
 import { APIError } from "better-auth";
-import { createAuthMiddleware } from "better-auth/api";
-import { eq } from "drizzle-orm";
+import { createAuthEndpoint, createAuthMiddleware, sessionMiddleware } from "better-auth/api";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
 import * as schema from "@proptryx/database";
 import { type UserFields, userFields } from "./fields/user";
 import { resolveAuthDatabase, resolveEmailExistsCache } from "./utils";
@@ -105,5 +106,90 @@ export const emailOtpGuardPlugin = {
         }),
       },
     ],
+  },
+} satisfies BetterAuthPlugin;
+
+const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+const GOOGLE_MEET_SCOPE = "https://www.googleapis.com/auth/meetings.space.created";
+
+const googleDisconnectScopeEndpoint = createAuthEndpoint(
+  "/google/disconnect-scope",
+  {
+    method: "POST",
+    body: z.object({
+      accountId: z.string().min(1),
+      scope: z.enum(["calendar", "meet"]),
+    }),
+    use: [sessionMiddleware],
+    metadata: {
+      openapi: {
+        summary: "Disconnect Google scope",
+        description:
+          "Removes a Google Calendar or Meet scope from the signed-in user's linked account.",
+        responses: {
+          200: {
+            description: "Google scope disconnected successfully",
+          },
+        },
+      },
+    },
+  },
+  async (ctx) => {
+    const session = ctx.context.session as { user?: { id?: string } } | undefined;
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      throw new APIError("UNAUTHORIZED", {
+        message: "Authentication required.",
+      });
+    }
+
+    const targetScope = ctx.body.scope === "calendar" ? GOOGLE_CALENDAR_SCOPE : GOOGLE_MEET_SCOPE;
+    const db = resolveAuthDatabase();
+    const [googleAccount] = await db
+      .select({
+        id: schema.account.id,
+        scope: schema.account.scope,
+      })
+      .from(schema.account)
+      .where(
+        and(
+          eq(schema.account.userId, userId),
+          eq(schema.account.providerId, "google"),
+          eq(schema.account.accountId, ctx.body.accountId)
+        )
+      )
+      .limit(1);
+
+    if (!googleAccount) {
+      throw new APIError("NOT_FOUND", {
+        message: "Google account not found.",
+      });
+    }
+
+    const nextScopes = (googleAccount.scope ?? "")
+      .split(",")
+      .map((scope) => scope.trim())
+      .filter((scope) => scope.length > 0 && scope !== targetScope);
+
+    await db
+      .update(schema.account)
+      .set({
+        scope: nextScopes.length > 0 ? nextScopes.join(",") : null,
+      })
+      .where(eq(schema.account.id, googleAccount.id));
+
+    return ctx.json({
+      success: true,
+      disconnectedScope: targetScope,
+      scopes: nextScopes,
+    });
+  }
+);
+
+export const googleAccountControlsPlugin = {
+  id: "google-account-controls",
+  endpoints: {
+    googleDisconnectScope: googleDisconnectScopeEndpoint,
   },
 } satisfies BetterAuthPlugin;

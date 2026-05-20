@@ -32,6 +32,7 @@ export const user = pgTable(
     banExpires: timestamp("ban_expires"),
     phoneNumber: text("phone_number"),
     phoneNumberVerified: boolean("phone_number_verified").default(false),
+    twoFactorEnabled: boolean("two_factor_enabled").default(false),
 
     // For Kepp Reference
     deletedAt: timestamp("deleted_at"),
@@ -57,6 +58,23 @@ export const user = pgTable(
     index("user_role_idx").on(table.role),
     index("user_panel_idx").on(table.panel),
     index("user_zoneId_idx").on(table.zoneId),
+  ]
+);
+
+export const twoFactor = pgTable(
+  "twoFactor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verified: boolean("verified").default(true),
+  },
+  (table) => [
+    index("twoFactor_secret_idx").on(table.secret),
+    index("twoFactor_userId_idx").on(table.userId),
   ]
 );
 

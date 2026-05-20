@@ -2,7 +2,7 @@
 import { dash } from "@better-auth/infra";
 import { APIError, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { customSession, emailOTP, openAPI, phoneNumber } from "better-auth/plugins";
+import { customSession, emailOTP, openAPI, phoneNumber, twoFactor } from "better-auth/plugins";
 import { admin } from "better-auth/plugins/admin";
 import { bearer } from "better-auth/plugins/bearer";
 import { multiSession } from "better-auth/plugins/multi-session";
@@ -13,6 +13,7 @@ import {
   renderPasswordResetOtpEmail,
   sendEmail,
   emailSubject,
+  renderTwoFactorCodeEmail,
 } from "@proptryx/notification";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
@@ -28,7 +29,11 @@ import {
 import { organizationSubscriptionPlugin, subscriptionPlansPlugin } from "../razorpay/subscriptions";
 import { organizationControlsPlugin } from "./organization";
 import { generateRandomId, generateUID, PasswordUtils } from "@proptryx/utils";
-import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
+import {
+  allowCustomInputFieldsPlugin,
+  emailOtpGuardPlugin,
+  googleAccountControlsPlugin,
+} from "./plugin";
 import { and, eq, isNull } from "drizzle-orm";
 import { createAuthMiddleware } from "better-auth/api";
 
@@ -94,6 +99,23 @@ async function createAuthInstance(): Promise<BetterAuthInstance> {
         verify: ({ password, hash }) => PasswordUtils.verify(password, hash),
       },
     },
+    socialProviders: {
+      google: {
+        clientId: env.GOOGLE_OAUTH_CLIENT_ID,
+        clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
+        accessType: "offline",
+        prompt: "select_account consent",
+      },
+    },
+    account: {
+      updateAccountOnSignIn: true,
+      accountLinking: {
+        enabled: true,
+        disableImplicitLinking: true,
+        allowDifferentEmails: true,
+        trustedProviders: ["google"],
+      },
+    },
     emailVerification: {
       sendOnSignUp: false,
       autoSignInAfterVerification: true,
@@ -143,6 +165,7 @@ async function createAuthInstance(): Promise<BetterAuthInstance> {
         },
       }),
       organizationControlsPlugin,
+      googleAccountControlsPlugin,
       subscriptionPlansPlugin,
       organizationSubscriptionPlugin,
       admin({
@@ -159,6 +182,7 @@ async function createAuthInstance(): Promise<BetterAuthInstance> {
           role?: string | null;
           panel?: string | null;
           zoneId?: string | null;
+          twoFactorEnabled?: boolean | null;
         };
 
         const cachedUser = await userStatusCache.get(sessionUser.id);
@@ -174,6 +198,7 @@ async function createAuthInstance(): Promise<BetterAuthInstance> {
                 role: schema.user.role,
                 panel: schema.user.panel,
                 zoneId: schema.user.zoneId,
+                twoFactorEnabled: schema.user.twoFactorEnabled,
                 updatedAt: schema.user.updatedAt,
               })
               .from(schema.user)
@@ -191,6 +216,7 @@ async function createAuthInstance(): Promise<BetterAuthInstance> {
               role: dbUser.role,
               panel: dbUser.panel,
               zoneId: dbUser.zoneId,
+              twoFactorEnabled: Boolean(dbUser.twoFactorEnabled),
               updatedAt: dbUser.updatedAt.toISOString(),
             };
 
@@ -211,6 +237,7 @@ async function createAuthInstance(): Promise<BetterAuthInstance> {
           role: liveUser?.role ?? sessionUser.role,
           panel: liveUser?.panel ?? sessionUser.panel,
           zoneId: liveUser?.zoneId ?? sessionUser.zoneId,
+          twoFactorEnabled: liveUser?.twoFactorEnabled ?? Boolean(sessionUser.twoFactorEnabled),
         };
 
         const location = await resolveUserZone(userWithTags.zoneId);
@@ -327,11 +354,29 @@ async function createAuthInstance(): Promise<BetterAuthInstance> {
           }
         },
       }),
+
+      // Two factor
+
+      twoFactor({
+        issuer: "Proptryx",
+        otpOptions: {
+          async sendOTP({ user, otp }) {
+            await sendEmail({
+              to: user.email,
+              subject: `${emailSubject["two-factor-code"].subject}`,
+              html: await renderTwoFactorCodeEmail({
+                otpCode: otp,
+                previewText: emailSubject["two-factor-code"].previewText,
+              }),
+            });
+          },
+        },
+      }),
     ],
     rateLimit: {
       enabled: true,
       window: 60,
-      max: 100,
+      max: 200,
       customRules: {
         "/sign-in/email": { window: 60, max: 20 },
         "/sign-up/email": { window: 60, max: 20 },
@@ -383,6 +428,38 @@ async function createAuthInstance(): Promise<BetterAuthInstance> {
       after: createAuthMiddleware(async (ctx) => {
         const path = ctx.path;
         const returned = ctx.context.returned;
+        const returnedUserId =
+          returned &&
+          typeof returned === "object" &&
+          "user" in returned &&
+          returned.user &&
+          typeof returned.user === "object" &&
+          "id" in returned.user
+            ? (returned.user.id as string)
+            : null;
+        const sessionUserId = (ctx.context.session as { user?: { id?: string } } | undefined)?.user
+          ?.id;
+        const twoFactorUserId = returnedUserId ?? sessionUserId ?? null;
+
+        if (
+          twoFactorUserId &&
+          (path === "/two-factor/verify-totp" || path === "/two-factor/verify-otp")
+        ) {
+          await db
+            .update(schema.user)
+            .set({ twoFactorEnabled: true })
+            .where(eq(schema.user.id, twoFactorUserId));
+          await userStatusCache.del(twoFactorUserId);
+        }
+
+        if (twoFactorUserId && path === "/two-factor/disable") {
+          await db
+            .update(schema.user)
+            .set({ twoFactorEnabled: false })
+            .where(eq(schema.user.id, twoFactorUserId));
+          await userStatusCache.del(twoFactorUserId);
+        }
+
         const isAuthPath =
           path === "/sign-in/email" ||
           path === "/sign-up/email" ||
@@ -412,6 +489,7 @@ async function createAuthInstance(): Promise<BetterAuthInstance> {
               ban: schema.user.banReason,
               zoneId: schema.user.zoneId,
               panel: schema.user.panel,
+              twoFactorEnabled: schema.user.twoFactorEnabled,
             })
             .from(schema.user)
             .leftJoin(schema.member, eq(schema.user.id, schema.member.userId))

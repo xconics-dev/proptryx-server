@@ -38,6 +38,10 @@ export const emailSubject: Record<string, EmailSubPrev> = {
     subject: "Complete Your Proptryx Subscription Purchase",
     previewText: "Confirm purchase to activate your Proptryx Account",
   },
+  "two-factor-code": {
+    subject: "Your Proptryx Two-Factor Verification Code",
+    previewText: "Your Proptryx two-factor verification code",
+  },
 
   // credentials emails
   "account-credentials": {

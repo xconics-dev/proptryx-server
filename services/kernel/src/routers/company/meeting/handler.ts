@@ -16,6 +16,8 @@ import {
   confirm,
   create,
   get,
+  googleCalendarEvents,
+  googleSync,
   list,
   publishMom,
   reject,
@@ -24,6 +26,7 @@ import {
   start,
   update,
 } from "./openapi.route";
+import { GoogleWorkspaceError, listGoogleCalendarEvents, syncMeetingWithGoogle } from "./google";
 import { fetchMeetingList } from "./list";
 import {
   attachMeetingRelations,
@@ -83,6 +86,44 @@ registerOpenApiRoute(meetingGroup, list, async (c) => {
   const items = await attachMeetingRelations(response.items);
 
   return c.json(createSuccessResponse({ ...response, items }), 200);
+});
+
+registerOpenApiRoute(meetingGroup, googleCalendarEvents, async (c) => {
+  const query = c.req.valid("query");
+  const authContext = getBetterAuthContext(c);
+
+  if (!authContext.user?.id) {
+    return c.json(
+      createErrorResponse({
+        error: "Unauthorized",
+        message: "Authenticated user is required to read Google Calendar events.",
+      }),
+      401
+    );
+  }
+
+  try {
+    const events = await listGoogleCalendarEvents({
+      userId: authContext.user.id,
+      headers: c.req.raw.headers,
+      timeMin: query.timeMin,
+      timeMax: query.timeMax,
+      query: query.query,
+      maxResults: query.maxResults,
+    });
+
+    return c.json(createSuccessResponse(events), 200);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch Google Calendar events.";
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message,
+      }),
+      error instanceof GoogleWorkspaceError && error.status === 401 ? 401 : 400
+    );
+  }
 });
 
 registerOpenApiRoute(meetingGroup, get, async (c) => {
@@ -291,7 +332,79 @@ registerOpenApiRoute(meetingGroup, schedule, async (c) => {
 
   const meetingData = await findMeetingByIdWithRelations(id);
 
+  if (meetingData && body.syncGoogle !== false && user?.id) {
+    try {
+      const syncedMeeting = await syncMeetingWithGoogle({
+        meetingData,
+        userId: user.id,
+        headers: c.req.raw.headers,
+        durationMinutes: body.googleDurationMinutes,
+      });
+
+      return c.json(createSuccessResponse(syncedMeeting), 200);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Meeting scheduled but Google sync failed.";
+      return c.json(
+        createErrorResponse({
+          error: "Bad Request",
+          message,
+        }),
+        error instanceof GoogleWorkspaceError && error.status === 401 ? 401 : 400
+      );
+    }
+  }
+
   return c.json(createSuccessResponse(meetingData ?? existingMeeting), 200);
+});
+
+registerOpenApiRoute(meetingGroup, googleSync, async (c) => {
+  const { id } = c.req.valid("param");
+  const body = c.req.valid("json");
+  const scopedMeeting = await resolveScopedMeeting(c, id);
+
+  if (scopedMeeting.errorResponse) {
+    return scopedMeeting.errorResponse;
+  }
+
+  const { user } = getBetterAuthContext(c);
+
+  if (!user?.id) {
+    return c.json(
+      createErrorResponse({
+        error: "Unauthorized",
+        message: "Authenticated user is required to sync Google Meeting.",
+      }),
+      401
+    );
+  }
+
+  try {
+    const syncedMeeting = await syncMeetingWithGoogle({
+      meetingData: scopedMeeting.meetingData,
+      userId: user.id,
+      headers: c.req.raw.headers,
+      durationMinutes: body.durationMinutes,
+      summary: body.summary,
+      description: body.description,
+      force: body.force,
+    });
+
+    return c.json(createSuccessResponse(syncedMeeting), 200);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to sync meeting with Google.";
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message,
+      }),
+      error instanceof GoogleWorkspaceError && error.status === 404
+        ? 404
+        : error instanceof GoogleWorkspaceError && error.status === 401
+          ? 401
+          : 400
+    );
+  }
 });
 
 registerOpenApiRoute(meetingGroup, confirm, async (c) => {

@@ -18,6 +18,7 @@ import {
   organizationSubscription,
   session,
   subscriptionPlans,
+  twoFactor,
   user,
 } from "./schema";
 import { rbacRole } from "./rbac/schema";
@@ -53,6 +54,7 @@ export const userRelations = relations(user, ({ many, one }) => {
   return {
     accounts: many(account),
     sessions: many(session),
+    twoFactors: many(twoFactor),
     members: many(member, {
       relationName: memberUserRelationName,
     }),
@@ -191,6 +193,13 @@ export const userRelations = relations(user, ({ many, one }) => {
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const twoFactorRelations = relations(twoFactor, ({ one }) => ({
+  user: one(user, {
+    fields: [twoFactor.userId],
     references: [user.id],
   }),
 }));

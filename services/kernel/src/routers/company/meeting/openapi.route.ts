@@ -11,12 +11,15 @@ import {
   IdStringParamSchema,
 } from "@proptryx/utils";
 import {
+  googleCalendarEventsQuerySchema,
+  googleCalendarEventsResponseSchema,
   meetingCancelSchema,
   meetingCompleteSchema,
   meetingConfirmSchema,
   meetingCreateSchema,
   meetingDetailSchema,
   meetingGetQuerySchema,
+  meetingGoogleSyncSchema,
   meetingLifecycleResponseSchema,
   meetingListQuerySchema,
   meetingListResponseSchema,
@@ -26,7 +29,7 @@ import {
   meetingUpdateSchema,
 } from "./schema";
 
-const tags = ["Company Meetings"];
+const tags = ["Meetings"];
 
 const meetingRbac = createResourceRbacGuards({
   resource: DATABASE_RESOURCES.meeting,
@@ -67,6 +70,25 @@ export const get = createOpenApiRoute({
   responses: {
     200: createApiSuccessResponse(meetingDetailSchema, "Meeting fetched successfully"),
     404: ApiNotFoundOpenApi,
+  },
+});
+
+export const googleCalendarEvents = createOpenApiRoute({
+  method: "get",
+  path: "/google/calendar-events",
+  operationId: "kernelCompanyMeetingGoogleCalendarEvents",
+  tags,
+  middleware: [meetingMethodsRateLimit, meetingRbac.custom("getAll")],
+  summary: "List connected Google Calendar events",
+  request: {
+    query: googleCalendarEventsQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      googleCalendarEventsResponseSchema,
+      "Google Calendar events fetched successfully"
+    ),
+    400: ApiBadRequestOpenApi,
   },
 });
 
@@ -144,6 +166,27 @@ export const schedule = createOpenApiRoute({
     200: createApiSuccessResponse(
       meetingLifecycleResponseSchema,
       "Meeting request accepted and scheduled successfully"
+    ),
+    400: ApiBadRequestOpenApi,
+    404: ApiNotFoundOpenApi,
+  },
+});
+
+export const googleSync = createOpenApiRoute({
+  method: "post",
+  path: "/{id}/google-sync",
+  operationId: "kernelCompanyMeetingGoogleSync",
+  tags,
+  middleware: [meetingMethodsRateLimit, meetingRbac.custom("update")],
+  summary: "Create or update Google Meet and Calendar event",
+  request: {
+    params: IdStringParamSchema(),
+    body: createApiJsonBody(meetingGoogleSyncSchema),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      meetingLifecycleResponseSchema,
+      "Meeting synced with Google successfully"
     ),
     400: ApiBadRequestOpenApi,
     404: ApiNotFoundOpenApi,

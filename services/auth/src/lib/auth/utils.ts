@@ -15,6 +15,7 @@ export type CachedAuthUserStatus = {
   role: string | null;
   panel: string | null;
   zoneId: string | null;
+  twoFactorEnabled: boolean;
   updatedAt: string;
 };
 
