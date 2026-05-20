@@ -24,7 +24,14 @@ const optionalCookieDomainSchema = z
   });
 
 const optionalCookieSameSiteSchema = z
-  .enum(["lax", "strict", "none"])
+  .preprocess((value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const normalizedValue = value.trim().toLowerCase();
+    return normalizedValue.length > 0 ? normalizedValue : undefined;
+  }, z.enum(["lax", "strict", "none"]).optional())
   .optional()
   .transform((value) => value ?? undefined);
 
