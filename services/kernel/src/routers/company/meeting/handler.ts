@@ -8,7 +8,6 @@ import {
   getBetterAuthContext,
   getPermissionAccessLevel,
   registerOpenApiRoute,
-  resolveCurrentOrganizationAccess,
 } from "@proptryx/utils";
 import { eq } from "drizzle-orm";
 import {
@@ -41,61 +40,20 @@ import {
 
 export const meetingGroup = new OpenAPIHono<AppBindings>();
 
-function resolveCurrentOrganizationContext(c: Context<AppBindings>) {
-  const authCheck = resolveCurrentOrganizationAccess(c);
-  const organizationId = authCheck.organizationId;
-
-  if (!organizationId) {
-    return {
-      errorResponse: c.json(
-        createErrorResponse({
-          error: "Unauthorized",
-          message: "Required organization member access",
-        }),
-        401
-      ),
-      organizationId: null,
-      user: authCheck.user,
-      authContext: authCheck.authContext,
-    };
-  }
-
-  return {
-    errorResponse: null,
-    organizationId,
-    user: authCheck.user,
-    authContext: authCheck.authContext,
-  };
-}
-
-function hasUserLevelMeetingAccess(scopedOrganization: {
-  authContext: ReturnType<typeof resolveCurrentOrganizationAccess>["authContext"];
-}) {
-  return (
-    getPermissionAccessLevel(scopedOrganization.authContext, DATABASE_RESOURCES.meeting) === "user"
-  );
+function hasUserLevelMeetingAccess(c: Context<AppBindings>) {
+  return getPermissionAccessLevel(getBetterAuthContext(c), DATABASE_RESOURCES.meeting) === "user";
 }
 
 async function resolveScopedMeeting(c: Context<AppBindings>, id: string, includeDeleted = false) {
-  const scopedOrganization = resolveCurrentOrganizationContext(c);
-
-  if (scopedOrganization.errorResponse) {
-    return {
-      errorResponse: scopedOrganization.errorResponse,
-      meetingData: null,
-      scopedOrganization,
-    };
-  }
+  const authContext = getBetterAuthContext(c);
 
   const meetingData = await findMeetingById(id, {
     includeDeleted,
-    organizationId: scopedOrganization.organizationId,
   });
 
   if (
     !meetingData ||
-    (hasUserLevelMeetingAccess(scopedOrganization) &&
-      !canAccessMeetingAsUser(meetingData, scopedOrganization.user?.id))
+    (hasUserLevelMeetingAccess(c) && !canAccessMeetingAsUser(meetingData, authContext.user?.id))
   ) {
     return {
       errorResponse: c.json(
@@ -106,30 +64,23 @@ async function resolveScopedMeeting(c: Context<AppBindings>, id: string, include
         404
       ),
       meetingData: null,
-      scopedOrganization,
     };
   }
 
   return {
     errorResponse: null,
     meetingData,
-    scopedOrganization,
   };
 }
 
 registerOpenApiRoute(meetingGroup, list, async (c) => {
   const query = c.req.valid("query");
-  const scopedOrganization = resolveCurrentOrganizationContext(c);
-
-  if (scopedOrganization.errorResponse) {
-    return scopedOrganization.errorResponse;
-  }
+  const authContext = getBetterAuthContext(c);
 
   const response = await fetchMeetingList({
     ...query,
-    organizationId: scopedOrganization.organizationId,
-    ownUserId: hasUserLevelMeetingAccess(scopedOrganization)
-      ? (scopedOrganization.user?.id ?? "__none__")
+    ownUserId: hasUserLevelMeetingAccess(c)
+      ? (authContext.user?.id ?? "__none__")
       : query.ownUserId,
   });
   const items = await attachMeetingRelations(response.items);
@@ -139,13 +90,9 @@ registerOpenApiRoute(meetingGroup, list, async (c) => {
 
 registerOpenApiRoute(meetingGroup, googleCalendarEvents, async (c) => {
   const query = c.req.valid("query");
-  const scopedOrganization = resolveCurrentOrganizationContext(c);
+  const authContext = getBetterAuthContext(c);
 
-  if (scopedOrganization.errorResponse) {
-    return scopedOrganization.errorResponse;
-  }
-
-  if (!scopedOrganization.user?.id) {
+  if (!authContext.user?.id) {
     return c.json(
       createErrorResponse({
         error: "Unauthorized",
@@ -157,7 +104,7 @@ registerOpenApiRoute(meetingGroup, googleCalendarEvents, async (c) => {
 
   try {
     const events = await listGoogleCalendarEvents({
-      userId: scopedOrganization.user.id,
+      userId: authContext.user.id,
       headers: c.req.raw.headers,
       timeMin: query.timeMin,
       timeMax: query.timeMax,
@@ -182,21 +129,15 @@ registerOpenApiRoute(meetingGroup, googleCalendarEvents, async (c) => {
 registerOpenApiRoute(meetingGroup, get, async (c) => {
   const { id } = c.req.valid("param");
   const query = c.req.valid("query");
-  const scopedOrganization = resolveCurrentOrganizationContext(c);
-
-  if (scopedOrganization.errorResponse) {
-    return scopedOrganization.errorResponse;
-  }
+  const authContext = getBetterAuthContext(c);
 
   const meetingData = await findMeetingByIdWithRelations(id, {
     includeDeleted: query.includeDeleted,
-    organizationId: scopedOrganization.organizationId,
   });
 
   if (
     !meetingData ||
-    (hasUserLevelMeetingAccess(scopedOrganization) &&
-      !canAccessMeetingAsUser(meetingData, scopedOrganization.user?.id))
+    (hasUserLevelMeetingAccess(c) && !canAccessMeetingAsUser(meetingData, authContext.user?.id))
   ) {
     return c.json(
       createErrorResponse({
@@ -212,19 +153,12 @@ registerOpenApiRoute(meetingGroup, get, async (c) => {
 
 registerOpenApiRoute(meetingGroup, create, async (c) => {
   const body = c.req.valid("json");
-  const scopedOrganization = resolveCurrentOrganizationContext(c);
-
-  if (scopedOrganization.errorResponse) {
-    return scopedOrganization.errorResponse;
-  }
-
   const { user } = getBetterAuthContext(c);
   const requestedByUser =
     body.requestedByUser === undefined ? (user?.id ?? null) : body.requestedByUser;
 
   const referenceValidation = await validateMeetingReferences({
     propertyId: body.propertyId,
-    organizationId: scopedOrganization.organizationId,
     developerId: body.developerId,
     occupierId: body.occupierId,
     requestedByUser,
@@ -260,33 +194,16 @@ registerOpenApiRoute(meetingGroup, update, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
   const { user } = getBetterAuthContext(c);
-  const scopedOrganization = resolveCurrentOrganizationContext(c);
+  const scopedMeeting = await resolveScopedMeeting(c, id);
 
-  if (scopedOrganization.errorResponse) {
-    return scopedOrganization.errorResponse;
+  if (scopedMeeting.errorResponse) {
+    return scopedMeeting.errorResponse;
   }
 
-  const existingMeeting = await findMeetingById(id, {
-    organizationId: scopedOrganization.organizationId,
-  });
-
-  if (
-    !existingMeeting ||
-    (hasUserLevelMeetingAccess(scopedOrganization) &&
-      !canAccessMeetingAsUser(existingMeeting, scopedOrganization.user?.id))
-  ) {
-    return c.json(
-      createErrorResponse({
-        error: "Not Found",
-        message: `No meeting found with id ${id}`,
-      }),
-      404
-    );
-  }
+  const existingMeeting = scopedMeeting.meetingData;
 
   const referenceValidation = await validateMeetingReferences({
     propertyId: body.propertyId,
-    organizationId: scopedOrganization.organizationId,
     developerId: body.developerId,
     occupierId: body.occupierId,
     requestedByUser: body.requestedByUser,
@@ -321,30 +238,13 @@ registerOpenApiRoute(meetingGroup, update, async (c) => {
 registerOpenApiRoute(meetingGroup, remove, async (c) => {
   const { id } = c.req.valid("param");
   const { user } = getBetterAuthContext(c);
-  const scopedOrganization = resolveCurrentOrganizationContext(c);
+  const scopedMeeting = await resolveScopedMeeting(c, id, true);
 
-  if (scopedOrganization.errorResponse) {
-    return scopedOrganization.errorResponse;
+  if (scopedMeeting.errorResponse) {
+    return scopedMeeting.errorResponse;
   }
 
-  const existingMeeting = await findMeetingById(id, {
-    includeDeleted: true,
-    organizationId: scopedOrganization.organizationId,
-  });
-
-  if (
-    !existingMeeting ||
-    (hasUserLevelMeetingAccess(scopedOrganization) &&
-      !canAccessMeetingAsUser(existingMeeting, scopedOrganization.user?.id))
-  ) {
-    return c.json(
-      createErrorResponse({
-        error: "Not Found",
-        message: `No meeting found with id ${id}`,
-      }),
-      404
-    );
-  }
+  const existingMeeting = scopedMeeting.meetingData;
 
   if (existingMeeting.isDeleted) {
     return c.json(

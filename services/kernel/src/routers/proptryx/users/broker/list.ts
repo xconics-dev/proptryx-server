@@ -44,7 +44,7 @@ export const fetchProptryxBrokerUserList = createTableListFetcher<
       sql`EXISTS (
         SELECT 1 FROM ${broker_request}
         WHERE lower(trim(${broker_request.email})) = lower(trim(${user.email}))
-          AND ${broker_request.pincode} ILIKE ${"%" + searchTerm + "%"}
+          AND ${broker_request.pincode} ILIKE ${`%${searchTerm}%`}
       )`,
   },
   filterColumns: {

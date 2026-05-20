@@ -24,6 +24,11 @@ export const meeting = pgTable(
     cancelledAt: timestamp("cancelled_at"),
     cancellationReason: text("cancellation_reason"),
     momPublishedAt: timestamp("mom_published_at"),
+    googleCalendarEventId: text("google_calendar_event_id"),
+    googleCalendarEventLink: text("google_calendar_event_link"),
+    googleMeetSpaceName: text("google_meet_space_name"),
+    googleMeetUri: text("google_meet_uri"),
+    googleSyncedAt: timestamp("google_synced_at"),
 
     // relations
     developerId: text("developer_id").references(() => user.id, {
@@ -66,6 +71,7 @@ export const meeting = pgTable(
     index("meeting_status_idx").on(table.status),
     index("meeting_requestedAt_idx").on(table.requestedAt),
     index("meeting_scheduledAt_idx").on(table.scheduledAt),
+    index("meeting_googleCalendarEventId_idx").on(table.googleCalendarEventId),
     index("meeting_isDeleted_type_status_requestedAt_idx").on(
       table.isDeleted,
       table.type,

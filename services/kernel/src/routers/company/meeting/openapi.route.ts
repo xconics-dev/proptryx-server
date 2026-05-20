@@ -44,7 +44,7 @@ const meetingMethodsRateLimit = createOperationalRateLimit({
 export const list = createOpenApiRoute({
   method: "get",
   path: "/list",
-  operationId: "meetingList",
+  operationId: "kernelCompanyMeetingList",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("getAll")],
   summary: "List meetings",
@@ -59,7 +59,7 @@ export const list = createOpenApiRoute({
 export const get = createOpenApiRoute({
   method: "get",
   path: "/{id}",
-  operationId: "meetingGetById",
+  operationId: "kernelCompanyMeetingGetById",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.get],
   summary: "Get a meeting by ID",
@@ -76,7 +76,7 @@ export const get = createOpenApiRoute({
 export const googleCalendarEvents = createOpenApiRoute({
   method: "get",
   path: "/google/calendar-events",
-  operationId: "meetingGoogleCalendarEvents",
+  operationId: "kernelCompanyMeetingGoogleCalendarEvents",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("getAll")],
   summary: "List connected Google Calendar events",
@@ -96,7 +96,7 @@ export const googleCalendarEvents = createOpenApiRoute({
 export const create = createOpenApiRoute({
   method: "post",
   path: "/",
-  operationId: "meetingCreate",
+  operationId: "kernelCompanyMeetingCreate",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("create")],
   summary: "Create Meeting Request",
@@ -114,7 +114,7 @@ export const create = createOpenApiRoute({
 export const update = createOpenApiRoute({
   method: "patch",
   path: "/{id}",
-  operationId: "meetingUpdateById",
+  operationId: "kernelCompanyMeetingUpdateById",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("update")],
   summary: "Update Meeting Request Details",
@@ -134,7 +134,7 @@ export const update = createOpenApiRoute({
 export const remove = createOpenApiRoute({
   method: "delete",
   path: "/{id}",
-  operationId: "meetingDeleteById",
+  operationId: "kernelCompanyMeetingDeleteById",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("delete")],
   summary: "Soft delete a meeting by ID",
@@ -152,7 +152,7 @@ export const remove = createOpenApiRoute({
 export const schedule = createOpenApiRoute({
   method: "post",
   path: "/{id}/schedule",
-  operationId: "meetingSchedule",
+  operationId: "kernelCompanyMeetingSchedule",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("update")],
   summary: "Accept / Schedule Meeting Request",
@@ -175,7 +175,7 @@ export const schedule = createOpenApiRoute({
 export const googleSync = createOpenApiRoute({
   method: "post",
   path: "/{id}/google-sync",
-  operationId: "meetingGoogleSync",
+  operationId: "kernelCompanyMeetingGoogleSync",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("update")],
   summary: "Create or update Google Meet and Calendar event",
@@ -196,7 +196,7 @@ export const googleSync = createOpenApiRoute({
 export const confirm = createOpenApiRoute({
   method: "post",
   path: "/{id}/confirm",
-  operationId: "meetingConfirm",
+  operationId: "kernelCompanyMeetingConfirm",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("update")],
   summary: "Confirm Scheduled Meeting",
@@ -215,7 +215,7 @@ export const confirm = createOpenApiRoute({
 export const start = createOpenApiRoute({
   method: "post",
   path: "/{id}/start",
-  operationId: "meetingStart",
+  operationId: "kernelCompanyMeetingStart",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("update")],
   summary: "Mark a meeting as in progress",
@@ -235,7 +235,7 @@ export const start = createOpenApiRoute({
 export const complete = createOpenApiRoute({
   method: "post",
   path: "/{id}/complete",
-  operationId: "meetingComplete",
+  operationId: "kernelCompanyMeetingComplete",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("update")],
   summary: "Complete a meeting",
@@ -253,7 +253,7 @@ export const complete = createOpenApiRoute({
 export const cancel = createOpenApiRoute({
   method: "post",
   path: "/{id}/cancel",
-  operationId: "meetingCancel",
+  operationId: "kernelCompanyMeetingCancel",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("update")],
   summary: "Cancel a meeting",
@@ -271,7 +271,7 @@ export const cancel = createOpenApiRoute({
 export const reject = createOpenApiRoute({
   method: "post",
   path: "/{id}/reject",
-  operationId: "meetingReject",
+  operationId: "kernelCompanyMeetingReject",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("update")],
   summary: "Reject Meeting Request",
@@ -291,7 +291,7 @@ export const reject = createOpenApiRoute({
 export const publishMom = createOpenApiRoute({
   method: "post",
   path: "/{id}/publish-mom",
-  operationId: "meetingPublishMom",
+  operationId: "kernelCompanyMeetingPublishMom",
   tags,
   middleware: [meetingMethodsRateLimit, meetingRbac.custom("publish")],
   summary: "Publish minutes of meeting",

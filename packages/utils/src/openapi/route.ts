@@ -35,8 +35,8 @@ type RequestPart<R extends RouteConfig, Part extends string> =
   R["request"] extends Record<string, unknown>
     ? Part extends keyof R["request"]
       ? R["request"][Part]
-      : {}
-    : {};
+      : Record<string, never>
+    : Record<string, never>;
 
 type HasUndefined<T> = undefined extends T ? true : false;
 
@@ -64,7 +64,7 @@ type InputTypeBase<
           [K in Target]: import("zod").output<RequestPart<R, Part>>;
         };
       }
-    : {};
+    : Record<string, never>;
 
 type InputTypeJson<R extends RouteConfig> = R["request"] extends {
   body?: {
@@ -80,8 +80,8 @@ type InputTypeJson<R extends RouteConfig> = R["request"] extends {
           json: import("zod").output<Content[keyof Content]["schema"]>;
         };
       }
-    : {}
-  : {};
+    : Record<string, never>
+  : Record<string, never>;
 
 type InputTypeForm<R extends RouteConfig> = R["request"] extends {
   body?: {
@@ -97,8 +97,8 @@ type InputTypeForm<R extends RouteConfig> = R["request"] extends {
           form: import("zod").output<Content[keyof Content]["schema"]>;
         };
       }
-    : {}
-  : {};
+    : Record<string, never>
+  : Record<string, never>;
 
 type InputTypeParam<R extends RouteConfig> = InputTypeBase<R, "params", "param">;
 type InputTypeQuery<R extends RouteConfig> = InputTypeBase<R, "query", "query">;

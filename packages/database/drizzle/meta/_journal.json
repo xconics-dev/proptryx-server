@@ -43,6 +43,20 @@
       "when": 1779100200000,
       "tag": "0005_remove_distribution_block_id",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779186880752,
+      "tag": "0006_cooing_harrier",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779258267418,
+      "tag": "0007_tense_cerebro",
+      "breakpoints": true
     }
   ]
 }

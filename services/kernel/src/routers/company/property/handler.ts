@@ -19,6 +19,7 @@ import {
   generateRandomId,
   getBetterAuthContext,
   getPermissionAccessLevel,
+  hasPermission,
   registerOpenApiRoute,
 } from "@proptryx/utils";
 import { and, eq } from "drizzle-orm";
@@ -62,6 +63,67 @@ function getPropertyAccessLevel(c: Parameters<typeof getBetterAuthContext>[0]) {
   return getPermissionAccessLevel(getBetterAuthContext(c), DATABASE_RESOURCES.property);
 }
 
+function getPropertyUpdatePermissionError({
+  authContext,
+  existingProperty,
+  updateBody,
+}: {
+  authContext: ReturnType<typeof getBetterAuthContext>;
+  existingProperty: typeof property.$inferSelect;
+  updateBody: Record<string, unknown>;
+}) {
+  const canUpdateProperty = hasPermission(authContext, {
+    resource: DATABASE_RESOURCES.property,
+    action: "update",
+  });
+
+  if (canUpdateProperty) {
+    return null;
+  }
+
+  const definedKeys = Object.entries(updateBody)
+    .filter(([, value]) => value !== undefined)
+    .map(([key]) => key);
+  const statusActionKeys = new Set(["isPublished", "isVerified"]);
+  const generalUpdateKeys = definedKeys.filter((key) => !statusActionKeys.has(key));
+
+  if (generalUpdateKeys.length > 0) {
+    return {
+      action: "update",
+      fields: generalUpdateKeys,
+    };
+  }
+
+  const isPublishedChanged =
+    typeof updateBody.isPublished === "boolean" &&
+    updateBody.isPublished !== existingProperty.isPublished;
+  const isVerifiedChanged =
+    typeof updateBody.isVerified === "boolean" &&
+    updateBody.isVerified !== existingProperty.isVerified;
+
+  if (
+    isPublishedChanged &&
+    !hasPermission(authContext, { resource: DATABASE_RESOURCES.property, action: "publish" })
+  ) {
+    return {
+      action: "publish",
+      fields: ["isPublished"],
+    };
+  }
+
+  if (
+    isVerifiedChanged &&
+    !hasPermission(authContext, { resource: DATABASE_RESOURCES.property, action: "verify" })
+  ) {
+    return {
+      action: "verify",
+      fields: ["isVerified"],
+    };
+  }
+
+  return null;
+}
+
 async function canAccessPropertyAsCurrentUser(
   propertyData: Pick<typeof property.$inferSelect, "id" | "createdByUser" | "superOwnerId">,
   userId?: string | null
@@ -85,14 +147,41 @@ async function canAccessPropertyAsCurrentUser(
 }
 
 function hasEMandateMedia(mediaItems?: import("./utils").PropertyMediaInput[]) {
-  return (mediaItems ?? []).some(
-    (mediaItem) =>
-      mediaItem.mediaType === "DOCUMENT" &&
-      mediaItem.mimeType === "application/pdf" &&
-      (mediaItem.altText === E_MANDATE_MEDIA_ALT_TEXT ||
-        mediaItem.name.trim().toLowerCase() === E_MANDATE_MEDIA_NAME.toLowerCase() ||
-        mediaItem.storageKey.includes("/e-mandate/"))
+  return (mediaItems ?? []).some((mediaItem) => isEMandateMedia(mediaItem));
+}
+
+function isEMandateMedia(mediaItem: import("./utils").PropertyMediaInput) {
+  return (
+    mediaItem.mediaType === "DOCUMENT" &&
+    mediaItem.mimeType === "application/pdf" &&
+    (mediaItem.altText === E_MANDATE_MEDIA_ALT_TEXT ||
+      mediaItem.name.trim().toLowerCase() === E_MANDATE_MEDIA_NAME.toLowerCase() ||
+      mediaItem.storageKey.includes("/e-mandate/"))
   );
+}
+
+function normalizeBrokerEMandateVisibility(
+  mediaItems: import("./utils").PropertyMediaInput[] | undefined,
+  existingMediaItems: import("./utils").PropertyMediaInput[] = []
+) {
+  if (mediaItems === undefined) {
+    return undefined;
+  }
+
+  return mediaItems.map((mediaItem) => {
+    if (!isEMandateMedia(mediaItem)) {
+      return mediaItem;
+    }
+
+    const existingMediaItem = existingMediaItems.find(
+      (item) => item.storageKey === mediaItem.storageKey || item.url === mediaItem.url
+    );
+
+    return {
+      ...mediaItem,
+      visibility: existingMediaItem?.visibility ?? "PRIVATE",
+    };
+  });
 }
 
 async function getOrganizationOwnerRecipients(organizationId: string) {
@@ -216,18 +305,52 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
     warehouseDetails?: import("./utils").PropertyTypeDetailsInput["warehouseDetails"];
     parkingDetails?: import("./utils").PropertyTypeDetailsInput["parkingDetails"];
   };
-  const { user: currentUser } = getBetterAuthContext(c);
+  const authContext = getBetterAuthContext(c);
+  const { user: currentUser } = authContext;
   const isBrokerUser =
     currentUser?.panel === "proptryx" && currentUser.role?.trim().toLowerCase() === "broker";
   const companyPanelOrganizationId = getCompanyPanelOrganizationId(c);
+  const effectiveSuperOwnerId = isBrokerUser
+    ? (currentUser?.id ?? null)
+    : propertyBody.superOwnerId;
   const effectivePropertyBody = {
     ...propertyBody,
     organizationId: isBrokerUser
       ? null
       : (companyPanelOrganizationId ?? propertyBody.organizationId),
+    superOwnerId: effectiveSuperOwnerId,
   };
+  const effectiveMediaItems = isBrokerUser
+    ? normalizeBrokerEMandateVisibility(mediaItems)
+    : mediaItems;
 
-  if (isBrokerUser && !hasEMandateMedia(mediaItems)) {
+  if (
+    propertyBody.isPublished === true &&
+    !hasPermission(authContext, { resource: DATABASE_RESOURCES.property, action: "publish" })
+  ) {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Missing permission: property.publish",
+      }),
+      403
+    );
+  }
+
+  if (
+    propertyBody.isVerified === true &&
+    !hasPermission(authContext, { resource: DATABASE_RESOURCES.property, action: "verify" })
+  ) {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "Missing permission: property.verify",
+      }),
+      403
+    );
+  }
+
+  if (isBrokerUser && !hasEMandateMedia(effectiveMediaItems)) {
     return c.json(
       createErrorResponse({
         error: "Bad Request",
@@ -303,7 +426,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
     await replacePropertyMediaItems({
       tx,
       propertyId: insertedProperty.id,
-      mediaItems,
+      mediaItems: effectiveMediaItems,
       userId: currentUser?.id ?? null,
     });
     await replacePropertyTemporaryOwnerTerms({
@@ -381,7 +504,32 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
     );
   }
 
-  if (isBrokerUser && mediaItems !== undefined && !hasEMandateMedia(mediaItems)) {
+  const updatePermissionError = getPropertyUpdatePermissionError({
+    authContext,
+    existingProperty,
+    updateBody: body as Record<string, unknown>,
+  });
+
+  if (updatePermissionError) {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: `Missing permission: property.${updatePermissionError.action}`,
+        details: updatePermissionError,
+      }),
+      403
+    );
+  }
+
+  const existingPropertyWithRelations =
+    isBrokerUser && mediaItems !== undefined
+      ? await findPropertyByIdWithRelations(id, { includeDeleted: true })
+      : null;
+  const effectiveMediaItems = isBrokerUser
+    ? normalizeBrokerEMandateVisibility(mediaItems, existingPropertyWithRelations?.mediaItems ?? [])
+    : mediaItems;
+
+  if (isBrokerUser && mediaItems !== undefined && !hasEMandateMedia(effectiveMediaItems)) {
     return c.json(
       createErrorResponse({
         error: "Bad Request",
@@ -397,11 +545,12 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
       propertyBody.organizationId ??
       existingProperty.organizationId);
   const effectiveSuperOwnerId = isBrokerUser
-    ? null
+    ? (currentUser?.id ?? existingProperty.superOwnerId)
     : (propertyBody.superOwnerId ?? existingProperty.superOwnerId);
   const effectivePropertyBody = {
     ...propertyBody,
     organizationId: effectiveOrganizationId,
+    superOwnerId: effectiveSuperOwnerId,
   };
 
   const normalizedOwnerTerms = normalizePropertyOwnerTerms({
@@ -470,7 +619,7 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, update, async (c) => {
     await replacePropertyMediaItems({
       tx,
       propertyId: id,
-      mediaItems,
+      mediaItems: effectiveMediaItems,
       userId: currentUser?.id ?? null,
     });
     await replacePropertyTemporaryOwnerTerms({

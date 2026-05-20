@@ -23,6 +23,18 @@ const optionalCookieDomainSchema = z
       .toLowerCase();
   });
 
+const optionalCookieSameSiteSchema = z
+  .preprocess((value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const normalizedValue = value.trim().toLowerCase();
+    return normalizedValue.length > 0 ? normalizedValue : undefined;
+  }, z.enum(["lax", "strict", "none"]).optional())
+  .optional()
+  .transform((value) => value ?? undefined);
+
 const corsOriginsSchema = z
   .string()
   .min(1, "CORS_ALLOWED_ORIGINS is required")
@@ -52,9 +64,19 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url("BETTER_AUTH_URL must be a valid URL"),
     BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES: optionalBooleanStringSchema,
     BETTER_AUTH_COOKIE_DOMAIN: optionalCookieDomainSchema,
+    BETTER_AUTH_COOKIE_SAME_SITE: optionalCookieSameSiteSchema,
     BETTER_AUTH_API_KEY: z
       .string()
       .min(1, "BETTER_AUTH_API_KEY is required for Better Auth infrastructure"),
+    GOOGLE_OAUTH_CLIENT_ID: z
+      .string()
+      .endsWith(
+        ".apps.googleusercontent.com",
+        "GOOGLE_OAUTH_CLIENT_ID must be the Google client id ending with .apps.googleusercontent.com"
+      ),
+    GOOGLE_OAUTH_CLIENT_SECRET: z
+      .string()
+      .startsWith("GOCSPX-", "GOOGLE_OAUTH_CLIENT_SECRET must be the Google client secret"),
     GST_API_KEY: z.string().min(1, "GST_API_KEY is required for GST verification"),
     RAZORPAY_KEY_ID: z.string().min(1, "RAZORPAY_KEY_ID is required for Razorpay integration"),
     RAZORPAY_KEY_SECRET: z
@@ -78,7 +100,10 @@ export const env = createEnv({
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES: process.env.BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES,
     BETTER_AUTH_COOKIE_DOMAIN: process.env.BETTER_AUTH_COOKIE_DOMAIN,
+    BETTER_AUTH_COOKIE_SAME_SITE: process.env.BETTER_AUTH_COOKIE_SAME_SITE,
     BETTER_AUTH_API_KEY: process.env.BETTER_AUTH_API_KEY,
+    GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID,
+    GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
     GST_API_KEY: process.env.GST_API_KEY,
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
