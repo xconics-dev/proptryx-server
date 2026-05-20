@@ -23,6 +23,11 @@ const optionalCookieDomainSchema = z
       .toLowerCase();
   });
 
+const optionalCookieSameSiteSchema = z
+  .enum(["lax", "strict", "none"])
+  .optional()
+  .transform((value) => value ?? undefined);
+
 const corsOriginsSchema = z
   .string()
   .min(1, "CORS_ALLOWED_ORIGINS is required")
@@ -52,6 +57,7 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url("BETTER_AUTH_URL must be a valid URL"),
     BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES: optionalBooleanStringSchema,
     BETTER_AUTH_COOKIE_DOMAIN: optionalCookieDomainSchema,
+    BETTER_AUTH_COOKIE_SAME_SITE: optionalCookieSameSiteSchema,
     BETTER_AUTH_API_KEY: z
       .string()
       .min(1, "BETTER_AUTH_API_KEY is required for Better Auth infrastructure"),
@@ -87,6 +93,7 @@ export const env = createEnv({
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES: process.env.BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES,
     BETTER_AUTH_COOKIE_DOMAIN: process.env.BETTER_AUTH_COOKIE_DOMAIN,
+    BETTER_AUTH_COOKIE_SAME_SITE: process.env.BETTER_AUTH_COOKIE_SAME_SITE,
     BETTER_AUTH_API_KEY: process.env.BETTER_AUTH_API_KEY,
     GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID,
     GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET,

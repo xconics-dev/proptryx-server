@@ -33,8 +33,25 @@ function getTrustedOriginHosts(origins: string[]) {
   );
 }
 
+function getHostname(value: string) {
+  return value.split(":")[0]?.toLowerCase() ?? value.toLowerCase();
+}
+
+function getSiteDomain(host: string) {
+  const hostname = getHostname(host);
+
+  if (hostname === "localhost" || /^[\d.]+$/.test(hostname)) {
+    return hostname;
+  }
+
+  const parts = hostname.split(".").filter(Boolean);
+
+  return parts.length <= 2 ? hostname : parts.slice(-2).join(".");
+}
+
 function matchesCookieDomain(host: string, domain: string) {
-  return host === domain || host.endsWith(`.${domain}`);
+  const hostname = getHostname(host);
+  return hostname === domain || hostname.endsWith(`.${domain}`);
 }
 
 export function getBetterAuthConfigState() {
@@ -43,6 +60,15 @@ export function getBetterAuthConfigState() {
   const isProduction = env.NODE_ENV === "production";
   const crossSubDomainCookiesEnabled = isProduction && env.BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES;
   const cookieDomain = env.BETTER_AUTH_COOKIE_DOMAIN;
+  const authHost = betterAuthUrl.host;
+  const trustedOriginSites = Array.from(
+    new Set(getTrustedOriginHosts(trustedOrigins).map((host) => getSiteDomain(host)))
+  );
+  const hasCrossSiteTrustedOrigins =
+    isProduction &&
+    trustedOriginSites.some((siteDomain) => siteDomain !== getSiteDomain(betterAuthUrl.host));
+  const cookieSameSite =
+    env.BETTER_AUTH_COOKIE_SAME_SITE ?? (hasCrossSiteTrustedOrigins ? "none" : "lax");
 
   if (crossSubDomainCookiesEnabled && !cookieDomain) {
     throw new Error(
@@ -51,13 +77,9 @@ export function getBetterAuthConfigState() {
   }
 
   if (crossSubDomainCookiesEnabled && cookieDomain) {
-    const incompatibleHosts = getTrustedOriginHosts(trustedOrigins).filter(
-      (host) => !matchesCookieDomain(host, cookieDomain)
-    );
-
-    if (incompatibleHosts.length > 0) {
+    if (!matchesCookieDomain(authHost, cookieDomain)) {
       throw new Error(
-        `BETTER_AUTH_COOKIE_DOMAIN=${cookieDomain} must be a shared parent domain for all trusted origins. Incompatible hosts: ${incompatibleHosts.join(", ")}`
+        `BETTER_AUTH_COOKIE_DOMAIN=${cookieDomain} must match BETTER_AUTH_URL host ${authHost}. For mixed domains such as proptryx.app and proptryx.com, keep BETTER_AUTH_COOKIE_DOMAIN on the auth server parent domain and use SameSite=None cookies.`
       );
     }
   }
@@ -72,6 +94,7 @@ export function getBetterAuthConfigState() {
           domain: cookieDomain,
         }
       : undefined,
+    cookieSameSite,
     isProduction,
     trustedOrigins,
   };
