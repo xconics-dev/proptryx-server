@@ -61,28 +61,32 @@ jobs:
               per_page: 100,
             });
 
-            const maxChars = 120000;
-            let usedChars = 0;
+            const fileSummary = files
+              .map((file) => `- ${file.status} ${file.filename} (+${file.additions}/-${file.deletions})`)
+              .join('\n');
+
+            const reviewedFiles = files
+              .filter((file) => typeof file.patch === 'string' && file.patch.length > 0)
+              .sort((a, b) => (b.additions + b.deletions) - (a.additions + a.deletions))
+              .slice(0, 8);
+
+            const maxPatchChars = 1500;
             const diffBlocks = [];
 
-            for (const file of files) {
-              if (!file.patch) {
-                continue;
-              }
+            for (const file of reviewedFiles) {
+              const patch = file.patch.length > maxPatchChars
+                ? `${file.patch.slice(0, maxPatchChars)}\n... [truncated]`
+                : file.patch;
 
               const block = [
                 `File: ${file.filename}`,
                 `Status: ${file.status}`,
+                `Additions: ${file.additions}`,
+                `Deletions: ${file.deletions}`,
                 'Patch:',
-                file.patch,
+                patch,
               ].join('\n');
-
-              if (usedChars + block.length > maxChars) {
-                break;
-              }
-
               diffBlocks.push(block);
-              usedChars += block.length;
             }
 
             if (diffBlocks.length === 0) {
@@ -105,7 +109,10 @@ jobs:
               `PR title: ${prTitle}`,
               `PR description: ${prBody}`,
               '',
-              'Changed files and patches:',
+              'Changed files summary:',
+              fileSummary,
+              '',
+              'Review the following most substantial file patches first:',
               diffBlocks.join('\n\n---\n\n'),
             ].join('\n');
 
@@ -123,7 +130,7 @@ jobs:
                 body: JSON.stringify({
                   prompt,
                   temperature: 0.2,
-                  max_tokens: 1400,
+                  max_tokens: 800,
                 }),
               },
             );
