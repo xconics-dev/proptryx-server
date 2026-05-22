@@ -6,7 +6,7 @@ import { property } from "./property";
 export const propertyOwnerTemporary = pgTable(
   "property_owner_temporary",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
+    id: text("id").primaryKey(),
     propertyId: text("property_id")
       .notNull()
       .references(() => property.id, { onDelete: "cascade" }),

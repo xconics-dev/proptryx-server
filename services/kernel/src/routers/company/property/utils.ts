@@ -13,6 +13,7 @@ import {
   user,
 } from "@proptryx/database";
 import { and, eq, inArray } from "drizzle-orm";
+import { generateRandomId } from "@proptryx/utils";
 
 type IncludeDeletedOptions = {
   includeDeleted?: boolean;
@@ -603,6 +604,7 @@ export async function replacePropertyTemporaryOwnerTerms({
 
   await tx.insert(propertyOwnerTemporary).values(
     normalizedTemporaryOwnerTerms.map((ownerTerm) => ({
+      id: generateRandomId(),
       propertyId,
       name: ownerTerm.name,
       email: ownerTerm.email ?? null,
