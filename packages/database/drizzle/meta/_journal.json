@@ -57,6 +57,13 @@
       "when": 1779258267418,
       "tag": "0007_tense_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779439481283,
+      "tag": "0008_classy_master_chief",
+      "breakpoints": true
     }
   ]
 }
