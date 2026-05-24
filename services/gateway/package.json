@@ -18,12 +18,12 @@
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.4.0",
-    "@hono/node-server": "^2.0.3",
+    "@hono/node-server": "^2.0.4",
     "@proptryx/database": "workspace:*",
     "@proptryx/logger": "workspace:*",
     "@proptryx/utils": "workspace:*",
     "@t3-oss/env-core": "^0.13.11",
-    "hono": "^4.12.19",
+    "hono": "^4.12.22",
     "zod": "^4.4.3"
   },
   "devDependencies": {
