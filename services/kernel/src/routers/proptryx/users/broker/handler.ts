@@ -17,7 +17,7 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@proptryx/utils";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { fetchProptryxBrokerUserList } from "./list";
 import {
   create,
@@ -46,6 +46,20 @@ export const proptryxBrokerUsersGroup = new OpenAPIHono<AppBindings>();
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
 const normalizePhoneNumber = (value?: string | null) => value?.replace(/\D/g, "") ?? "";
+const phoneNumbersMatch = (left?: string | null, right?: string | null) => {
+  const normalizedLeft = normalizePhoneNumber(left);
+  const normalizedRight = normalizePhoneNumber(right);
+
+  if (!(normalizedLeft && normalizedRight)) {
+    return false;
+  }
+
+  return (
+    normalizedLeft === normalizedRight ||
+    normalizedLeft.endsWith(normalizedRight) ||
+    normalizedRight.endsWith(normalizedLeft)
+  );
+};
 
 registerOpenApiRoute(proptryxBrokerUsersGroup, list, async (c) => {
   const query = c.req.valid("query");
@@ -129,7 +143,9 @@ registerOpenApiRoute(proptryxBrokerUsersGroup, create, async (c) => {
     env.BETTER_AUTH_SECRET
   );
 
-  // Find any active broker request matching by email and phone number
+  // Find active broker requests matching by email and phone number. The phone
+  // comparison allows country-code differences between public request forms and
+  // admin-created broker records.
   const candidateRequests = await db
     .select()
     .from(broker_request)
@@ -140,8 +156,8 @@ registerOpenApiRoute(proptryxBrokerUsersGroup, create, async (c) => {
       )
     );
 
-  const matchingBrokerRequest = candidateRequests.find(
-    (r) => normalizePhoneNumber(r.phoneNumber) === normalizedBodyPhoneNumber
+  const matchingBrokerRequests = candidateRequests.filter((request) =>
+    phoneNumbersMatch(request.phoneNumber, normalizedBodyPhoneNumber)
   );
 
   const userData = await db.transaction(async (tx) => {
@@ -168,7 +184,7 @@ registerOpenApiRoute(proptryxBrokerUsersGroup, create, async (c) => {
       password: hashedPassword,
     });
 
-    if (matchingBrokerRequest) {
+    if (matchingBrokerRequests.length > 0) {
       await tx
         .update(broker_request)
         .set({
@@ -177,7 +193,13 @@ registerOpenApiRoute(proptryxBrokerUsersGroup, create, async (c) => {
           deletedByUser: currentUser?.id ?? null,
         })
         .where(
-          and(eq(broker_request.id, matchingBrokerRequest.id), eq(broker_request.isDeleted, false))
+          and(
+            inArray(
+              broker_request.id,
+              matchingBrokerRequests.map((request) => request.id)
+            ),
+            eq(broker_request.isDeleted, false)
+          )
         );
     }
 

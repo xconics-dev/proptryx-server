@@ -4,6 +4,20 @@ import { createTableListFetcher, resolveDateRangeBoundary } from "@proptryx/util
 import { and, eq, gte, lte, ne, sql } from "drizzle-orm";
 import type { ScopedProptryxBrokerUserListQuery } from "./schema";
 
+const brokerRequestMatchesBrokerUser = sql`
+  lower(trim(${broker_request.email})) = lower(trim(${user.email}))
+  AND regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g') <> ''
+  AND regexp_replace(coalesce(${user.phoneNumber}, ''), '\\D', '', 'g') <> ''
+  AND (
+    regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g')
+      = regexp_replace(coalesce(${user.phoneNumber}, ''), '\\D', '', 'g')
+    OR regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g')
+      LIKE '%' || regexp_replace(coalesce(${user.phoneNumber}, ''), '\\D', '', 'g')
+    OR regexp_replace(coalesce(${user.phoneNumber}, ''), '\\D', '', 'g')
+      LIKE '%' || regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g')
+  )
+`;
+
 function proptryxBrokerUserListJoins(queryBuilder: any) {
   return queryBuilder
     .leftJoin(zone, eq(zone.id, user.zoneId))
@@ -24,7 +38,8 @@ export const fetchProptryxBrokerUserList = createTableListFetcher<
     pincode: sql<string | null>`(
       SELECT ${broker_request.pincode}
       FROM ${broker_request}
-      WHERE lower(trim(${broker_request.email})) = lower(trim(${user.email}))
+      WHERE ${brokerRequestMatchesBrokerUser}
+      ORDER BY ${broker_request.updatedAt} DESC, ${broker_request.createdAt} DESC
       LIMIT 1
     )`,
   }),
@@ -43,7 +58,7 @@ export const fetchProptryxBrokerUserList = createTableListFetcher<
     build: ({ searchTerm }) =>
       sql`EXISTS (
         SELECT 1 FROM ${broker_request}
-        WHERE lower(trim(${broker_request.email})) = lower(trim(${user.email}))
+        WHERE ${brokerRequestMatchesBrokerUser}
           AND ${broker_request.pincode} ILIKE ${`%${searchTerm}%`}
       )`,
   },

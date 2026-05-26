@@ -7,6 +7,21 @@ type IncludeDeletedOptions = {
   includeDeleted?: boolean;
 };
 
+const brokerRequestMatchesBrokerUser = (email: string, phoneNumber?: string | null) =>
+  and(
+    sql`lower(trim(${broker_request.email})) = lower(trim(${email}))`,
+    phoneNumber
+      ? sql`
+          regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g') <> ''
+          AND (
+            regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g') = ${phoneNumber.replace(/\D/g, "")}
+            OR regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g') LIKE ${`%${phoneNumber.replace(/\D/g, "")}`}
+            OR ${phoneNumber.replace(/\D/g, "")} LIKE '%' || regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g')
+          )
+        `
+      : undefined
+  );
+
 export async function findProptryxBrokerUserById(id: string, options?: IncludeDeletedOptions) {
   const userData = await findProptryxUserById(id, options);
 
@@ -20,14 +35,7 @@ export async function findProptryxBrokerUserById(id: string, options?: IncludeDe
       address: broker_request.address,
     })
     .from(broker_request)
-    .where(
-      and(
-        sql`lower(trim(${broker_request.email})) = lower(trim(${userData.email}))`,
-        userData.phoneNumber
-          ? sql`regexp_replace(coalesce(${broker_request.phoneNumber}, ''), '\\D', '', 'g') = ${userData.phoneNumber.replace(/\D/g, "")}`
-          : undefined
-      )
-    )
+    .where(brokerRequestMatchesBrokerUser(userData.email, userData.phoneNumber))
     .orderBy(desc(broker_request.updatedAt), desc(broker_request.createdAt))
     .limit(1)
     .then((rows) => rows[0]);
