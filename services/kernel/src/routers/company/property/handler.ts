@@ -5,6 +5,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import {
   db,
   DATABASE_RESOURCES,
+  checkOrganizationLimit,
   member,
   property,
   propertyMedia,
@@ -14,6 +15,7 @@ import {
 } from "@proptryx/database";
 import { sendPropertyPublishedNotificationEmails } from "@proptryx/notification";
 import {
+  buildOrganizationLimitDeniedMessage,
   createErrorResponse,
   createSuccessResponse,
   generateRandomId,
@@ -369,6 +371,28 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, create, async (c) => {
       400
     );
   }
+
+  if (effectivePropertyBody.organizationId) {
+    const propertyLimitCheck = await checkOrganizationLimit({
+      organizationId: effectivePropertyBody.organizationId,
+      featureName: "properties",
+    });
+
+    if (!propertyLimitCheck.allowed) {
+      return c.json(
+        createErrorResponse({
+          error: "Forbidden",
+          message: buildOrganizationLimitDeniedMessage({
+            featureName: propertyLimitCheck.normalizedFeatureName,
+            entry: propertyLimitCheck.entry,
+            reason: propertyLimitCheck.reason,
+          }),
+        }),
+        403
+      );
+    }
+  }
+
   const normalizedOwnerTerms = normalizePropertyOwnerTerms({
     superOwnerId: effectivePropertyBody.superOwnerId,
     coOwnerIds,
@@ -746,6 +770,27 @@ registerOpenApiRoute(kernelCompanyPropertyGroup, restore, async (c) => {
       }),
       409
     );
+  }
+
+  if (existingProperty.organizationId) {
+    const propertyLimitCheck = await checkOrganizationLimit({
+      organizationId: existingProperty.organizationId,
+      featureName: "properties",
+    });
+
+    if (!propertyLimitCheck.allowed) {
+      return c.json(
+        createErrorResponse({
+          error: "Forbidden",
+          message: buildOrganizationLimitDeniedMessage({
+            featureName: propertyLimitCheck.normalizedFeatureName,
+            entry: propertyLimitCheck.entry,
+            reason: propertyLimitCheck.reason,
+          }),
+        }),
+        403
+      );
+    }
   }
 
   await db.transaction(async (tx) => {

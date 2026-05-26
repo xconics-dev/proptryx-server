@@ -1,5 +1,6 @@
 import { DATABASE_RESOURCES } from "@proptryx/database";
 import {
+  ApiForbiddenOpenApi,
   ApiNotFoundOpenApi,
   createApiJsonBody,
   createApiSuccessResponse,
@@ -90,6 +91,7 @@ export const create = createOpenApiRoute({
   },
   responses: {
     201: createApiSuccessResponse(memberSchema, "Member created successfully"),
+    403: ApiForbiddenOpenApi,
   },
 });
 
@@ -151,6 +153,7 @@ export const restore = createOpenApiRoute({
   },
   responses: {
     200: createApiSuccessResponse(memberSchema, "Member restored successfully"),
+    403: ApiForbiddenOpenApi,
   },
 });
 

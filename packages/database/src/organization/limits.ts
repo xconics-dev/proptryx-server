@@ -130,7 +130,12 @@ export async function getOrganizationSubscriptionLimits(
       subscriptionPlans,
       eq(subscriptionPlans.id, organizationSubscription.subscriptionPlanId)
     )
-    .where(eq(organizationSubscription.organizationId, organizationId))
+    .where(
+      and(
+        eq(organizationSubscription.organizationId, organizationId),
+        eq(organizationSubscription.isDeleted, false)
+      )
+    )
     .limit(1);
 
   const subscription = subscriptionRow?.subscriptionId

@@ -1,6 +1,7 @@
 import { DATABASE_RESOURCES } from "@proptryx/database";
 import {
   ApiBadRequestOpenApi,
+  ApiForbiddenOpenApi,
   ApiNotFoundOpenApi,
   DEFAULT_FAST_RBAC_AUTH_OPTIONS,
   IdStringParamSchema,
@@ -75,6 +76,7 @@ export const create = createOpenApiRoute({
   responses: {
     201: createApiSuccessResponse(propertyDetailSchema, "Property created successfully"),
     400: ApiBadRequestOpenApi,
+    403: ApiForbiddenOpenApi,
   },
 });
 

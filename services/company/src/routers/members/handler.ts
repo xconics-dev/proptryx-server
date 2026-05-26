@@ -439,6 +439,20 @@ registerOpenApiRoute(membersGroup, restore, async (c) => {
     );
   }
 
+  if (existingMember.isDeleted) {
+    const memberLimitCheck = await checkCurrentOrganizationLimit(c, "users");
+
+    if (!memberLimitCheck.ok) {
+      return c.json(
+        createErrorResponse({
+          error: memberLimitCheck.error,
+          message: memberLimitCheck.message,
+        }),
+        memberLimitCheck.statusCode
+      );
+    }
+  }
+
   const [restoredMember] = await db
     .update(member)
     .set({
