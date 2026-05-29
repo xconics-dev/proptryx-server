@@ -22,10 +22,10 @@
     "clean": "rm -rf dist .turbo"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
-    "@types/node": "^25.8.0",
+    "@biomejs/biome": "^2.4.16",
+    "@types/node": "^25.9.1",
     "tsup": "^8.5.1",
-    "tsx": "^4.22.1",
+    "tsx": "^4.22.3",
     "typescript": "^6.0.3"
   }
 }
