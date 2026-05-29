@@ -7,6 +7,10 @@ import {
   invitation,
   meeting,
   member,
+  notification,
+  notificationPreference,
+  notificationPushSubscription,
+  notificationTemplate,
   organization,
   organizationSubscription,
   property,
@@ -27,6 +31,8 @@ const DEFAULT_RESOURCE_ACTIONS = ["get", "getAll", "create", "update", "delete"]
 
 const ACTIONS: Partial<Record<DatabaseResource, readonly string[]>> = {
   meeting: [...DEFAULT_RESOURCE_ACTIONS, "publish"],
+  notification: [...DEFAULT_RESOURCE_ACTIONS, "send", "broadcast", "read", "archive"],
+  notification_template: [...DEFAULT_RESOURCE_ACTIONS, "send"],
   organization: [...DEFAULT_RESOURCE_ACTIONS, "activate"],
   member: [...DEFAULT_RESOURCE_ACTIONS, "activate", "deactivate"],
   property: [...DEFAULT_RESOURCE_ACTIONS, "publish", "verify"],
@@ -40,6 +46,8 @@ const COMPANY_RESOURCES = new Set<DatabaseResource>([
   DATABASE_RESOURCES.faq,
   DATABASE_RESOURCES.meeting,
   DATABASE_RESOURCES.member,
+  DATABASE_RESOURCES.notification,
+  DATABASE_RESOURCES.notification_template,
   DATABASE_RESOURCES.organization,
   DATABASE_RESOURCES.property,
   DATABASE_RESOURCES.rbac_role,
@@ -51,6 +59,11 @@ const COMPANY_RESOURCES = new Set<DatabaseResource>([
   DATABASE_RESOURCES.zone,
 ]);
 
+const USER_OWNED_RESOURCES = new Set<DatabaseResource>([
+  DATABASE_RESOURCES.notification_preference,
+  DATABASE_RESOURCES.notification_push_subscription,
+]);
+
 const RESOURCE_TABLES = {
   account,
   broker_request,
@@ -59,6 +72,10 @@ const RESOURCE_TABLES = {
   invitation,
   member,
   meeting,
+  notification,
+  notification_preference: notificationPreference,
+  notification_push_subscription: notificationPushSubscription,
+  notification_template: notificationTemplate,
   property,
   organization,
   organization_subscription: organizationSubscription,
@@ -93,14 +110,16 @@ const getColumns = (table: Table) =>
   }));
 
 const RESOURCES = Object.freeze(
-  Object.entries(RESOURCE_TABLES).map(([resource, table]) => ({
-    resource: resource as DatabaseResource,
-    tableName: getTableName(table),
-    label: toLabel(resource),
-    scopes: getScopes(resource as DatabaseResource),
-    actions: ACTIONS[resource as DatabaseResource] ?? DEFAULT_RESOURCE_ACTIONS,
-    columns: getColumns(table),
-  }))
+  Object.entries(RESOURCE_TABLES)
+    .filter(([resource]) => !USER_OWNED_RESOURCES.has(resource as DatabaseResource))
+    .map(([resource, table]) => ({
+      resource: resource as DatabaseResource,
+      tableName: getTableName(table),
+      label: toLabel(resource),
+      scopes: getScopes(resource as DatabaseResource),
+      actions: [...new Set(ACTIONS[resource as DatabaseResource] ?? DEFAULT_RESOURCE_ACTIONS)],
+      columns: getColumns(table),
+    }))
 );
 
 export function getRbacResourceMetadata(scope: RbacResourceScope) {

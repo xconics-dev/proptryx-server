@@ -7,9 +7,10 @@ import {
   Preview,
   Section,
   Tailwind,
+  pretty,
+  render,
   Text,
-} from "@react-email/components";
-import { pretty, render } from "@react-email/render";
+} from "react-email";
 import { SatoshiFonts } from "../satoshi-fonts";
 import { collageTailwindConfig } from "../theme";
 import { metadata } from "../../static/const";

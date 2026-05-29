@@ -1,4 +1,5 @@
 import type { AppBindings } from "@/types/app";
+import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { deleteUploadObjects } from "@/lib/object-storage";
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -13,7 +14,6 @@ import {
   propertyZone,
   user,
 } from "@proptryx/database";
-import { sendPropertyPublishedNotificationEmails } from "@proptryx/notification";
 import {
   buildOrganizationLimitDeniedMessage,
   createErrorResponse,
@@ -189,6 +189,7 @@ function normalizeBrokerEMandateVisibility(
 async function getOrganizationOwnerRecipients(organizationId: string) {
   return db
     .select({
+      id: user.id,
       name: user.name,
       email: user.email,
     })
@@ -213,22 +214,37 @@ async function notifyPropertyPublished(
   }
 
   const organizationOwners = await getOrganizationOwnerRecipients(propertyData.organizationId);
-
-  await sendPropertyPublishedNotificationEmails({
-    propertyId: propertyData.id,
-    propertyName: propertyData.name,
-    organizationName: propertyData.organization?.name ?? "Proptryx",
-    propertyOwner: propertyData.superOwner
-      ? {
-          name: propertyData.superOwner.name,
-          email: propertyData.superOwner.email,
-        }
-      : null,
-    organizationOwners,
-    publishedAt: propertyData.updatedAt ?? propertyData.createdAt,
+  const response = await fetch(`${env.NOTIFICATION_SERVICE_URL}/internal/property-published`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-proptryx-internal-secret": env.BETTER_AUTH_SECRET,
+    },
+    body: JSON.stringify({
+      propertyId: propertyData.id,
+      propertyName: propertyData.name,
+      organizationName: propertyData.organization?.name ?? "Proptryx",
+      publishedAt: (propertyData.updatedAt ?? propertyData.createdAt).toISOString(),
+      propertyOwner: propertyData.superOwner
+        ? {
+            id: propertyData.superOwner.id,
+            name: propertyData.superOwner.name,
+            email: propertyData.superOwner.email,
+          }
+        : null,
+      organizationOwners,
+    }),
   }).catch((err) => {
-    logger.error(`[${logContext}] Property published email send failed:`, { error: err });
+    logger.error(`[${logContext}] Notification service request failed:`, { error: err });
+    return null;
   });
+
+  if (!response?.ok) {
+    logger.error(`[${logContext}] Notification service property-published event failed`, {
+      status: response?.status ?? null,
+      body: response ? await response.text().catch(() => null) : null,
+    });
+  }
 }
 
 registerOpenApiRoute(kernelCompanyPropertyGroup, list, async (c) => {

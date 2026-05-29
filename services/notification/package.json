@@ -1,0 +1,41 @@
+{
+  "name": "@proptryx/notification-service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:deps": "pnpm --dir ../.. --filter \"@proptryx/notification-service^...\" run build",
+    "build": "tsup --config ../../tsup.config.ts",
+    "predev": "pnpm run build:deps",
+    "dev": "tsx watch --env-file=../../env/.env src/index.ts",
+    "prestart": "pnpm run build:deps",
+    "start": "node dist/index.js",
+    "lint": "biome lint ./src",
+    "lint:fix": "biome lint --write ./src",
+    "pretype-check": "pnpm run build:deps",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.3",
+    "@hono/zod-openapi": "^1.4.0",
+    "@proptryx/database": "workspace:*",
+    "@proptryx/logger": "workspace:*",
+    "@proptryx/notification": "workspace:*",
+    "@proptryx/utils": "workspace:*",
+    "@t3-oss/env-core": "^0.13.11",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.19",
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "@proptryx/typescript-config": "workspace:*",
+    "@types/node": "^25.8.0",
+    "@types/ws": "^8.18.1",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.1",
+    "typescript": "^6.0.3"
+  }
+}

@@ -12,6 +12,7 @@ import { openApiInfo } from "@/config/openapi";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { logGatewayProxyRoutes, registerGatewayRoutes } from "@/routes";
+import { attachGatewayWebSocketProxy } from "@/websocket-proxy";
 
 const app = new OpenAPIHono();
 applyAppSecurity(app, { corsOrigins: env.CORS_ALLOWED_ORIGINS });
@@ -47,13 +48,17 @@ app.get(
         title: "Kernel Service",
         url: "/api/kernel/doc",
       },
+      {
+        title: "Notification Service",
+        url: "/api/notifications/doc",
+      },
     ],
   })
 );
 
 await initDB({ logger, serviceName: "gateway" });
 
-serve({ fetch: app.fetch, port: env.PORT }, () => {
+const server = serve({ fetch: app.fetch, port: env.PORT }, () => {
   logger.info("service started", {
     port: env.PORT,
     baseUrl: `http://localhost:${env.PORT}`,
@@ -61,5 +66,7 @@ serve({ fetch: app.fetch, port: env.PORT }, () => {
   });
   logGatewayProxyRoutes();
 });
+
+attachGatewayWebSocketProxy(server);
 
 export default app;

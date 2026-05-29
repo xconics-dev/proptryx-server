@@ -12,6 +12,7 @@ const GATEWAY_TAG = "Gateway";
 const AUTH_PROXY_TAG = "Auth Service (Proxied)";
 const COMPANY_PROXY_TAG = "Company Service (Proxied)";
 const KERNEL_PROXY_TAG = "Kernel Service (Proxied)";
+const NOTIFICATION_PROXY_TAG = "Notification Service (Proxied)";
 const HOP_BY_HOP_REQUEST_HEADERS = new Set([
   "connection",
   "content-length",
@@ -89,6 +90,19 @@ const companyRootRedirectRoute = createRoute({
   },
 });
 
+const notificationRootRedirectRoute = createRoute({
+  method: "get",
+  path: "/api/notifications",
+  tags: [NOTIFICATION_PROXY_TAG],
+  summary: "Notification docs entrypoint",
+  description: "Redirects to the Notification service root docs via gateway proxy scope.",
+  responses: {
+    302: {
+      description: "Redirect to /api/notifications/",
+    },
+  },
+});
+
 const authHealthProxyRoute = createRoute({
   method: "get",
   path: "/api/auth/health",
@@ -133,6 +147,22 @@ const companyHealthProxyRoute = createRoute({
     },
     502: {
       description: "Company service upstream unavailable",
+    },
+  },
+});
+
+const notificationHealthProxyRoute = createRoute({
+  method: "get",
+  path: "/api/notifications/health",
+  tags: [NOTIFICATION_PROXY_TAG],
+  summary: "Notification health (proxied)",
+  description: "Proxies notification service health status through the gateway.",
+  responses: {
+    200: {
+      description: "Notification service health response",
+    },
+    502: {
+      description: "Notification service upstream unavailable",
     },
   },
 });
@@ -261,6 +291,7 @@ export function registerGatewayRoutes(app: OpenAPIHono) {
   const authProxyRoute = getProxyRoute("/api/auth");
   const companyProxyRoute = getProxyRoute("/api/company");
   const kernelProxyRoute = getProxyRoute("/api/kernel");
+  const notificationProxyRoute = getProxyRoute("/api/notifications");
 
   app.openapi(
     gatewayHealthRoute,
@@ -278,10 +309,15 @@ export function registerGatewayRoutes(app: OpenAPIHono) {
   app.openapi(companyRootRedirectRoute, (c: Context) => c.redirect("/api/company/", 302));
   app.get("/api/company/", (c: Context) => c.redirect("/api/company/docs", 302));
   app.openapi(kernelRootRedirectRoute, (c: Context) => c.redirect("/api/kernel/", 302));
+  app.openapi(notificationRootRedirectRoute, (c: Context) =>
+    c.redirect("/api/notifications/", 302)
+  );
+  app.get("/api/notifications/", (c: Context) => c.redirect("/api/notifications/docs", 302));
 
   app.openapi(authHealthProxyRoute, createProxyHandler(authProxyRoute));
   app.openapi(companyHealthProxyRoute, createProxyHandler(companyProxyRoute));
   app.openapi(kernelHealthProxyRoute, createProxyHandler(kernelProxyRoute));
+  app.openapi(notificationHealthProxyRoute, createProxyHandler(notificationProxyRoute));
 
   for (const route of proxyRoutes) {
     const handler = createProxyHandler(route);

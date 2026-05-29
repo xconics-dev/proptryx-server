@@ -11,6 +11,7 @@ export const proxyRoutes: ProxyRoute[] = [
   { prefix: "/api/auth", target: env.AUTH_SERVICE_URL, stripPrefix: false },
   { prefix: "/api/company", target: env.COMPANY_SERVICE_URL, stripPrefix: true },
   { prefix: "/api/kernel", target: env.KERNEL_SERVICE_URL, stripPrefix: true },
+  { prefix: "/api/notifications", target: env.NOTIFICATION_SERVICE_URL, stripPrefix: true },
 ];
 
 export function createUpstreamUrl(requestUrl: string, route: ProxyRoute) {

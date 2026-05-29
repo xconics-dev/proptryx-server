@@ -64,6 +64,20 @@
       "when": 1779439481283,
       "tag": "0008_classy_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779966794070,
+      "tag": "0009_shiny_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779968901452,
+      "tag": "0010_slippery_tarantula",
+      "breakpoints": true
     }
   ]
 }

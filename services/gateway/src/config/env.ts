@@ -40,6 +40,9 @@ export const env = createEnv({
     ),
 
     KERNEL_SERVICE_URL: z.url("KERNEL_SERVICE_URL must be a valid URL — e.g. http://kernel:6003"),
+    NOTIFICATION_SERVICE_URL: z.url(
+      "NOTIFICATION_SERVICE_URL must be a valid URL — e.g. http://notification:6005"
+    ),
   },
 
   runtimeEnv: {
@@ -53,6 +56,7 @@ export const env = createEnv({
     AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL,
     COMPANY_SERVICE_URL: process.env.COMPANY_SERVICE_URL,
     KERNEL_SERVICE_URL: process.env.KERNEL_SERVICE_URL,
+    NOTIFICATION_SERVICE_URL: process.env.NOTIFICATION_SERVICE_URL,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",

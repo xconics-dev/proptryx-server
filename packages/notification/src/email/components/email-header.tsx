@@ -1,4 +1,4 @@
-import { Img, Section } from "@react-email/components";
+import { Img, Section } from "react-email";
 import { imgesdata } from "../static/const";
 
 export default function EmailHeader() {

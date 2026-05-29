@@ -29,5 +29,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
       description:
         "Kernel service scope exposed through gateway under /api/kernel. Includes kernel root redirect and proxied health endpoint.",
     },
+    {
+      name: "Notification Service (Proxied)",
+      description:
+        "Notification service scope exposed through gateway under /api/notifications. Includes notification docs redirect and proxied health endpoint.",
+    },
   ],
 };
