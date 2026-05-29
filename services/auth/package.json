@@ -20,9 +20,9 @@
     "db:auth:info": "set -a && . ../../env/.env && set +a && pnpm dlx auth@latest info --config src/lib/auth/index.ts --json"
   },
   "dependencies": {
-    "@better-auth/infra": "^0.2.8",
+    "@better-auth/infra": "^0.2.11",
     "@better-auth/redis-storage": "^1.6.11",
-    "@hono/node-server": "^2.0.3",
+    "@hono/node-server": "^2.0.4",
     "@proptryx/database": "workspace:*",
     "@proptryx/logger": "workspace:*",
     "@proptryx/notification": "workspace:*",
@@ -30,8 +30,8 @@
     "@t3-oss/env-core": "^0.13.11",
     "better-auth": "^1.6.11",
     "better-auth-razorpay": "^2.0.7",
-    "hono": "^4.12.19",
-    "ioredis": "^5.10.1",
+    "hono": "^4.12.23",
+    "ioredis": "^5.11.0",
     "razorpay": "^2.9.6",
     "zod": "^4.4.3"
   },
