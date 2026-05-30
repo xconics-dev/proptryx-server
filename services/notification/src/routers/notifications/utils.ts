@@ -4,6 +4,7 @@ import {
   notificationPreference,
   notificationPushSubscription,
   notificationTemplate,
+  notificationTriggerExecution,
   member,
   user,
   type NotificationAudiencePanel,
@@ -22,6 +23,7 @@ import { SYSTEM_NOTIFICATION_TEMPLATE_KEYS } from "./constants";
 import type { ProptryxNotificationBroadcastInput, ProptryxNotificationSendInput } from "./schema";
 
 const NOTIFICATION_DELETE_PURGE_AFTER_MS = 10 * 60 * 60 * 1000;
+const NOTIFICATION_TRIGGER_EXECUTION_PURGE_AFTER_MS = 10 * 24 * 60 * 60 * 1000;
 const PUSH_SUBSCRIPTION_INACTIVE_PURGE_AFTER_MS = 14 * 24 * 60 * 60 * 1000;
 const PUSH_SUBSCRIPTION_STALE_PURGE_AFTER_MS = 90 * 24 * 60 * 60 * 1000;
 const NOTIFICATION_DELETE_PURGE_INTERVAL_MS = 60 * 60 * 1000;
@@ -63,6 +65,8 @@ const DEFAULT_NOTIFICATION_PREFERENCE = {
 } as const;
 const DEFAULT_NOTIFICATION_ICON = "/logo/logo.png";
 const DEFAULT_NOTIFICATION_BADGE = "/logo/logo.png";
+const DOUBLE_BRACE_VARIABLE_PATTERN = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
+const SINGLE_BRACE_VARIABLE_PATTERN = /\{([a-zA-Z0-9_.-]+)\}/g;
 
 let notificationDeletePurgeCronStarted = false;
 let notificationDeletePurgeCronPromise: Promise<void> | null = null;
@@ -79,10 +83,15 @@ function renderTemplateValue(value: string | null | undefined, variables: Record
     return undefined;
   }
 
-  return value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key: string) => {
-    const replacement = variables[key];
-    return replacement == null ? "" : String(replacement);
-  });
+  return value
+    .replace(DOUBLE_BRACE_VARIABLE_PATTERN, (match, key: string) => {
+      const replacement = variables[key];
+      return replacement == null ? match : String(replacement);
+    })
+    .replace(SINGLE_BRACE_VARIABLE_PATTERN, (match, key: string) => {
+      const replacement = variables[key];
+      return replacement == null ? match : String(replacement);
+    });
 }
 
 function renderTemplateData(
@@ -769,6 +778,26 @@ export async function purgeExpiredPushSubscriptions(now = new Date()) {
   return deletedSubscriptions;
 }
 
+export async function purgeExpiredNotificationTriggerExecutions(now = new Date()) {
+  const executedBefore = new Date(now.getTime() - NOTIFICATION_TRIGGER_EXECUTION_PURGE_AFTER_MS);
+  const deletedExecutions = await db
+    .delete(notificationTriggerExecution)
+    .where(lte(notificationTriggerExecution.executedAt, executedBefore))
+    .returning({
+      id: notificationTriggerExecution.id,
+      triggerId: notificationTriggerExecution.triggerId,
+    });
+
+  if (deletedExecutions.length > 0) {
+    logger.info("expired notification trigger executions purged", {
+      count: deletedExecutions.length,
+      executionIds: deletedExecutions.map((item) => item.id),
+    });
+  }
+
+  return deletedExecutions;
+}
+
 function runNotificationMaintenanceCron() {
   if (notificationDeletePurgeCronPromise) {
     return;
@@ -777,6 +806,7 @@ function runNotificationMaintenanceCron() {
   notificationDeletePurgeCronPromise = Promise.all([
     purgeExpiredDeletedNotifications(),
     purgeExpiredPushSubscriptions(),
+    purgeExpiredNotificationTriggerExecutions(),
   ])
     .then(() => undefined)
     .catch((error) => {

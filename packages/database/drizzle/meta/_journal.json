@@ -78,6 +78,27 @@
       "when": 1779968901452,
       "tag": "0010_slippery_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780084646313,
+      "tag": "0011_easy_thunderbolts",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780135108246,
+      "tag": "0012_good_night_nurse",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1780135793453,
+      "tag": "0013_dazzling_apocalypse",
+      "breakpoints": true
     }
   ]
 }

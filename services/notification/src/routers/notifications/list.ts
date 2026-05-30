@@ -1,8 +1,19 @@
-import { getDB, notification, notificationTemplate } from "@proptryx/database";
+import {
+  getDB,
+  notification,
+  notificationTemplate,
+  notificationTrigger,
+  notificationTriggerExecution,
+} from "@proptryx/database";
 import { createTableListFetcher } from "@proptryx/utils";
-import { and, eq, isNotNull, isNull, notInArray } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, notInArray } from "drizzle-orm";
 import { SYSTEM_NOTIFICATION_TEMPLATE_KEYS } from "./constants";
-import type { NotificationListQuery, NotificationTemplateListQuery } from "./schema";
+import type {
+  NotificationListQuery,
+  NotificationTemplateListQuery,
+  NotificationTriggerExecutionListQuery,
+  NotificationTriggerListQuery,
+} from "./schema";
 
 export const fetchNotificationList = createTableListFetcher<
   typeof notification,
@@ -84,5 +95,92 @@ export const fetchNotificationTemplateList = createTableListFetcher<
     title: notificationTemplate.title,
     createdAt: notificationTemplate.createdAt,
     updatedAt: notificationTemplate.updatedAt,
+  },
+});
+
+export const fetchNotificationTriggerList = createTableListFetcher<
+  typeof notificationTrigger,
+  typeof notificationTrigger.$inferSelect,
+  NotificationTriggerListQuery
+>({
+  db: getDB,
+  table: notificationTrigger,
+  where: ({ params }) =>
+    and(
+      params.sourceService
+        ? eq(notificationTrigger.sourceService, params.sourceService)
+        : undefined,
+      params.resource ? eq(notificationTrigger.resource, params.resource) : undefined,
+      params.operation ? eq(notificationTrigger.operation, params.operation) : undefined,
+      params.phase ? eq(notificationTrigger.phase, params.phase) : undefined,
+      params.isActive === undefined ? undefined : eq(notificationTrigger.isActive, params.isActive),
+      eq(notificationTrigger.isDeleted, false)
+    ),
+  search: {
+    exact: [notificationTrigger.id, notificationTrigger.key],
+    contains: [
+      notificationTrigger.name,
+      notificationTrigger.description,
+      notificationTrigger.sourceService,
+      notificationTrigger.resource,
+      notificationTrigger.operation,
+      notificationTrigger.title,
+      notificationTrigger.body,
+    ],
+  },
+  sorting: {
+    defaultBy: "createdAt",
+    defaultOrder: "desc",
+  },
+  sortColumns: {
+    key: notificationTrigger.key,
+    name: notificationTrigger.name,
+    sourceService: notificationTrigger.sourceService,
+    resource: notificationTrigger.resource,
+    operation: notificationTrigger.operation,
+    phase: notificationTrigger.phase,
+    createdAt: notificationTrigger.createdAt,
+    updatedAt: notificationTrigger.updatedAt,
+  },
+});
+
+export const fetchNotificationTriggerExecutionList = createTableListFetcher<
+  typeof notificationTriggerExecution,
+  typeof notificationTriggerExecution.$inferSelect,
+  NotificationTriggerExecutionListQuery & { triggerId: string }
+>({
+  db: getDB,
+  table: notificationTriggerExecution,
+  where: ({ params }) =>
+    and(
+      eq(notificationTriggerExecution.triggerId, params.triggerId),
+      params.status ? eq(notificationTriggerExecution.status, params.status) : undefined,
+      params.startDate ? gte(notificationTriggerExecution.executedAt, params.startDate) : undefined,
+      params.endDate ? lte(notificationTriggerExecution.executedAt, params.endDate) : undefined
+    ),
+  search: {
+    exact: [
+      notificationTriggerExecution.id,
+      notificationTriggerExecution.relatedEntityId,
+      notificationTriggerExecution.status,
+    ],
+    contains: [
+      notificationTriggerExecution.sourceService,
+      notificationTriggerExecution.resource,
+      notificationTriggerExecution.operation,
+      notificationTriggerExecution.relatedEntityType,
+      notificationTriggerExecution.error,
+    ],
+  },
+  sorting: {
+    defaultBy: "executedAt",
+    defaultOrder: "desc",
+  },
+  sortColumns: {
+    executedAt: notificationTriggerExecution.executedAt,
+    status: notificationTriggerExecution.status,
+    resource: notificationTriggerExecution.resource,
+    operation: notificationTriggerExecution.operation,
+    phase: notificationTriggerExecution.phase,
   },
 });

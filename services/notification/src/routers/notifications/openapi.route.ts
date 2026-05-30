@@ -24,9 +24,20 @@ import {
   notificationTemplateListResultSchema,
   notificationTemplateSchema,
   notificationTemplateUpsertSchema,
+  notificationTriggerListQuerySchema,
+  notificationTriggerListResultSchema,
+  notificationTriggerExecutionListQuerySchema,
+  notificationTriggerExecutionListResultSchema,
+  notificationTriggerOptionsSchema,
+  notificationTriggerSchema,
+  notificationTriggerBaseInputSchema,
+  notificationTriggerTestResultSchema,
+  notificationTriggerTestSchema,
+  notificationTriggerUpsertSchema,
   notificationUnreadCountSchema,
   notificationUnregisterPushSubscriptionSchema,
   internalPropertyPublishedNotificationSchema,
+  internalResourceEventNotificationSchema,
   proptryxNotificationBroadcastSchema,
   proptryxNotificationSendResultSchema,
   proptryxNotificationSendSchema,
@@ -53,6 +64,10 @@ const notificationRbac = createResourceRbacGuards({
 const notificationTemplateRbac = createResourceRbacGuards({
   resource: DATABASE_RESOURCES.notification_template,
   auth: notificationTemplateAuthOptions,
+});
+const notificationTriggerRbac = createResourceRbacGuards({
+  resource: DATABASE_RESOURCES.notification_trigger,
+  auth: DEFAULT_FAST_RBAC_AUTH_OPTIONS,
 });
 
 const userTags = ["Notifications"];
@@ -329,6 +344,156 @@ export const deleteNotificationTemplate = createOpenApiRoute({
   },
 });
 
+export const listNotificationTriggerOptions = createOpenApiRoute({
+  method: "get",
+  path: "/triggers/options",
+  operationId: "proptryxNotificationTriggerOptions",
+  tags: proptryxTags,
+  middleware: [notificationRateLimit, notificationTriggerRbac.custom("getAll")],
+  summary: "List available notification trigger operations",
+  responses: {
+    200: createApiSuccessResponse(
+      notificationTriggerOptionsSchema,
+      "Notification trigger options fetched"
+    ),
+  },
+});
+
+export const listNotificationTriggers = createOpenApiRoute({
+  method: "get",
+  path: "/triggers",
+  operationId: "proptryxNotificationTriggers",
+  tags: proptryxTags,
+  middleware: [notificationRateLimit, notificationTriggerRbac.custom("getAll")],
+  summary: "List notification triggers",
+  request: {
+    query: notificationTriggerListQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      notificationTriggerListResultSchema,
+      "Notification triggers fetched"
+    ),
+  },
+});
+
+export const listNotificationTriggerExecutions = createOpenApiRoute({
+  method: "get",
+  path: "/triggers/{id}/executions",
+  operationId: "proptryxNotificationTriggerExecutions",
+  tags: proptryxTags,
+  middleware: [notificationRateLimit, notificationTriggerRbac.custom("get")],
+  summary: "List notification trigger execution records",
+  request: {
+    params: IdStringParamSchema(),
+    query: notificationTriggerExecutionListQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      notificationTriggerExecutionListResultSchema,
+      "Notification trigger executions fetched"
+    ),
+  },
+});
+
+export const getNotificationTrigger = createOpenApiRoute({
+  method: "get",
+  path: "/triggers/{id}",
+  operationId: "proptryxNotificationTriggerGet",
+  tags: proptryxTags,
+  middleware: [notificationRateLimit, notificationTriggerRbac.custom("get")],
+  summary: "Get a notification trigger",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(notificationTriggerSchema, "Notification trigger fetched"),
+  },
+});
+
+export const createNotificationTrigger = createOpenApiRoute({
+  method: "post",
+  path: "/triggers",
+  operationId: "proptryxNotificationTriggerCreate",
+  tags: proptryxTags,
+  middleware: [notificationRateLimit, notificationTriggerRbac.custom("create")],
+  summary: "Create a notification trigger",
+  request: {
+    body: createApiJsonBody(notificationTriggerUpsertSchema),
+  },
+  responses: {
+    200: createApiSuccessResponse(notificationTriggerSchema, "Notification trigger created"),
+  },
+});
+
+export const updateNotificationTrigger = createOpenApiRoute({
+  method: "patch",
+  path: "/triggers/{id}",
+  operationId: "proptryxNotificationTriggerUpdate",
+  tags: proptryxTags,
+  middleware: [notificationRateLimit, notificationTriggerRbac.custom("update")],
+  summary: "Update a notification trigger",
+  request: {
+    params: IdStringParamSchema(),
+    body: createApiJsonBody(notificationTriggerBaseInputSchema.partial()),
+  },
+  responses: {
+    200: createApiSuccessResponse(notificationTriggerSchema, "Notification trigger updated"),
+  },
+});
+
+export const deleteNotificationTrigger = createOpenApiRoute({
+  method: "delete",
+  path: "/triggers/{id}",
+  operationId: "proptryxNotificationTriggerDelete",
+  tags: proptryxTags,
+  middleware: [notificationRateLimit, notificationTriggerRbac.custom("delete")],
+  summary: "Soft delete a notification trigger",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(notificationTriggerSchema, "Notification trigger soft deleted"),
+  },
+});
+
+export const permanentlyDeleteNotificationTrigger = createOpenApiRoute({
+  method: "delete",
+  path: "/triggers/{id}/permanent",
+  operationId: "proptryxNotificationTriggerPermanentDelete",
+  tags: proptryxTags,
+  middleware: [notificationRateLimit, notificationTriggerRbac.custom("delete")],
+  summary: "Permanently delete a notification trigger",
+  request: {
+    params: IdStringParamSchema(),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      notificationTriggerSchema,
+      "Notification trigger permanently deleted"
+    ),
+  },
+});
+
+export const testNotificationTrigger = createOpenApiRoute({
+  method: "post",
+  path: "/triggers/{id}/test",
+  operationId: "proptryxNotificationTriggerTest",
+  tags: proptryxTags,
+  middleware: [notificationRateLimit, notificationTriggerRbac.custom("create")],
+  summary: "Execute a notification trigger test for the current user",
+  request: {
+    params: IdStringParamSchema(),
+    body: createApiJsonBody(notificationTriggerTestSchema),
+  },
+  responses: {
+    202: createApiSuccessResponse(
+      notificationTriggerTestResultSchema,
+      "Notification trigger test executed"
+    ),
+  },
+});
+
 export const sendProptryxNotification = createOpenApiRoute({
   method: "post",
   path: "/send",
@@ -376,6 +541,24 @@ export const notifyPropertyPublished = createOpenApiRoute({
     202: createApiSuccessResponse(
       proptryxNotificationSendResultSchema,
       "Notification event queued"
+    ),
+  },
+});
+
+export const notifyResourceEvent = createOpenApiRoute({
+  method: "post",
+  path: "/resource-event",
+  operationId: "internalNotificationResourceEvent",
+  tags: internalTags,
+  middleware: [notificationRateLimit],
+  summary: "Execute a configured notification trigger from an internal resource event",
+  request: {
+    body: createApiJsonBody(internalResourceEventNotificationSchema),
+  },
+  responses: {
+    202: createApiSuccessResponse(
+      proptryxNotificationSendResultSchema,
+      "Notification trigger event processed"
     ),
   },
 });

@@ -10,6 +10,7 @@ export const DATABASE_RESOURCES = {
   notification_preference: "notification_preference",
   notification_push_subscription: "notification_push_subscription",
   notification_template: "notification_template",
+  notification_trigger: "notification_trigger",
   property: "property",
   organization: "organization",
   organization_subscription: "organization_subscription",

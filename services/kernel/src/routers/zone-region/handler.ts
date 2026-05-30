@@ -1,4 +1,5 @@
 import type { AppBindings } from "@/types/app";
+import { emitNotificationResourceEvent } from "@/lib/notification-events";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { db, region, zone } from "@proptryx/database";
 import {
@@ -34,6 +35,68 @@ import {
 } from "./utils";
 
 export const zoneRegionGroup = new OpenAPIHono<AppBindings>();
+
+function getActorVariables(
+  user?: { id?: string; name?: string | null; email?: string | null } | null
+) {
+  return {
+    actorUserId: user?.id ?? "",
+    actorName: user?.name ?? user?.email ?? "Current User",
+  };
+}
+
+function getRegionVariables(
+  regionData: typeof region.$inferSelect,
+  user?: { id?: string; name?: string | null; email?: string | null } | null,
+  extra: Record<string, unknown> = {}
+) {
+  return {
+    id: regionData.id,
+    regionId: regionData.id,
+    name: regionData.name,
+    regionName: regionData.name,
+    createdAt: regionData.createdAt.toISOString(),
+    updatedAt: regionData.updatedAt.toISOString(),
+    ...getActorVariables(user),
+    ...extra,
+  };
+}
+
+function getZoneVariables(
+  zoneData: typeof zone.$inferSelect,
+  user?: { id?: string; name?: string | null; email?: string | null } | null,
+  extra: Record<string, unknown> = {}
+) {
+  return {
+    id: zoneData.id,
+    zoneId: zoneData.id,
+    name: zoneData.name,
+    zoneName: zoneData.name,
+    regionId: zoneData.regionId,
+    createdAt: zoneData.createdAt.toISOString(),
+    updatedAt: zoneData.updatedAt.toISOString(),
+    ...getActorVariables(user),
+    ...extra,
+  };
+}
+
+function getRegionEventDefaults(regionData: typeof region.$inferSelect, operation: string) {
+  return {
+    relatedEntityType: "region",
+    relatedEntityId: regionData.id,
+    defaultActionUrl: `/utility/location/region/${regionData.id}`,
+    defaultTag: `region:${regionData.id}:${operation}`,
+  };
+}
+
+function getZoneEventDefaults(zoneData: typeof zone.$inferSelect, operation: string) {
+  return {
+    relatedEntityType: "zone",
+    relatedEntityId: zoneData.id,
+    defaultActionUrl: `/utility/location/zone/${zoneData.id}`,
+    defaultTag: `zone:${zoneData.id}:${operation}`,
+  };
+}
 
 registerOpenApiRoute(zoneRegionGroup, listRegions, async (c) => {
   const query = c.req.valid("query");
@@ -83,14 +146,58 @@ registerOpenApiRoute(zoneRegionGroup, createRegion, async (c) => {
     );
   }
 
+  const regionId = generateRandomId();
+  await emitNotificationResourceEvent({
+    resource: "region",
+    operation: "create",
+    phase: "before",
+    relatedEntityType: "region",
+    relatedEntityId: regionId,
+    variables: {
+      id: regionId,
+      regionId,
+      name: body.name,
+      regionName: body.name,
+      ...getActorVariables(user),
+    },
+    data: {
+      type: "region-create-before",
+      entityType: "region",
+      entityId: regionId,
+      regionName: body.name,
+    },
+    defaultTitle: "Region creation started",
+    defaultBody: `${body.name} region is being created.`,
+    defaultActionUrl: `/utility/location/region/${regionId}`,
+    defaultTag: `region:${regionId}:create:before`,
+    logContext: "kernel.zone-region.region.create.before",
+  });
+
   const [createdRegion] = await db
     .insert(region)
     .values({
-      id: generateRandomId(),
+      id: regionId,
       createdByUser: user?.id ?? null,
       ...body,
     })
     .returning();
+
+  await emitNotificationResourceEvent({
+    resource: "region",
+    operation: "create",
+    phase: "after",
+    ...getRegionEventDefaults(createdRegion, "create"),
+    variables: getRegionVariables(createdRegion, user),
+    data: {
+      type: "region-created",
+      entityType: "region",
+      entityId: createdRegion.id,
+      regionName: createdRegion.name,
+    },
+    defaultTitle: "Region created",
+    defaultBody: `${createdRegion.name} region was created.`,
+    logContext: "kernel.zone-region.region.create.after",
+  });
 
   return c.json(createSuccessResponse(createdRegion), 201);
 });
@@ -126,11 +233,50 @@ registerOpenApiRoute(zoneRegionGroup, updateRegion, async (c) => {
     }
   }
 
+  await emitNotificationResourceEvent({
+    resource: "region",
+    operation: "update",
+    phase: "before",
+    ...getRegionEventDefaults(existingRegion, "update"),
+    variables: getRegionVariables(existingRegion, user, {
+      previousName: existingRegion.name,
+      nextName: body.name ?? existingRegion.name,
+    }),
+    data: {
+      type: "region-update-before",
+      entityType: "region",
+      entityId: existingRegion.id,
+      regionName: existingRegion.name,
+    },
+    defaultTitle: "Region update started",
+    defaultBody: `${existingRegion.name} region is being updated.`,
+    logContext: "kernel.zone-region.region.update.before",
+  });
+
   const [updatedRegion] = await db
     .update(region)
     .set({ ...body, updatedByUser: user?.id ?? null })
     .where(eq(region.id, id))
     .returning();
+
+  await emitNotificationResourceEvent({
+    resource: "region",
+    operation: "update",
+    phase: "after",
+    ...getRegionEventDefaults(updatedRegion, "update"),
+    variables: getRegionVariables(updatedRegion, user, {
+      previousName: existingRegion.name,
+    }),
+    data: {
+      type: "region-updated",
+      entityType: "region",
+      entityId: updatedRegion.id,
+      regionName: updatedRegion.name,
+    },
+    defaultTitle: "Region updated",
+    defaultBody: `${updatedRegion.name} region was updated.`,
+    logContext: "kernel.zone-region.region.update.after",
+  });
 
   return c.json(createSuccessResponse(updatedRegion), 200);
 });
@@ -163,6 +309,23 @@ registerOpenApiRoute(zoneRegionGroup, removeRegion, async (c) => {
     );
   }
 
+  await emitNotificationResourceEvent({
+    resource: "region",
+    operation: "delete",
+    phase: "before",
+    ...getRegionEventDefaults(existingRegion, "delete"),
+    variables: getRegionVariables(existingRegion, user),
+    data: {
+      type: "region-delete-before",
+      entityType: "region",
+      entityId: existingRegion.id,
+      regionName: existingRegion.name,
+    },
+    defaultTitle: "Region deletion started",
+    defaultBody: `${existingRegion.name} region is being deleted.`,
+    logContext: "kernel.zone-region.region.delete.before",
+  });
+
   await db
     .update(region)
     .set({
@@ -173,6 +336,24 @@ registerOpenApiRoute(zoneRegionGroup, removeRegion, async (c) => {
     .where(eq(region.id, id));
 
   const deletedRegion = await findRegionById(id, { includeDeleted: true });
+  const regionForEvent = deletedRegion ?? existingRegion;
+
+  await emitNotificationResourceEvent({
+    resource: "region",
+    operation: "delete",
+    phase: "after",
+    ...getRegionEventDefaults(regionForEvent, "delete"),
+    variables: getRegionVariables(regionForEvent, user),
+    data: {
+      type: "region-deleted",
+      entityType: "region",
+      entityId: regionForEvent.id,
+      regionName: regionForEvent.name,
+    },
+    defaultTitle: "Region deleted",
+    defaultBody: `${regionForEvent.name} region was deleted.`,
+    logContext: "kernel.zone-region.region.delete.after",
+  });
 
   return c.json(createSuccessResponse(deletedRegion ?? existingRegion), 200);
 });
@@ -240,14 +421,66 @@ registerOpenApiRoute(zoneRegionGroup, createZone, async (c) => {
     );
   }
 
+  const zoneId = generateRandomId();
+  await emitNotificationResourceEvent({
+    resource: "zone",
+    operation: "create",
+    phase: "before",
+    relatedEntityType: "zone",
+    relatedEntityId: zoneId,
+    variables: {
+      id: zoneId,
+      zoneId,
+      name: body.name,
+      zoneName: body.name,
+      regionId: body.regionId,
+      regionName: regionData.name,
+      ...getActorVariables(user),
+    },
+    data: {
+      type: "zone-create-before",
+      entityType: "zone",
+      entityId: zoneId,
+      zoneName: body.name,
+      regionId: body.regionId,
+      regionName: regionData.name,
+    },
+    defaultTitle: "Zone creation started",
+    defaultBody: `${body.name} zone is being created.`,
+    defaultActionUrl: `/utility/location/zone/${zoneId}`,
+    defaultTag: `zone:${zoneId}:create:before`,
+    logContext: "kernel.zone-region.zone.create.before",
+  });
+
   const [createdZone] = await db
     .insert(zone)
     .values({
-      id: generateRandomId(),
+      id: zoneId,
       ...body,
       createdByUser: user?.id ?? null,
     })
     .returning();
+
+  await emitNotificationResourceEvent({
+    resource: "zone",
+    operation: "create",
+    phase: "after",
+    ...getZoneEventDefaults(createdZone, "create"),
+    variables: getZoneVariables(createdZone, user, {
+      regionName: regionData.name,
+    }),
+    data: {
+      type: "zone-created",
+      entityType: "zone",
+      entityId: createdZone.id,
+      zoneName: createdZone.name,
+      regionId: createdZone.regionId,
+      regionName: regionData.name,
+    },
+    defaultTitle: "Zone created",
+    defaultBody: `${createdZone.name} zone was created.`,
+    logContext: "kernel.zone-region.zone.create.after",
+  });
 
   return c.json(createSuccessResponse(createdZone), 201);
 });
@@ -297,11 +530,58 @@ registerOpenApiRoute(zoneRegionGroup, updateZone, async (c) => {
     );
   }
 
+  await emitNotificationResourceEvent({
+    resource: "zone",
+    operation: "update",
+    phase: "before",
+    ...getZoneEventDefaults(existingZone, "update"),
+    variables: getZoneVariables(existingZone, user, {
+      previousName: existingZone.name,
+      nextName,
+      previousRegionId: existingZone.regionId,
+      nextRegionId,
+      regionName: regionData.name,
+    }),
+    data: {
+      type: "zone-update-before",
+      entityType: "zone",
+      entityId: existingZone.id,
+      zoneName: existingZone.name,
+      regionId: existingZone.regionId,
+    },
+    defaultTitle: "Zone update started",
+    defaultBody: `${existingZone.name} zone is being updated.`,
+    logContext: "kernel.zone-region.zone.update.before",
+  });
+
   const [updatedZone] = await db
     .update(zone)
     .set({ ...body, updatedByUser: user?.id ?? null })
     .where(eq(zone.id, id))
     .returning();
+
+  await emitNotificationResourceEvent({
+    resource: "zone",
+    operation: "update",
+    phase: "after",
+    ...getZoneEventDefaults(updatedZone, "update"),
+    variables: getZoneVariables(updatedZone, user, {
+      previousName: existingZone.name,
+      previousRegionId: existingZone.regionId,
+      regionName: regionData.name,
+    }),
+    data: {
+      type: "zone-updated",
+      entityType: "zone",
+      entityId: updatedZone.id,
+      zoneName: updatedZone.name,
+      regionId: updatedZone.regionId,
+      regionName: regionData.name,
+    },
+    defaultTitle: "Zone updated",
+    defaultBody: `${updatedZone.name} zone was updated.`,
+    logContext: "kernel.zone-region.zone.update.after",
+  });
 
   return c.json(createSuccessResponse(updatedZone), 200);
 });
@@ -322,6 +602,24 @@ registerOpenApiRoute(zoneRegionGroup, removeZone, async (c) => {
     );
   }
 
+  await emitNotificationResourceEvent({
+    resource: "zone",
+    operation: "delete",
+    phase: "before",
+    ...getZoneEventDefaults(existingZone, "delete"),
+    variables: getZoneVariables(existingZone, user),
+    data: {
+      type: "zone-delete-before",
+      entityType: "zone",
+      entityId: existingZone.id,
+      zoneName: existingZone.name,
+      regionId: existingZone.regionId,
+    },
+    defaultTitle: "Zone deletion started",
+    defaultBody: `${existingZone.name} zone is being deleted.`,
+    logContext: "kernel.zone-region.zone.delete.before",
+  });
+
   await db
     .update(zone)
     .set({
@@ -332,6 +630,25 @@ registerOpenApiRoute(zoneRegionGroup, removeZone, async (c) => {
     .where(eq(zone.id, id));
 
   const deletedZone = await findZoneById(id, { includeDeleted: true });
+  const zoneForEvent = deletedZone ?? existingZone;
+
+  await emitNotificationResourceEvent({
+    resource: "zone",
+    operation: "delete",
+    phase: "after",
+    ...getZoneEventDefaults(zoneForEvent, "delete"),
+    variables: getZoneVariables(zoneForEvent, user),
+    data: {
+      type: "zone-deleted",
+      entityType: "zone",
+      entityId: zoneForEvent.id,
+      zoneName: zoneForEvent.name,
+      regionId: zoneForEvent.regionId,
+    },
+    defaultTitle: "Zone deleted",
+    defaultBody: `${zoneForEvent.name} zone was deleted.`,
+    logContext: "kernel.zone-region.zone.delete.after",
+  });
 
   return c.json(createSuccessResponse(deletedZone ?? existingZone), 200);
 });
