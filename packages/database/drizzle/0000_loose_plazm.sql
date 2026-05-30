@@ -1,6 +1,6 @@
 CREATE TYPE "public"."access_panel" AS ENUM('proptryx', 'company');--> statement-breakpoint
 CREATE TYPE "public"."business_type" AS ENUM('B2B', 'B2C', 'BOTH', 'GENERAL');--> statement-breakpoint
-CREATE TYPE "public"."organization_type" AS ENUM('DEVELOPER', 'OCCUPIER', 'MANAGEMENT', 'APPLICATION', 'BROKER');--> statement-breakpoint
+CREATE TYPE "public"."organization_type" AS ENUM('DEVELOPER', 'OCCUPIER', 'MANAGEMENT');--> statement-breakpoint
 CREATE TYPE "public"."permission_access_level" AS ENUM('company', 'user', 'all');--> statement-breakpoint
 CREATE TYPE "public"."area_type" AS ENUM('SINGLE', 'SPLIT');--> statement-breakpoint
 CREATE TYPE "public"."business_district_type" AS ENUM('CBD', 'SBD', 'TBD');--> statement-breakpoint
@@ -13,7 +13,7 @@ CREATE TYPE "public"."parking_security_control" AS ENUM('RFID_ENTRY', 'MANUAL_TI
 CREATE TYPE "public"."parking_type" AS ENUM('BASEMENT', 'COVERED', 'OPENED');--> statement-breakpoint
 CREATE TYPE "public"."parking_ventilation_type" AS ENUM('NATURAL', 'MECHANICAL');--> statement-breakpoint
 CREATE TYPE "public"."price_unit" AS ENUM('PER_SQFT', 'LUMP_SUM', 'PER_MONTH');--> statement-breakpoint
-CREATE TYPE "public"."property_media_type" AS ENUM('IMAGE', 'DOCUMENT');--> statement-breakpoint
+CREATE TYPE "public"."property_media_type" AS ENUM('IMAGE', 'VIDEO', 'DOCUMENT');--> statement-breakpoint
 CREATE TYPE "public"."property_media_visibility" AS ENUM('PUBLIC', 'PRIVATE');--> statement-breakpoint
 CREATE TYPE "public"."property_ownership_type" AS ENUM('SINGLE_OWNER', 'MULTIPLE_OWNER');--> statement-breakpoint
 CREATE TYPE "public"."property_status" AS ENUM('VACANT', 'BUILD_TO_SUITE', 'READY_TO_MOVE', 'UNDER_NEGOTIATION', 'BOOKED', 'CLOSED', 'ON_HOLD');--> statement-breakpoint
@@ -23,7 +23,10 @@ CREATE TYPE "public"."retail_mall_type" AS ENUM('MALL', 'HIGH_STREET');--> state
 CREATE TYPE "public"."retail_store_type" AS ENUM('ANCHOR', 'VANILLA');--> statement-breakpoint
 CREATE TYPE "public"."warehouse_construction_type" AS ENUM('RCC_COMPLIANT', 'NON_RCC');--> statement-breakpoint
 CREATE TYPE "public"."meeting_status" AS ENUM('REQUESTED', 'SCHEDULED', 'COMPLETED', 'CANCELLED', 'REJECTED', 'IN_PROGRESS');--> statement-breakpoint
-CREATE TYPE "public"."meeting_type" AS ENUM('MEETING', 'SITE_VISIT');--> statement-breakpoint
+CREATE TYPE "public"."meeting_type" AS ENUM('ONLINE', 'SITE_VISIT');--> statement-breakpoint
+CREATE TYPE "public"."notification_audience_panel" AS ENUM('PROPTRYX', 'COMPANY', 'ALL');--> statement-breakpoint
+CREATE TYPE "public"."notification_delivery_channel" AS ENUM('DASHBOARD', 'PUSH', 'BOTH');--> statement-breakpoint
+CREATE TYPE "public"."notification_status" AS ENUM('QUEUED', 'SENT', 'PARTIAL', 'FAILED', 'SKIPPED');--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -171,6 +174,14 @@ CREATE TABLE "subscription_plans" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "twoFactor" (
+	"id" text PRIMARY KEY NOT NULL,
+	"secret" text NOT NULL,
+	"backup_codes" text NOT NULL,
+	"user_id" text NOT NULL,
+	"verified" boolean DEFAULT true
+);
+--> statement-breakpoint
 CREATE TABLE "user" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -185,6 +196,7 @@ CREATE TABLE "user" (
 	"ban_expires" timestamp,
 	"phone_number" text,
 	"phone_number_verified" boolean DEFAULT false,
+	"two_factor_enabled" boolean DEFAULT false,
 	"deleted_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
@@ -300,7 +312,13 @@ CREATE TABLE "property" (
 	"certificate_received_at" timestamp,
 	"total_area_sqft" real,
 	"road_width_ft" real,
+	"total_floors" integer,
 	"area_type" "area_type" DEFAULT 'SINGLE' NOT NULL,
+	"area_distribution" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"transaction_type" "handover_type",
+	"price_per_unit" real,
+	"price_unit" "price_unit",
+	"price_negotiable" boolean DEFAULT false NOT NULL,
 	"type" "property_type" NOT NULL,
 	"status" "property_status" NOT NULL,
 	"organization_id" text,
@@ -362,6 +380,21 @@ CREATE TABLE "property_owner" (
 	CONSTRAINT "property_owner_propertyId_userId_unique" UNIQUE("property_id","user_id")
 );
 --> statement-breakpoint
+CREATE TABLE "property_owner_temporary" (
+	"id" text PRIMARY KEY NOT NULL,
+	"property_id" text NOT NULL,
+	"name" text NOT NULL,
+	"email" text,
+	"phone_number" text,
+	"floor_number" text,
+	"allocated_area_sqft" real,
+	"area_description" text,
+	"handover_type" "handover_type",
+	"price_per_unit" real,
+	"price_unit" "price_unit",
+	"price_negotiable" boolean
+);
+--> statement-breakpoint
 CREATE TABLE "property_parking" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"property_id" text NOT NULL,
@@ -413,7 +446,7 @@ CREATE TABLE "property_zone" (
 --> statement-breakpoint
 CREATE TABLE "meeting" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"type" "meeting_type" DEFAULT 'MEETING' NOT NULL,
+	"type" "meeting_type" DEFAULT 'ONLINE' NOT NULL,
 	"status" "meeting_status" DEFAULT 'REQUESTED' NOT NULL,
 	"agenda" text,
 	"request_note" text,
@@ -428,6 +461,11 @@ CREATE TABLE "meeting" (
 	"cancelled_at" timestamp,
 	"cancellation_reason" text,
 	"mom_published_at" timestamp,
+	"google_calendar_event_id" text,
+	"google_calendar_event_link" text,
+	"google_meet_space_name" text,
+	"google_meet_uri" text,
+	"google_synced_at" timestamp,
 	"developer_id" text,
 	"property_id" text NOT NULL,
 	"occupier_id" text,
@@ -441,8 +479,81 @@ CREATE TABLE "meeting" (
 	"deleted_by_user" text
 );
 --> statement-breakpoint
+CREATE TABLE "notification" (
+	"id" text PRIMARY KEY NOT NULL,
+	"user_id" text,
+	"audience_panel" "notification_audience_panel" DEFAULT 'ALL' NOT NULL,
+	"audience_role" text,
+	"title" text NOT NULL,
+	"body" text NOT NULL,
+	"template_key" text,
+	"delivery_channel" "notification_delivery_channel" DEFAULT 'BOTH' NOT NULL,
+	"push_status" "notification_status" DEFAULT 'QUEUED' NOT NULL,
+	"dashboard_status" "notification_status" DEFAULT 'QUEUED' NOT NULL,
+	"icon" text,
+	"image" text,
+	"action_url" text,
+	"tag" text,
+	"related_entity_type" text,
+	"related_entity_id" text,
+	"broadcast_id" text,
+	"data" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"read_at" timestamp,
+	"clicked_at" timestamp,
+	"archived_at" timestamp,
+	"deleted_at" timestamp,
+	"sent_at" timestamp,
+	"push_error" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"created_by_user" text
+);
+--> statement-breakpoint
+CREATE TABLE "notification_preference" (
+	"id" text PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"email_notifications_enabled" boolean DEFAULT true NOT NULL,
+	"dashboard_notifications_enabled" boolean DEFAULT true NOT NULL,
+	"push_notifications_enabled" boolean DEFAULT true NOT NULL,
+	"browser_permission_prompted_at" timestamp,
+	"browser_permission_status" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "notification_push_subscription" (
+	"id" text PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"token" text NOT NULL,
+	"device_id" text,
+	"platform" text,
+	"browser" text,
+	"user_agent" text,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"last_seen_at" timestamp DEFAULT now() NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "notification_template" (
+	"id" text PRIMARY KEY NOT NULL,
+	"key" text NOT NULL,
+	"name" text NOT NULL,
+	"title" text NOT NULL,
+	"body" text NOT NULL,
+	"icon" text,
+	"image" text,
+	"action_url" text,
+	"data" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"created_by_user" text,
+	"updated_by_user" text
+);
+--> statement-breakpoint
 CREATE TABLE "faq" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" text PRIMARY KEY NOT NULL,
 	"property_id" text,
 	"question" text NOT NULL,
 	"answer" text,
@@ -495,6 +606,7 @@ ALTER TABLE "session" ADD CONSTRAINT "session_active_organization_id_organizatio
 ALTER TABLE "subscription_plans" ADD CONSTRAINT "subscription_plans_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subscription_plans" ADD CONSTRAINT "subscription_plans_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subscription_plans" ADD CONSTRAINT "subscription_plans_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "twoFactor" ADD CONSTRAINT "twoFactor_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user" ADD CONSTRAINT "user_zone_id_zone_id_fk" FOREIGN KEY ("zone_id") REFERENCES "public"."zone"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user" ADD CONSTRAINT "user_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user" ADD CONSTRAINT "user_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -526,6 +638,7 @@ ALTER TABLE "property_media" ADD CONSTRAINT "property_media_deleted_by_user_user
 ALTER TABLE "property_office" ADD CONSTRAINT "property_office_property_id_property_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."property"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property_owner" ADD CONSTRAINT "property_owner_property_id_property_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."property"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property_owner" ADD CONSTRAINT "property_owner_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "property_owner_temporary" ADD CONSTRAINT "property_owner_temporary_property_id_property_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."property"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property_parking" ADD CONSTRAINT "property_parking_property_id_property_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."property"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property_retail" ADD CONSTRAINT "property_retail_property_id_property_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."property"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property_warehouse" ADD CONSTRAINT "property_warehouse_property_id_property_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."property"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -541,6 +654,12 @@ ALTER TABLE "meeting" ADD CONSTRAINT "meeting_requested_by_user_user_id_fk" FORE
 ALTER TABLE "meeting" ADD CONSTRAINT "meeting_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meeting" ADD CONSTRAINT "meeting_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meeting" ADD CONSTRAINT "meeting_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notification" ADD CONSTRAINT "notification_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notification" ADD CONSTRAINT "notification_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notification_preference" ADD CONSTRAINT "notification_preference_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notification_push_subscription" ADD CONSTRAINT "notification_push_subscription_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notification_template" ADD CONSTRAINT "notification_template_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notification_template" ADD CONSTRAINT "notification_template_updated_by_user_user_id_fk" FOREIGN KEY ("updated_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "faq" ADD CONSTRAINT "faq_property_id_property_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."property"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "faq" ADD CONSTRAINT "faq_deleted_by_user_user_id_fk" FOREIGN KEY ("deleted_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "faq" ADD CONSTRAINT "faq_created_by_user_user_id_fk" FOREIGN KEY ("created_by_user") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -586,6 +705,8 @@ CREATE UNIQUE INDEX "subscription_plans_razorpayPlanId_uidx" ON "subscription_pl
 CREATE UNIQUE INDEX "subscription_plans_isRecommended_uidx" ON "subscription_plans" USING btree ("is_recommended") WHERE "subscription_plans"."is_deleted" = false and "subscription_plans"."is_recommended" = true;--> statement-breakpoint
 CREATE INDEX "subscription_plans_isDeleted_isActive_idx" ON "subscription_plans" USING btree ("is_deleted","is_active");--> statement-breakpoint
 CREATE INDEX "subscription_plans_discountAvailableTill_idx" ON "subscription_plans" USING btree ("discount_available_till");--> statement-breakpoint
+CREATE INDEX "twoFactor_secret_idx" ON "twoFactor" USING btree ("secret");--> statement-breakpoint
+CREATE INDEX "twoFactor_userId_idx" ON "twoFactor" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "user_name_idx" ON "user" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "user_role_idx" ON "user" USING btree ("role");--> statement-breakpoint
 CREATE INDEX "user_panel_idx" ON "user" USING btree ("panel");--> statement-breakpoint
@@ -634,6 +755,9 @@ CREATE INDEX "property_media_isDeleted_propertyId_idx" ON "property_media" USING
 CREATE INDEX "property_office_businessDistrictType_idx" ON "property_office" USING btree ("business_district_type");--> statement-breakpoint
 CREATE INDEX "property_owner_propertyId_idx" ON "property_owner" USING btree ("property_id");--> statement-breakpoint
 CREATE INDEX "property_owner_userId_idx" ON "property_owner" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "property_owner_temporary_propertyId_idx" ON "property_owner_temporary" USING btree ("property_id");--> statement-breakpoint
+CREATE INDEX "property_owner_temporary_email_idx" ON "property_owner_temporary" USING btree ("email");--> statement-breakpoint
+CREATE INDEX "property_owner_temporary_phoneNumber_idx" ON "property_owner_temporary" USING btree ("phone_number");--> statement-breakpoint
 CREATE INDEX "property_parking_parkingType_idx" ON "property_parking" USING btree ("parking_type");--> statement-breakpoint
 CREATE INDEX "property_parking_accessType_idx" ON "property_parking" USING btree ("access_type");--> statement-breakpoint
 CREATE INDEX "property_retail_propertyType_idx" ON "property_retail" USING btree ("property_type");--> statement-breakpoint
@@ -650,7 +774,22 @@ CREATE INDEX "meeting_type_idx" ON "meeting" USING btree ("type");--> statement-
 CREATE INDEX "meeting_status_idx" ON "meeting" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "meeting_requestedAt_idx" ON "meeting" USING btree ("requested_at");--> statement-breakpoint
 CREATE INDEX "meeting_scheduledAt_idx" ON "meeting" USING btree ("scheduled_at");--> statement-breakpoint
+CREATE INDEX "meeting_googleCalendarEventId_idx" ON "meeting" USING btree ("google_calendar_event_id");--> statement-breakpoint
 CREATE INDEX "meeting_isDeleted_type_status_requestedAt_idx" ON "meeting" USING btree ("is_deleted","type","status","requested_at");--> statement-breakpoint
+CREATE INDEX "notification_user_id_created_at_idx" ON "notification" USING btree ("user_id","created_at");--> statement-breakpoint
+CREATE INDEX "notification_user_id_read_at_idx" ON "notification" USING btree ("user_id","read_at");--> statement-breakpoint
+CREATE INDEX "notification_user_id_archived_at_idx" ON "notification" USING btree ("user_id","archived_at");--> statement-breakpoint
+CREATE INDEX "notification_user_id_deleted_at_idx" ON "notification" USING btree ("user_id","deleted_at");--> statement-breakpoint
+CREATE INDEX "notification_broadcast_id_idx" ON "notification" USING btree ("broadcast_id");--> statement-breakpoint
+CREATE INDEX "notification_template_key_idx" ON "notification" USING btree ("template_key");--> statement-breakpoint
+CREATE INDEX "notification_related_entity_idx" ON "notification" USING btree ("related_entity_type","related_entity_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "notification_preference_user_id_uidx" ON "notification_preference" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "notification_preference_user_id_idx" ON "notification_preference" USING btree ("user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "notification_push_subscription_token_uidx" ON "notification_push_subscription" USING btree ("token");--> statement-breakpoint
+CREATE INDEX "notification_push_subscription_user_id_idx" ON "notification_push_subscription" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "notification_push_subscription_user_active_idx" ON "notification_push_subscription" USING btree ("user_id","is_active");--> statement-breakpoint
+CREATE UNIQUE INDEX "notification_template_key_uidx" ON "notification_template" USING btree ("key");--> statement-breakpoint
+CREATE INDEX "notification_template_isActive_idx" ON "notification_template" USING btree ("is_active");--> statement-breakpoint
 CREATE INDEX "faq_property_id_idx" ON "faq" USING btree ("property_id");--> statement-breakpoint
 CREATE INDEX "faq_question_idx" ON "faq" USING btree ("question");--> statement-breakpoint
 CREATE INDEX "faq_isDeleted_isArchived_createdAt_idx" ON "faq" USING btree ("is_deleted","is_archived","created_at");--> statement-breakpoint
