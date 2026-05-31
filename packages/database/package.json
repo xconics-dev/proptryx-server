@@ -33,13 +33,13 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
+    "@biomejs/biome": "^2.4.16",
     "@proptryx/typescript-config": "workspace:*",
-    "@types/node": "^25.8.0",
+    "@types/node": "^25.9.1",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "tsup": "^8.5.1",
-    "tsx": "^4.22.1",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }
 }
