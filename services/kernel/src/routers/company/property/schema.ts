@@ -355,6 +355,9 @@ export const propertyUpdateSchema = createDbUpdateSchema(property, {
     validatePropertyMediaLimits(value.mediaItems, ctx);
     validateOwnerAllocatedArea(value, ctx);
     validatePropertyAreaDistribution(value, ctx);
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one property field is required.",
   });
 
 export const propertyListSortFields = [
